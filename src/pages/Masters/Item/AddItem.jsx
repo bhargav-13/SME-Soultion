@@ -211,7 +211,7 @@ const AddItem = () => {
         {/* Header */}
         <div className="mb-6">
        
-          <h1 className="text-3xl semi-bold text-gray-900">Add New Item</h1>
+          <h1 className="text-3xl font-semibold text-gray-900">Add New Item</h1>
           <p className="text-md text-gray-600 mt-1">
             Create and define item specifications including size, weight, category, and stock thresholds.
           </p>

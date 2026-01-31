@@ -114,7 +114,7 @@ const ItemMaster = () => {
         {/* Header */}
         <div className="flex justify-between items-start">
           <div>
-            <h1 className="text-3xl semi-bold text-gray-900">Item Master</h1>
+            <h1 className="text-3xl font-semibold text-gray-900">Item Master</h1>
             <p className="text-gray-600 mt-1 text-md">
               Centralised management of all items with sizes, weights, categories, and stock details.
             </p>

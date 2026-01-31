@@ -7,14 +7,9 @@ import {
   Users,
   Package,
   Layers,
-  ShoppingCart,
-  ShoppingBag,
-  Settings,
-  Zap,
-  UserCircle,
-  Grid3x3,
-  Box,
   ChevronRight,
+  User,
+  ListTodo,
 } from "lucide-react"; // icons
 
 
@@ -28,9 +23,9 @@ const SidebarLayout = ({ children }) => {
 
   // Masters submenu links
   const masterLinks = [
-    { to: "/masters/party", icon: <UserCircle className="w-4 h-4" />, label: "Party Master" },
-    { to: "/masters/category", icon: <Grid3x3 className="w-4 h-4" />, label: "Category Master" },
-    { to: "/masters/item", icon: <Box className="w-4 h-4" />, label: "Item Master" },
+    { to: "/masters/party", icon: <User className="w-4 h-4" />, label: "Party Master" },
+    { to: "/masters/category", icon: <LayoutDashboard  className="w-4 h-4" />, label: "Category Master" },
+    { to: "/masters/item", icon: <ListTodo   className="w-4 h-4" />, label: "Item Master" },
   ];
 
   // Sidebar links

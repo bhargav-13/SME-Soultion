@@ -2,7 +2,7 @@
 import React from "react";
 import { Link, useNavigate } from "react-router-dom";
 // import { useAuth } from "../context/AuthContext";
-import { LogOut, UserCircle } from "lucide-react";
+import { LogOut, User } from "lucide-react";
 
 export default function Navbar() {
   // const { user, logout } = useAuth();
@@ -19,7 +19,7 @@ export default function Navbar() {
         <div className="flex items-center gap-4">
           {/* User Profile */}
           <div className="flex items-center gap-2 px-4 py-2 rounded-lg hover:bg-gray-100 transition cursor-pointer" onClick={() => navigate("/profile")}>
-            <UserCircle className="w-5 h-5 text-gray-600" />
+            <User className="w-5 h-5 text-gray-600" />
             <span className="text-sm font-medium text-gray-700">{userName}</span>
           </div>
 

@@ -215,10 +215,10 @@ const CategoryMaster = () => {
         <div className="mb-8">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-3xl font-bold text-gray-900 mb-2">
+              <h1 className="text-3xl font-semibold text-gray-900 mb-2">
                 Category Master
               </h1>
-              <p className="text-gray-600">
+              <p className="text-gray-600 text-md">
                 Organise items into categories and subcategories for structured
                 inventory management.
               </p>

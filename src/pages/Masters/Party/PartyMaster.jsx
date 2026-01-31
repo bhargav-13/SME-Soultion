@@ -131,7 +131,7 @@ const PartyMaster = () => {
         <div className="mb-8">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-3xl font-bold text-gray-900 mb-2">Party Master</h1>
+              <h1 className="text-3xl font-semibold text-gray-900 mb-2">Party Master</h1>
               <p className="text-gray-600 text-md">
                 Centralised management of customers and vendors with GST, contact, and role details.
               </p>
