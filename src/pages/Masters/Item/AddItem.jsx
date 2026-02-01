@@ -187,7 +187,7 @@ const AddItem = () => {
 
   const handleSaveEdit = (formData) => {
     const updatedItems = items.map((item) =>
-      item.id === editDialog.data.id ? { ...item, ...formData } : item
+      item.id === editDialog.data.id ? { ...item, ...formData } : item,
     );
     setItems(updatedItems);
     setEditDialog({ isOpen: false, data: null });
@@ -211,10 +211,10 @@ const AddItem = () => {
       <div className="max-w-6xl mx-auto">
         {/* Header */}
         <div className="mb-6">
-       
           <h1 className="text-3xl font-semibold text-gray-900">Add New Item</h1>
           <p className="text-md text-gray-600 mt-1">
-            Create and define item specifications including size, weight, category, and stock thresholds.
+            Create and define item specifications including size, weight,
+            category, and stock thresholds.
           </p>
         </div>
 
@@ -238,7 +238,10 @@ const AddItem = () => {
         )}
 
         {/* Form */}
-        <form onSubmit={handleSave} className="bg-white rounded-lg shadow-sm border border-gray-200 p-8 mb-8">
+        <form
+          onSubmit={handleSave}
+          className="bg-white rounded-lg shadow-sm border border-gray-200 p-8 mb-8"
+        >
           <div className="space-y-6">
             {/* Row 1 */}
             <div className="grid grid-cols-2 gap-6">
@@ -523,14 +526,14 @@ const AddItem = () => {
               <button
                 type="submit"
                 disabled={loading}
-                className="px-8 py-2 bg-[#343434] text-white rounded-full hover:bg-gray-800 transition font-medium disabled:opacity-50"
+                className="px-10 py-2 bg-black text-white rounded-xl hover:bg-gray-800 transition font-medium disabled:opacity-50"
               >
                 {loading ? "Saving..." : "Save"}
               </button>
               <button
                 type="button"
                 onClick={handleCancel}
-                className="px-8 py-2 border-2 border-gray-900 text-gray-900 rounded-full hover:bg-gray-50 transition font-medium"
+                className="px-8 py-2 border-2 border-gray-900 text-gray-900 rounded-xl hover:bg-gray-50 transition font-medium"
               >
                 Cancel
               </button>
@@ -587,15 +590,15 @@ const AddItem = () => {
             )}
           </div>
         </div> */}
-<SearchFilter
-  className="mb-6 flex gap-4"
-  searchQuery={searchQuery}
-  setSearchQuery={setSearchQuery}
-  typeFilter={categoryFilter}
-  setTypeFilter={setCategoryFilter}
-  filterOptions={["All Categories", "Butt Hinges", "Door Hinges"]}
-  filterPlaceholder="Type"
-/>
+        <SearchFilter
+          className="mb-6 flex gap-4"
+          searchQuery={searchQuery}
+          setSearchQuery={setSearchQuery}
+          typeFilter={categoryFilter}
+          setTypeFilter={setCategoryFilter}
+          filterOptions={["All Categories", "Butt Hinges", "Door Hinges"]}
+          filterPlaceholder="Type"
+        />
 
         {/* Items Table */}
         <ItemsTable

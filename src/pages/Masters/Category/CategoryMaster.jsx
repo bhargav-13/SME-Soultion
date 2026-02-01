@@ -1,6 +1,14 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Edit2, SquarePen, Trash2, Plus, ChevronRight, X, ChevronDown } from "lucide-react";
+import {
+  Edit2,
+  SquarePen,
+  Trash2,
+  Plus,
+  ChevronRight,
+  X,
+  ChevronDown,
+} from "lucide-react";
 import SidebarLayout from "../../../components/SidebarLayout";
 import ConfirmationDialog from "../../../components/ConfirmationDialog";
 import AddCategoryDialog from "../../../components/Category/AddCategoryDialog";
@@ -61,7 +69,7 @@ const CategoryMaster = () => {
     const totalCategories = CategoriesData.length;
     const totalSubCategories = CategoriesData.reduce(
       (sum, cat) => sum + cat.subCategories.length,
-      0
+      0,
     );
     setStats({
       totalCategories,
@@ -95,7 +103,7 @@ const CategoryMaster = () => {
               categoryName: formData.categoryName,
               subCategories: formData.subCategories,
             }
-          : cat
+          : cat,
       );
       setCategories(updatedCategories);
       setMessage("Category updated successfully!");
@@ -154,13 +162,17 @@ const CategoryMaster = () => {
             subCategories: cat.subCategories.map((sub) =>
               sub.id === editSubCategoryDialog.subCategory.id
                 ? { ...sub, name: subCategoryName }
-                : sub
+                : sub,
             ),
           }
-        : cat
+        : cat,
     );
     setCategories(updatedCategories);
-    setEditSubCategoryDialog({ isOpen: false, categoryId: null, subCategory: null });
+    setEditSubCategoryDialog({
+      isOpen: false,
+      categoryId: null,
+      subCategory: null,
+    });
     setMessage("SubCategory updated successfully!");
     setTimeout(() => setMessage(""), 3000);
     calculateStats();
@@ -181,20 +193,30 @@ const CategoryMaster = () => {
         ? {
             ...cat,
             subCategories: cat.subCategories.filter(
-              (sub) => sub.id !== deleteSubCategoryDialog.subCategoryId
+              (sub) => sub.id !== deleteSubCategoryDialog.subCategoryId,
             ),
           }
-        : cat
+        : cat,
     );
     setCategories(updatedCategories);
-    setDeleteSubCategoryDialog({ isOpen: false, categoryId: null, subCategoryId: null, subCategoryName: "" });
+    setDeleteSubCategoryDialog({
+      isOpen: false,
+      categoryId: null,
+      subCategoryId: null,
+      subCategoryName: "",
+    });
     setMessage("SubCategory deleted successfully!");
     setTimeout(() => setMessage(""), 3000);
     calculateStats();
   };
 
   const handleCancelDeleteSubCategory = () => {
-    setDeleteSubCategoryDialog({ isOpen: false, categoryId: null, subCategoryId: null, subCategoryName: "" });
+    setDeleteSubCategoryDialog({
+      isOpen: false,
+      categoryId: null,
+      subCategoryId: null,
+      subCategoryName: "",
+    });
   };
 
   // Filter categories based on search and type
@@ -204,8 +226,10 @@ const CategoryMaster = () => {
       .includes(searchQuery.toLowerCase());
     const matchesType =
       !typeFilter ||
-      (typeFilter === "With SubCategories" && category.subCategories.length > 0) ||
-      (typeFilter === "Without SubCategories" && category.subCategories.length === 0);
+      (typeFilter === "With SubCategories" &&
+        category.subCategories.length > 0) ||
+      (typeFilter === "Without SubCategories" &&
+        category.subCategories.length === 0);
     return matchesSearch && matchesType;
   });
 
@@ -235,17 +259,16 @@ const CategoryMaster = () => {
 
         {/* Stats Cards */}
         <div className="grid grid-cols-2 gap-6 mb-8">
-          <div className="bg-white p-6 rounded-lg border-2 border-gray-200">
-            <h3 className="text-gray-500 font-medium mb-3">Total Categories</h3>
-            <p className="text-4xl font-bold text-gray-900">
+          <div className="bg-white p-3 rounded-lg border-2 border-gray-200 h-[120px] flex flex-col justify-between">
+            <h3 className="text-gray-500 ">Total Categories</h3>
+            <p className="text-4xl font-semibold text-gray-900">
               {stats.totalCategories}
             </p>
           </div>
-          <div className="bg-white p-6 rounded-lg border-2 border-gray-200">
-            <h3 className="text-gray-500 font-medium mb-3">
-              Total Sub Categories
-            </h3>
-            <p className="text-4xl font-bold text-gray-900">
+
+          <div className="bg-white p-3 rounded-lg border-2 border-gray-200 h-[120px] flex flex-col justify-between">
+            <h3 className="text-gray-500 ">Total Sub Categories</h3>
+            <p className="text-4xl font-semibold text-gray-900">
               {stats.totalSubCategories}
             </p>
           </div>
@@ -265,15 +288,18 @@ const CategoryMaster = () => {
         )}
 
         {/* Search and Filter */}
-        <SearchFilter
-          className="mb-6 flex gap-4"
-          searchQuery={searchQuery}
-          setSearchQuery={setSearchQuery}
-          typeFilter={typeFilter}
-          setTypeFilter={setTypeFilter}
-          filterOptions={["Type", "With SubCategories", "Without SubCategories"]}
-          filterPlaceholder="Type"
-        />
+          <SearchFilter
+            searchQuery={searchQuery}
+            setSearchQuery={setSearchQuery}
+            typeFilter={typeFilter}
+            setTypeFilter={setTypeFilter}
+            filterOptions={[
+              "Type",
+              "With SubCategories",
+              "Without SubCategories",
+            ]}
+            filterPlaceholder="Type"
+          />
 
         {/* Categories Grid */}
         <div className="grid grid-cols-2 gap-6">
@@ -343,14 +369,18 @@ const CategoryMaster = () => {
                           <span className="text-gray-700">{subCat.name}</span>
                           <div className="flex items-center gap-2">
                             <button
-                              onClick={() => handleEditSubCategory(category, subCat)}
+                              onClick={() =>
+                                handleEditSubCategory(category, subCat)
+                              }
                               className="text-black hover:text-blue-600 transition"
                               title="Edit"
                             >
                               <SquarePen className="w-3 h-3 cursor-pointer" />
                             </button>
                             <button
-                              onClick={() => handleDeleteSubCategoryClick(category, subCat)}
+                              onClick={() =>
+                                handleDeleteSubCategoryClick(category, subCat)
+                              }
                               className="text-red-600 hover:text-red-800 transition"
                               title="Delete"
                             >
@@ -394,7 +424,9 @@ const CategoryMaster = () => {
         {editSubCategoryDialog.isOpen && (
           <div className="fixed inset-0 bg-black/50  flex items-center justify-center z-50">
             <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
-              <h2 className="text-xl font-bold text-gray-900 mb-4">Edit SubCategory</h2>
+              <h2 className="text-xl font-bold text-gray-900 mb-4">
+                Edit SubCategory
+              </h2>
               <input
                 type="text"
                 defaultValue={editSubCategoryDialog.subCategory?.name || ""}
@@ -404,14 +436,22 @@ const CategoryMaster = () => {
               />
               <div className="flex gap-4 justify-end">
                 <button
-                  onClick={() => setEditSubCategoryDialog({ isOpen: false, categoryId: null, subCategory: null })}
+                  onClick={() =>
+                    setEditSubCategoryDialog({
+                      isOpen: false,
+                      categoryId: null,
+                      subCategory: null,
+                    })
+                  }
                   className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={() => {
-                    const inputValue = document.getElementById("subCategoryName").value.trim();
+                    const inputValue = document
+                      .getElementById("subCategoryName")
+                      .value.trim();
                     if (inputValue) {
                       handleSaveSubCategory(inputValue);
                     }

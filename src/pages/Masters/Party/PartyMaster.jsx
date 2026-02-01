@@ -93,7 +93,7 @@ const PartyMaster = () => {
             gstin: formData.gstin,
             type: formData.type,
           }
-        : party
+        : party,
     );
     setParties(updatedParties);
     setEditDialog({ isOpen: false, data: null });
@@ -112,7 +112,7 @@ const PartyMaster = () => {
   const handleConfirmDelete = async () => {
     try {
       // Remove party from mock data
-      setParties(parties.filter(p => p.id !== deleteDialog.partyId));
+      setParties(parties.filter((p) => p.id !== deleteDialog.partyId));
       setMessage("Party deleted successfully!");
       setDeleteDialog({ isOpen: false, partyId: null, partyName: "" });
       setTimeout(() => setMessage(""), 3000);
@@ -131,9 +131,12 @@ const PartyMaster = () => {
         <div className="mb-8">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-3xl font-semibold text-gray-900 mb-2">Party Master</h1>
+              <h1 className="text-3xl font-semibold text-gray-900 mb-2">
+                Party Master
+              </h1>
               <p className="text-gray-600 text-md">
-                Centralised management of customers and vendors with GST, contact, and role details.
+                Centralised management of customers and vendors with GST,
+                contact, and role details.
               </p>
             </div>
             <button
@@ -148,17 +151,28 @@ const PartyMaster = () => {
 
         {/* Stats Cards */}
         <div className="grid grid-cols-3 gap-6 mb-8">
-          <div className="bg-white p-6 rounded-lg border-2 border-gray-200">
-            <h3 className="text-gray-500 font-medium mb-3">Total Customers</h3>
-            <p className="text-4xl font-bold text-gray-900">{stats.customers}</p>
+          {/* Card 1 */}
+          <div className="bg-white px-3 py-2 rounded-lg border border-gray-300 h-[110px] flex flex-col justify-between">
+            <p className=" text-gray-500">Total Customers</p>
+            <p className="text-2xl font-semibold text-gray-900">
+              {stats.customers}
+            </p>
           </div>
-          <div className="bg-white p-6 rounded-lg border-2 border-gray-200">
-            <h3 className="text-gray-500 font-medium mb-3">Total Vendors</h3>
-            <p className="text-4xl font-bold text-gray-900">{stats.vendors}</p>
+
+          {/* Card 2 */}
+          <div className="bg-white px-3 py-2 rounded-lg border border-gray-300 h-[110px] flex flex-col justify-between">
+            <p className=" text-gray-500">Total Vendors</p>
+            <p className="text-2xl font-semibold text-gray-900">
+              {stats.vendors}
+            </p>
           </div>
-          <div className="bg-white p-6 rounded-lg border-2 border-gray-200">
-            <h3 className="text-gray-500 font-medium mb-3">Total Parties</h3>
-            <p className="text-4xl font-bold text-gray-900">{stats.total}</p>
+
+          {/* Card 3 */}
+          <div className="bg-white px-3 py-2 rounded-lg border border-gray-300 h-[110px] flex flex-col justify-between">
+            <p className=" text-gray-500">Total Parties</p>
+            <p className="text-2xl font-semibold text-gray-900">
+              {stats.total}
+            </p>
           </div>
         </div>
 

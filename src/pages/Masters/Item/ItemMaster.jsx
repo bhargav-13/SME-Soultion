@@ -34,17 +34,16 @@ const ItemMaster = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("");
 
-  const filteredItems = items.filter(
-    (item) => {
-      const matchesSearch =
-        item.sizeInch.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        item.category.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        item.subCategory.toLowerCase().includes(searchTerm.toLowerCase());
-      const matchesCategory =
-        !categoryFilter || item.category.toLowerCase().includes(categoryFilter.toLowerCase());
-      return matchesSearch && matchesCategory;
-    }
-  );
+  const filteredItems = items.filter((item) => {
+    const matchesSearch =
+      item.sizeInch.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      item.category.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      item.subCategory.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesCategory =
+      !categoryFilter ||
+      item.category.toLowerCase().includes(categoryFilter.toLowerCase());
+    return matchesSearch && matchesCategory;
+  });
 
   const handleAddItem = () => {
     navigate("/masters/item/add");
@@ -59,7 +58,7 @@ const ItemMaster = () => {
 
   const handleSaveEdit = (formData) => {
     const updatedItems = items.map((item) =>
-      item.id === editDialog.data.id ? { ...item, ...formData } : item
+      item.id === editDialog.data.id ? { ...item, ...formData } : item,
     );
     setItems(updatedItems);
     setEditDialog({ isOpen: false, data: null });
@@ -114,9 +113,12 @@ const ItemMaster = () => {
         {/* Header */}
         <div className="flex justify-between items-start">
           <div>
-            <h1 className="text-3xl font-semibold text-gray-900">Item Master</h1>
+            <h1 className="text-3xl font-semibold text-gray-900">
+              Item Master
+            </h1>
             <p className="text-gray-600 mt-1 text-md">
-              Centralised management of all items with sizes, weights, categories, and stock details.
+              Centralised management of all items with sizes, weights,
+              categories, and stock details.
             </p>
           </div>
           <button
@@ -137,15 +139,16 @@ const ItemMaster = () => {
 
         {/* Stats Cards */}
         <div className="grid grid-cols-2 gap-4">
-          <div className="bg-white border border-gray-200 rounded-lg p-6">
-            <p className="text-gray-600 text-sm">Total Items</p>
-            <p className="text-3xl font-bold text-gray-900 mt-2">
+          <div className="bg-white border border-gray-200 rounded-lg p-3 h-[110px] flex flex-col justify-between">
+            <p className="text-gray-600 ">Total Items</p>
+            <p className="text-3xl font-semibold text-gray-900">
               {stats.totalItems}
             </p>
           </div>
-          <div className="bg-white border border-gray-200 rounded-lg p-6">
-            <p className="text-gray-600 text-sm">Total Low Stock Items</p>
-            <p className="text-3xl font-bold text-gray-900 mt-2">
+
+          <div className="bg-white border border-gray-200 rounded-lg p-3 h-[110px] flex flex-col justify-between">
+            <p className="text-gray-600 ">Total Low Stock Items</p>
+            <p className="text-3xl font-semibold text-gray-900">
               {stats.lowStockItems}
             </p>
           </div>

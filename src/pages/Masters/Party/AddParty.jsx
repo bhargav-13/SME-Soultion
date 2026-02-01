@@ -330,7 +330,7 @@ const AddParty = () => {
             <button
               type="submit"
               disabled={loading}
-              className="px-8 py-2  bg-[#343434] text-white rounded-xl hover:bg-gray-800 transition font-medium disabled:opacity-50"
+              className="px-10 py-2  bg-black text-white rounded-xl hover:bg-gray-900 transition font-medium disabled:opacity-50"
             >
               {loading ? "Saving..." : "Save"}
             </button>

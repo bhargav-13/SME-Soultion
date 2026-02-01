@@ -29,35 +29,49 @@ const PartiesTable = ({
         <table className="w-full">
           <thead>
             <tr className="bg-gray-100 border-b border-gray-200">
-              <th className="px-6 py-4 text-left text-sm font-semibold text-gray-900">
+              <th className="px-6 py-4 text-center text-sm font-semibold text-gray-900">
                 Party Name
               </th>
-              <th className="px-6 py-4 text-left text-sm font-semibold text-gray-900">
+              <th className="px-6 py-4 text-center text-sm font-semibold text-gray-900">
                 Type
               </th>
-              <th className="px-6 py-4 text-left text-sm font-semibold text-gray-900">
+              <th className="px-6 py-4 text-center text-sm font-semibold text-gray-900">
                 GSTIN
               </th>
-              <th className="px-6 py-4 text-left text-sm font-semibold text-gray-900">
+              <th className="px-6 py-4 text-center text-sm font-semibold text-gray-900">
                 Contact
               </th>
-              <th className="px-6 py-4 text-left text-sm font-semibold text-gray-900">
+              <th className="px-6 py-4 text-center text-sm font-semibold text-gray-900">
                 Email
               </th>
-              <th className="px-6 py-4 text-left text-sm font-semibold text-gray-900">
+              <th className="px-6 py-4 text-center text-sm font-semibold text-gray-900">
                 Action
               </th>
             </tr>
           </thead>
+
           <tbody>
             {filteredParties.map((party) => (
-              <tr key={party.id} className="border-b border-gray-200 hover:bg-gray-50">
-                <td className="px-6 py-4 text-sm text-gray-900">{party.name}</td>
-                <td className="px-6 py-4 text-sm text-gray-600">{party.type}</td>
-                <td className="px-6 py-4 text-sm text-gray-600">{party.gstin}</td>
-                <td className="px-6 py-4 text-sm text-gray-600">{party.contact}</td>
-                <td className="px-6 py-4 text-sm text-gray-600">{party.email}</td>
-                <td className="px-6 py-4 text-sm flex items-center gap-3">
+              <tr
+                key={party.id}
+                className="border-b border-gray-200 hover:bg-gray-50"
+              >
+                <td className="px-6 py-4 text-sm text-gray-900 text-center">
+                  {party.name}
+                </td>
+                <td className="px-6 py-4 text-sm text-gray-600 text-center">
+                  {party.type}
+                </td>
+                <td className="px-6 py-4 text-sm text-gray-600 text-center">
+                  {party.gstin}
+                </td>
+                <td className="px-6 py-4 text-sm text-gray-600 text-center">
+                  {party.contact}
+                </td>
+                <td className="px-6 py-4 text-sm text-gray-600 text-center">
+                  {party.email}
+                </td>
+                <td className="px-6 py-4 text-sm flex items-center justify-center gap-3">
                   <button
                     onClick={() => handleEdit(party)}
                     className="text-black hover:text-black transition"
