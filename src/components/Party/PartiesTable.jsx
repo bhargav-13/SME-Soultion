@@ -20,7 +20,7 @@ const PartiesTable = ({
         setSearchQuery={setSearchQuery}
         typeFilter={typeFilter}
         setTypeFilter={setTypeFilter}
-        filterOptions={["Type", "Customer", "Vendor", "Customer / Vendor"]}
+        filterOptions={["Customer", "Vendor", "Both"]}
         filterPlaceholder="Type"
       />
 

@@ -161,7 +161,7 @@ const ItemMaster = () => {
           setSearchQuery={setSearchTerm}
           typeFilter={categoryFilter}
           setTypeFilter={setCategoryFilter}
-          filterOptions={["Type", "Butt Hinges", "Door Hinges"]}
+          filterOptions={["Customer", "Vendor", "Both"]}
           filterPlaceholder="Type"
         />
 

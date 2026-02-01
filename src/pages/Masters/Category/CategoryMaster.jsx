@@ -293,11 +293,7 @@ const CategoryMaster = () => {
             setSearchQuery={setSearchQuery}
             typeFilter={typeFilter}
             setTypeFilter={setTypeFilter}
-            filterOptions={[
-              "Type",
-              "With SubCategories",
-              "Without SubCategories",
-            ]}
+             filterOptions={["Customer", "Vendor", "Both"]}
             filterPlaceholder="Type"
           />
 
