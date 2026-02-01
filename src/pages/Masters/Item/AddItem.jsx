@@ -7,6 +7,7 @@ import ConfirmationDialog from "../../../components/ConfirmationDialog";
 import ViewItemDialog from "../../../components/Item/ViewItemDialog";
 import EditItemDialog from "../../../components/Item/EditItemDialog";
 import ItemsData from "../../../Data/itemdata";
+import SearchFilter from "../../../components/SearchFilter";
 
 const AddItem = () => {
   const navigate = useNavigate();
@@ -538,7 +539,7 @@ const AddItem = () => {
         </form>
 
         {/* Search and Filter */}
-        <div className="mb-6 flex gap-4 ">
+        {/* <div className="mb-6 flex gap-4 ">
           <div className="flex-1 relative">
             <input
               type="text"
@@ -585,7 +586,16 @@ const AddItem = () => {
               </div>
             )}
           </div>
-        </div>
+        </div> */}
+<SearchFilter
+  className="mb-6 flex gap-4"
+  searchQuery={searchQuery}
+  setSearchQuery={setSearchQuery}
+  typeFilter={categoryFilter}
+  setTypeFilter={setCategoryFilter}
+  filterOptions={["All Categories", "Butt Hinges", "Door Hinges"]}
+  filterPlaceholder="Type"
+/>
 
         {/* Items Table */}
         <ItemsTable

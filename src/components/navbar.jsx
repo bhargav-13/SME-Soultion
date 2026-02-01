@@ -5,29 +5,26 @@ import { Link, useNavigate } from "react-router-dom";
 import { LogOut, User } from "lucide-react";
 
 export default function Navbar() {
-  // const { user, logout } = useAuth();
   const navigate = useNavigate();
-  const userName = "Profile"; // Replace with actual user data
+  const userName = "Profile";
 
   return (
-    <nav className="bg-gray-50/60 text-gray-800 px-6 py-4.5 shadow-md z-40 border-b border-gray-200">
+    <nav className="sticky top-0 z-40 bg-gray-50/90 backdrop-blur border-b border-gray-200 px-6 py-4 shadow-sm">
       <div className="flex justify-between items-center">
-        {/* Left side - Empty space */}
         <div></div>
-        
-        {/* Right side - Profile and Logout */}
+
         <div className="flex items-center gap-4">
-          {/* User Profile */}
-          <div className="flex items-center gap-2 px-4 py-2 rounded-lg hover:bg-gray-100 transition cursor-pointer" onClick={() => navigate("/profile")}>
+          <div
+            className="flex items-center gap-2 px-4 py-2 rounded-lg hover:bg-gray-100 transition cursor-pointer"
+            onClick={() => navigate("/profile")}
+          >
             <User className="w-5 h-5 text-gray-600" />
-            <span className="text-sm font-medium text-gray-700">{userName}</span>
+            <span className=" font-medium text-gray-700">
+              {userName}
+            </span>
           </div>
 
-          {/* Logout Button */}
-          <button
-            // onClick={handleLogout}
-            className="flex items-center gap-2 bg-gray-900 text-white px-3 py-2 rounded-lg hover:bg-gray-800 transition font-medium text-sm"
-          >
+          <button className="flex items-center gap-2 bg-gray-900 text-white px-3 py-2 rounded-lg hover:bg-gray-800 transition font-medium">
             <LogOut className="w-4 h-4" />
             <span>Logout</span>
           </button>

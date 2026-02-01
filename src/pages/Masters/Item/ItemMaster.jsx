@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Plus } from "lucide-react";
 import SidebarLayout from "../../../components/SidebarLayout";
@@ -7,6 +7,7 @@ import EditItemDialog from "../../../components/Item/EditItemDialog";
 import ViewItemDialog from "../../../components/Item/ViewItemDialog";
 import ItemsTable from "../../../components/Item/ItemsTable";
 import ItemsData from "../../../Data/itemdata";
+import SearchFilter from "../../../components/SearchFilter";
 
 const ItemMaster = () => {
   const navigate = useNavigate();
@@ -32,7 +33,6 @@ const ItemMaster = () => {
   const [message, setMessage] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("");
-  const [isCategoryFilterOpen, setIsCategoryFilterOpen] = useState(false);
 
   const filteredItems = items.filter(
     (item) => {
@@ -152,54 +152,15 @@ const ItemMaster = () => {
         </div>
 
         {/* Search and Filter */}
-        <div className="flex gap-4 ">
-          <div className="flex-1 relative">
-            <input
-              type="text"
-              placeholder="Search"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full px-4 py-2 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-500 focus:border-transparent outline-none"
-            />
-          </div>
-          <div className="relative w-48">
-            <button
-              type="button"
-              onClick={() => setIsCategoryFilterOpen(!isCategoryFilterOpen)}
-              className="w-full flex items-center justify-between px-4 py-2 border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-gray-500 transition"
-            >
-              <span className={categoryFilter === "" ? "text-gray-400" : "text-gray-900"}>
-                {categoryFilter === "" ? "Type" : categoryFilter}
-              </span>
-              <svg
-                className={`w-4 h-4 text-gray-500 transition-transform ${isCategoryFilterOpen ? "rotate-180" : ""}`}
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                viewBox="0 0 24 24"
-              >
-                <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-              </svg>
-            </button>
-            {isCategoryFilterOpen && (
-              <div className="absolute z-20 mt-2 w-full bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden">
-                {["Type", "Butt Hinges", "Door Hinges"].map((category) => (
-                  <button
-                    key={category}
-                    type="button"
-                    onClick={() => {
-                      setCategoryFilter(category === "Type" ? "" : category);
-                      setIsCategoryFilterOpen(false);
-                    }}
-                    className="w-full text-left px-4 py-2 text-sm hover:bg-gray-100 transition"
-                  >
-                    {category}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
+        <SearchFilter
+          className="flex gap-4"
+          searchQuery={searchTerm}
+          setSearchQuery={setSearchTerm}
+          typeFilter={categoryFilter}
+          setTypeFilter={setCategoryFilter}
+          filterOptions={["Type", "Butt Hinges", "Door Hinges"]}
+          filterPlaceholder="Type"
+        />
 
         {/*Items Table */}
         <ItemsTable
