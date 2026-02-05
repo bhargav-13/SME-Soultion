@@ -1,21 +1,24 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { ChevronRight, X } from "lucide-react";
+import { X } from "lucide-react";
 import SidebarLayout from "../../../components/SidebarLayout";
 import ItemsTable from "../../../components/Item/ItemsTable";
 import ConfirmationDialog from "../../../components/ConfirmationDialog";
 import ViewItemDialog from "../../../components/Item/ViewItemDialog";
 import EditItemDialog from "../../../components/Item/EditItemDialog";
-import ItemsData from "../../../Data/itemdata";
 import SearchFilter from "../../../components/SearchFilter";
+import { itemApi, categoryApi } from "../../../services/apiService";
+import toast from "react-hot-toast";
 
 const AddItem = () => {
   const navigate = useNavigate();
   const [formData, setFormData] = useState({
     sizeInch: "",
     sizeMM: "",
-    category: "",
-    subCategory: "",
+    categoryId: "",
+    categoryName: "",
+    subCategoryId: "",
+    subCategoryName: "",
     itemKg: "",
     weightPerPL: "",
     weightUnit: "Kg",
@@ -23,9 +26,10 @@ const AddItem = () => {
     dozenWeight: "",
     lowStockWarning: "",
   });
-  const [items, setItems] = useState(ItemsData);
+  const [items, setItems] = useState([]);
+  const [categories, setCategories] = useState([]);
+  const [subCategories, setSubCategories] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("");
   const [deleteDialog, setDeleteDialog] = useState({
@@ -43,69 +47,160 @@ const AddItem = () => {
   });
   const [isWeightUnitOpen, setIsWeightUnitOpen] = useState(false);
   const [isSubCategoryOpen, setIsSubCategoryOpen] = useState(false);
-  const [isCategoryFilterOpen, setIsCategoryFilterOpen] = useState(false);
   const [isCategoryOpen, setIsCategoryOpen] = useState(false);
 
   useEffect(() => {
     fetchItems();
+    fetchCategories();
   }, []);
 
-  const fetchItems = () => {
+  const fetchItems = async () => {
     try {
       setLoading(true);
-      setItems([...ItemsData]);
+      const response = await itemApi.getAllItems();
+      const itemsData = response.data;
+
+      const rawItems = itemsData.data || itemsData;
+
+      const transformedItems = (Array.isArray(rawItems) ? rawItems : []).map((item) => ({
+        id: item.id,
+        sizeInch: item.sizeInch || "",
+        sizeMM: item.sizeMm || "",
+        category: item.itemCategory?.name || "",
+        categoryId: item.itemCategory?.id,
+        subCategory: item.itemSubCategory?.name || "",
+        subCategoryId: item.itemSubCategory?.id,
+        totalKg: item.itemKg,
+        itemKg: item.itemKg,
+        weightPerPL: item.weightPerPc,
+        totalPL: item.totalPc,
+        dozenWeight: item.dozenWeight,
+        lowStockWarning: item.lowStockWarning,
+        lowStock: item.stockStatus === "LOW_STOCK" ? "Low Stock" : "In Stock",
+        stockStatus: item.stockStatus,
+      }));
+
+      setItems(transformedItems);
     } catch (error) {
       console.error("Error fetching items:", error);
+      toast.error(error.response?.data?.message || "Failed to fetch items");
     } finally {
       setLoading(false);
     }
   };
 
-  const handleChange = (e) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({
-      ...prev,
-      [name]: value,
-    }));
+  const fetchCategories = async () => {
+    try {
+      const response = await categoryApi.getAllCategories();
+      const categoriesData = response.data;
+
+      setCategories(
+        categoriesData.map((cat) => ({
+          id: cat.id,
+          name: cat.name,
+          subCategories: (cat.subCategories || []).map((sub) => ({
+            id: sub.id,
+            name: sub.name,
+          })),
+        }))
+      );
+    } catch (error) {
+      console.error("Error fetching categories:", error);
+    }
   };
 
-  const handleSave = (e) => {
-    e.preventDefault();
-    setLoading(true);
-    try {
-      if (
-        !formData.sizeInch.trim() ||
-        !formData.category.trim() ||
-        !formData.itemKg.trim()
-      ) {
-        alert("Please fill in all required fields");
-        setLoading(false);
-        return;
-      }
+  const handleCategorySelect = (category) => {
+    setFormData((prev) => ({
+      ...prev,
+      categoryId: category.id,
+      categoryName: category.name,
+      subCategoryId: "",
+      subCategoryName: "",
+    }));
+    setSubCategories(category.subCategories || []);
+    setIsCategoryOpen(false);
+  };
 
-      const newItem = {
-        id: Math.max(...items.map((i) => i.id), 0) + 1,
-        sizeInch: formData.sizeInch,
-        sizeMM: formData.sizeMM,
-        category: formData.category,
-        subCategory: formData.subCategory,
-        totalKg: formData.itemKg,
-        dozenWeight: formData.dozenWeight,
-        lowStock: "In Stock",
-        itemKg: formData.itemKg,
-        weightPerPL: formData.weightPerPL,
-        weightUnit: formData.weightUnit,
-        totalPL: formData.totalPL,
-        lowStockWarning: formData.lowStockWarning,
+  const handleSubCategorySelect = (subCategory) => {
+    setFormData((prev) => ({
+      ...prev,
+      subCategoryId: subCategory.id,
+      subCategoryName: subCategory.name,
+    }));
+    setIsSubCategoryOpen(false);
+  };
+
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    
+    setFormData((prev) => {
+      const newFormData = {
+        ...prev,
+        [name]: value,
       };
 
-      setItems([...items, newItem]);
-      setMessage("Item added successfully!");
+      // Auto-calculate Total Pc when Item Kg or Weight/Pc changes
+      if (name === 'itemKg' || name === 'weightPerPL') {
+        const itemKg = name === 'itemKg' ? parseFloat(value) || 0 : parseFloat(prev.itemKg) || 0;
+        const weightPerPc = name === 'weightPerPL' ? parseFloat(value) || 0 : parseFloat(prev.weightPerPL) || 0;
+        
+        if (itemKg > 0 && weightPerPc > 0) {
+          // Total Pc = Item Kg / Weight per Pc
+          newFormData.totalPL = (itemKg / weightPerPc).toFixed(2);
+        } else {
+          newFormData.totalPL = '';
+        }
+      }
+
+      // Auto-calculate Dozen Weight when Weight/Pc changes
+      if (name === 'weightPerPL') {
+        const weightPerPc = parseFloat(value) || 0;
+        
+        if (weightPerPc > 0) {
+          // Dozen Weight = Weight per Pc × 12
+          newFormData.dozenWeight = (weightPerPc * 12).toFixed(2);
+        } else {
+          newFormData.dozenWeight = '';
+        }
+      }
+
+      return newFormData;
+    });
+  };
+
+  const handleSave = async (e) => {
+    e.preventDefault();
+
+    if (!formData.sizeInch.trim() || !formData.categoryId || !formData.itemKg.trim()) {
+      toast.error("Please fill in all required fields");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const createData = {
+        sizeInch: formData.sizeInch,
+        sizeMm: formData.sizeMM,
+        categoryId: formData.categoryId,
+        subCategoryId: formData.subCategoryId || undefined,
+        itemKg: parseFloat(formData.itemKg) || 0,
+        weightPerPc: parseFloat(formData.weightPerPL) || 0,
+        totalPc: parseFloat(formData.totalPL) || 0,
+        dozenWeight: parseFloat(formData.dozenWeight) || 0,
+        lowStockWarning: parseFloat(formData.lowStockWarning) || 0,
+        stockStatus: "IN_STOCK",
+      };
+
+      await itemApi.createItem(createData);
+
+      toast.success("Item added successfully!");
       setFormData({
         sizeInch: "",
         sizeMM: "",
-        category: "",
-        subCategory: "",
+        categoryId: "",
+        categoryName: "",
+        subCategoryId: "",
+        subCategoryName: "",
         itemKg: "",
         weightPerPL: "",
         weightUnit: "Kg",
@@ -113,9 +208,12 @@ const AddItem = () => {
         dozenWeight: "",
         lowStockWarning: "",
       });
-      setTimeout(() => setMessage(""), 3000);
+      setSubCategories([]);
+
+      await fetchItems();
     } catch (error) {
-      setMessage("Error adding item: " + error.message);
+      console.error("Error adding item:", error);
+      toast.error(error.response?.data?.message || "Failed to add item");
     } finally {
       setLoading(false);
     }
@@ -125,8 +223,10 @@ const AddItem = () => {
     setFormData({
       sizeInch: "",
       sizeMM: "",
-      category: "",
-      subCategory: "",
+      categoryId: "",
+      categoryName: "",
+      subCategoryId: "",
+      subCategoryName: "",
       itemKg: "",
       weightPerPL: "",
       weightUnit: "Kg",
@@ -134,7 +234,7 @@ const AddItem = () => {
       dozenWeight: "",
       lowStockWarning: "",
     });
-    setMessage("");
+    setSubCategories([]);
   };
 
   const handleEdit = (item) => {
@@ -152,15 +252,16 @@ const AddItem = () => {
     });
   };
 
-  const handleConfirmDelete = () => {
+  const handleConfirmDelete = async () => {
     try {
-      setItems(items.filter((i) => i.id !== deleteDialog.itemId));
-      setMessage("Item deleted successfully!");
+      await itemApi.deleteItem(deleteDialog.itemId);
+      await fetchItems();
+
       setDeleteDialog({ isOpen: false, itemId: null, itemName: "" });
-      setTimeout(() => setMessage(""), 3000);
+      toast.success("Item deleted successfully!");
     } catch (error) {
       console.error("Error deleting item:", error);
-      setMessage("Error deleting item: " + error.message);
+      toast.error(error.response?.data?.message || "Failed to delete item");
     }
   };
 
@@ -185,14 +286,30 @@ const AddItem = () => {
     setDeleteDialog({ isOpen: false, itemId: null, itemName: "" });
   };
 
-  const handleSaveEdit = (formData) => {
-    const updatedItems = items.map((item) =>
-      item.id === editDialog.data.id ? { ...item, ...formData } : item,
-    );
-    setItems(updatedItems);
-    setEditDialog({ isOpen: false, data: null });
-    setMessage("Item updated successfully!");
-    setTimeout(() => setMessage(""), 3000);
+  const handleSaveEdit = async (formData) => {
+    try {
+      const updateData = {
+        sizeInch: formData.sizeInch,
+        sizeMm: formData.sizeMM,
+        categoryId: editDialog.data.categoryId,
+        subCategoryId: editDialog.data.subCategoryId,
+        itemKg: parseFloat(formData.itemKg) || 0,
+        weightPerPc: parseFloat(formData.weightPerPL) || 0,
+        totalPc: parseFloat(formData.totalPL) || 0,
+        dozenWeight: parseFloat(formData.dozenWeight) || 0,
+        lowStockWarning: parseFloat(formData.lowStockWarning) || 0,
+        stockStatus: editDialog.data.stockStatus || "IN_STOCK",
+      };
+
+      await itemApi.updateItem(editDialog.data.id, updateData);
+      await fetchItems();
+
+      setEditDialog({ isOpen: false, data: null });
+      toast.success("Item updated successfully!");
+    } catch (error) {
+      console.error("Error updating item:", error);
+      toast.error(error.response?.data?.message || "Failed to update item");
+    }
   };
 
   // Filter items based on search and category
@@ -217,25 +334,6 @@ const AddItem = () => {
             category, and stock thresholds.
           </p>
         </div>
-
-        {/* Message Alert */}
-        {message && (
-          <div
-            className={`mb-6 p-4 rounded-lg flex items-center justify-between ${
-              message.includes("Error")
-                ? "bg-red-50 text-red-800 border border-red-200"
-                : "bg-green-50 text-green-800 border border-green-200"
-            }`}
-          >
-            <span>{message}</span>
-            <button
-              onClick={() => setMessage("")}
-              className="text-gray-500 hover:text-gray-700"
-            >
-              <X className="w-4 h-4" />
-            </button>
-          </div>
-        )}
 
         {/* Form */}
         <form
@@ -273,7 +371,7 @@ const AddItem = () => {
               </div>
             </div>
 
-            {/* Row 2 */}
+            {/* Row 2 - Category & SubCategory from API */}
             <div className="grid grid-cols-2 gap-6">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -287,14 +385,14 @@ const AddItem = () => {
                   >
                     <span
                       className={
-                        formData.category === ""
+                        formData.categoryName === ""
                           ? "text-gray-400"
                           : "text-gray-900"
                       }
                     >
-                      {formData.category === ""
+                      {formData.categoryName === ""
                         ? "Select Category"
-                        : formData.category}
+                        : formData.categoryName}
                     </span>
                     <svg
                       className={`w-4 h-4 text-gray-500 transition-transform ${
@@ -314,23 +412,23 @@ const AddItem = () => {
                   </button>
 
                   {isCategoryOpen && (
-                    <div className="absolute z-20 mt-2 w-full bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden">
-                      {["Butt Hinges", "Door Hinges"].map((category) => (
-                        <button
-                          key={category}
-                          type="button"
-                          onClick={() => {
-                            setFormData((prev) => ({
-                              ...prev,
-                              category: category,
-                            }));
-                            setIsCategoryOpen(false);
-                          }}
-                          className="w-full text-left px-4 py-2 text-sm hover:bg-gray-100 transition"
-                        >
-                          {category}
-                        </button>
-                      ))}
+                    <div className="absolute z-20 mt-2 w-full bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden max-h-48 overflow-y-auto">
+                      {categories.length === 0 ? (
+                        <div className="px-4 py-2 text-sm text-gray-500">
+                          No categories available
+                        </div>
+                      ) : (
+                        categories.map((category) => (
+                          <button
+                            key={category.id}
+                            type="button"
+                            onClick={() => handleCategorySelect(category)}
+                            className="w-full text-left px-4 py-2 text-sm hover:bg-gray-100 transition"
+                          >
+                            {category.name}
+                          </button>
+                        ))
+                      )}
                     </div>
                   )}
                 </div>
@@ -343,18 +441,19 @@ const AddItem = () => {
                   <button
                     type="button"
                     onClick={() => setIsSubCategoryOpen(!isSubCategoryOpen)}
-                    className="w-full flex items-center justify-between px-4 py-2 border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-gray-500 transition"
+                    disabled={!formData.categoryId}
+                    className="w-full flex items-center justify-between px-4 py-2 border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-gray-500 transition disabled:bg-gray-50 disabled:cursor-not-allowed"
                   >
                     <span
                       className={
-                        formData.subCategory === ""
+                        formData.subCategoryName === ""
                           ? "text-gray-400"
                           : "text-gray-900"
                       }
                     >
-                      {formData.subCategory === ""
+                      {formData.subCategoryName === ""
                         ? "Select Sub Category"
-                        : formData.subCategory}
+                        : formData.subCategoryName}
                     </span>
                     <svg
                       className={`w-4 h-4 text-gray-500 transition-transform ${
@@ -374,23 +473,23 @@ const AddItem = () => {
                   </button>
 
                   {isSubCategoryOpen && (
-                    <div className="absolute z-20 mt-2 w-full bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden">
-                      {["Medium Butt", "Heavy Butt"].map((subCategory) => (
-                        <button
-                          key={subCategory}
-                          type="button"
-                          onClick={() => {
-                            setFormData((prev) => ({
-                              ...prev,
-                              subCategory: subCategory,
-                            }));
-                            setIsSubCategoryOpen(false);
-                          }}
-                          className="w-full text-left px-4 py-2 text-sm hover:bg-gray-100 transition"
-                        >
-                          {subCategory}
-                        </button>
-                      ))}
+                    <div className="absolute z-20 mt-2 w-full bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden max-h-48 overflow-y-auto">
+                      {subCategories.length === 0 ? (
+                        <div className="px-4 py-2 text-sm text-gray-500">
+                          No sub categories available
+                        </div>
+                      ) : (
+                        subCategories.map((subCategory) => (
+                          <button
+                            key={subCategory.id}
+                            type="button"
+                            onClick={() => handleSubCategorySelect(subCategory)}
+                            className="w-full text-left px-4 py-2 text-sm hover:bg-gray-100 transition"
+                          >
+                            {subCategory.name}
+                          </button>
+                        ))
+                      )}
                     </div>
                   )}
                 </div>
@@ -480,28 +579,28 @@ const AddItem = () => {
             <div className="grid grid-cols-2 gap-6">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Total Pc.<span className="text-red-500">*</span>
+                  Total Pc. <span className="text-gray-500 text-xs">(Auto-calculated)</span>
                 </label>
                 <input
                   type="text"
                   name="totalPL"
                   value={formData.totalPL}
-                  onChange={handleChange}
-                  placeholder="Enter Pc."
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-500 focus:border-transparent outline-none"
+                  readOnly
+                  placeholder="Auto-calculated"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-700 cursor-not-allowed outline-none"
                 />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Dozen Weight<span className="text-red-500">*</span>
+                  Dozen Weight <span className="text-gray-500 text-xs">(Auto-calculated)</span>
                 </label>
                 <input
                   type="text"
                   name="dozenWeight"
                   value={formData.dozenWeight}
-                  onChange={handleChange}
-                  placeholder="Enter Dozen Weight"
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-500 focus:border-transparent outline-none"
+                  readOnly
+                  placeholder="Auto-calculated"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-700 cursor-not-allowed outline-none"
                 />
               </div>
             </div>
@@ -523,17 +622,17 @@ const AddItem = () => {
 
             {/* Action Buttons */}
             <div className="flex gap-4 justify-center">
-              <button
+                <button
                 type="submit"
                 disabled={loading}
-                className="px-10 py-2 bg-black text-white rounded-xl hover:bg-gray-800 transition font-medium disabled:opacity-50"
+                className="px-12 py-2 bg-[#343434] text-white rounded-2xl hover:bg-gray-800 transition font-medium disabled:opacity-50"
               >
                 {loading ? "Saving..." : "Save"}
               </button>
               <button
                 type="button"
                 onClick={handleCancel}
-                className="px-8 py-2 border-2 border-gray-900 text-gray-900 rounded-xl hover:bg-gray-50 transition font-medium"
+                className="px-12 py-2 border border-[#343434] text-[#343434] rounded-2xl hover:bg-gray-50 transition font-medium"
               >
                 Cancel
               </button>
@@ -542,62 +641,14 @@ const AddItem = () => {
         </form>
 
         {/* Search and Filter */}
-        {/* <div className="mb-6 flex gap-4 ">
-          <div className="flex-1 relative">
-            <input
-              type="text"
-              placeholder="Search by size or category..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full px-4 py-2 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-500 focus:border-transparent outline-none"
-            />
-          </div>
-          <div className="relative w-48">
-            <button
-              type="button"
-              onClick={() => setIsCategoryFilterOpen(!isCategoryFilterOpen)}
-              className="w-full flex items-center justify-between px-4 py-2 border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-gray-500 transition"
-            >
-              <span className={categoryFilter === "" ? "text-gray-400" : "text-gray-900"}>
-                {categoryFilter === "" ? "All Categories" : categoryFilter}
-              </span>
-              <svg
-                className={`w-4 h-4 text-gray-500 transition-transform ${isCategoryFilterOpen ? "rotate-180" : ""}`}
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                viewBox="0 0 24 24"
-              >
-                <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-              </svg>
-            </button>
-            {isCategoryFilterOpen && (
-              <div className="absolute z-20 mt-2 w-full bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden">
-                {["All Categories", "Butt Hinges", "Door Hinges"].map((category) => (
-                  <button
-                    key={category}
-                    type="button"
-                    onClick={() => {
-                      setCategoryFilter(category === "All Categories" ? "" : category);
-                      setIsCategoryFilterOpen(false);
-                    }}
-                    className="w-full text-left px-4 py-2 text-sm hover:bg-gray-100 transition"
-                  >
-                    {category}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-        </div> */}
         <SearchFilter
           className="mb-6 flex gap-4"
           searchQuery={searchQuery}
           setSearchQuery={setSearchQuery}
           typeFilter={categoryFilter}
           setTypeFilter={setCategoryFilter}
-          filterOptions={["All Categories", "Butt Hinges", "Door Hinges"]}
-          filterPlaceholder="Type"
+          filterOptions={categories.map((c) => c.name)}
+          filterPlaceholder="Category"
         />
 
         {/* Items Table */}

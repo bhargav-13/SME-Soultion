@@ -1,23 +1,22 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import {
-  Edit2,
   SquarePen,
   Trash2,
   Plus,
-  ChevronRight,
   X,
   ChevronDown,
 } from "lucide-react";
 import SidebarLayout from "../../../components/SidebarLayout";
 import ConfirmationDialog from "../../../components/ConfirmationDialog";
 import AddCategoryDialog from "../../../components/Category/AddCategoryDialog";
-import CategoriesData from "../../../Data/categorydata";
 import SearchFilter from "../../../components/SearchFilter";
+import { categoryApi, subCategoryApi } from "../../../services/apiService";
+import toast from "react-hot-toast";
 
 const CategoryMaster = () => {
   const navigate = useNavigate();
-  const [categories, setCategories] = useState(CategoriesData);
+  const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [expandedId, setExpandedId] = useState(null);
   const [stats, setStats] = useState({
@@ -34,7 +33,6 @@ const CategoryMaster = () => {
     isEdit: false,
     data: null,
   });
-  const [message, setMessage] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [typeFilter, setTypeFilter] = useState("");
   const [editSubCategoryDialog, setEditSubCategoryDialog] = useState({
@@ -53,28 +51,35 @@ const CategoryMaster = () => {
     fetchCategories();
   }, []);
 
-  const fetchCategories = () => {
+  const fetchCategories = async () => {
     try {
       setLoading(true);
-      setCategories([...CategoriesData]);
-      calculateStats();
+      const response = await categoryApi.getAllCategories();
+      const categoriesData = response.data;
+
+      const transformedCategories = categoriesData.map((cat) => ({
+        id: cat.id,
+        categoryName: cat.name,
+        subCategories: (cat.subCategories || []).map((sub) => ({
+          id: sub.id,
+          name: sub.name,
+        })),
+      }));
+
+      setCategories(transformedCategories);
+
+      const totalCategories = transformedCategories.length;
+      const totalSubCategories = transformedCategories.reduce(
+        (sum, cat) => sum + cat.subCategories.length,
+        0,
+      );
+      setStats({ totalCategories, totalSubCategories });
     } catch (error) {
       console.error("Error fetching categories:", error);
+      toast.error(error.response?.data?.message || "Failed to fetch categories");
     } finally {
       setLoading(false);
     }
-  };
-
-  const calculateStats = () => {
-    const totalCategories = CategoriesData.length;
-    const totalSubCategories = CategoriesData.reduce(
-      (sum, cat) => sum + cat.subCategories.length,
-      0,
-    );
-    setStats({
-      totalCategories,
-      totalSubCategories,
-    });
   };
 
   const handleAddCategory = () => {
@@ -93,33 +98,31 @@ const CategoryMaster = () => {
     });
   };
 
-  const handleSaveCategory = (formData) => {
-    if (addCategoryDialog.isEdit) {
-      // Edit existing category
-      const updatedCategories = categories.map((cat) =>
-        cat.id === addCategoryDialog.data.id
-          ? {
-              ...cat,
-              categoryName: formData.categoryName,
-              subCategories: formData.subCategories,
-            }
-          : cat,
-      );
-      setCategories(updatedCategories);
-      setMessage("Category updated successfully!");
-    } else {
-      // Add new category
-      const newCategory = {
-        id: Math.max(...categories.map((c) => c.id), 0) + 1,
-        categoryName: formData.categoryName,
-        subCategories: formData.subCategories,
-      };
-      setCategories([...categories, newCategory]);
-      setMessage("Category added successfully!");
+  const handleSaveCategory = async (formData) => {
+    try {
+      if (addCategoryDialog.isEdit) {
+        // Update existing category name
+        await categoryApi.updateCategory(addCategoryDialog.data.id, {
+          name: formData.categoryName,
+          subCategories: formData.subCategories.map((sub) => ({ name: sub.name || sub })),
+        });
+        toast.success("Category updated successfully!");
+      } else {
+        // Create new category with subcategories
+        const createData = {
+          name: formData.categoryName,
+          subCategories: formData.subCategories.map((sub) => ({ name: sub.name || sub })),
+        };
+        await categoryApi.createCategory(createData);
+        toast.success("Category added successfully!");
+      }
+
+      setAddCategoryDialog({ isOpen: false, isEdit: false, data: null });
+      await fetchCategories();
+    } catch (error) {
+      console.error("Error saving category:", error);
+      toast.error(error.response?.data?.message || "Failed to save category");
     }
-    setAddCategoryDialog({ isOpen: false, isEdit: false, data: null });
-    setTimeout(() => setMessage(""), 3000);
-    calculateStats();
   };
 
   const handleDeleteClick = (category) => {
@@ -130,12 +133,17 @@ const CategoryMaster = () => {
     });
   };
 
-  const handleConfirmDelete = () => {
-    setCategories(categories.filter((c) => c.id !== deleteDialog.categoryId));
-    setMessage("Category deleted successfully!");
-    setDeleteDialog({ isOpen: false, categoryId: null, categoryName: "" });
-    setTimeout(() => setMessage(""), 3000);
-    calculateStats();
+  const handleConfirmDelete = async () => {
+    try {
+      await categoryApi.deleteCategory(deleteDialog.categoryId);
+      await fetchCategories();
+
+      setDeleteDialog({ isOpen: false, categoryId: null, categoryName: "" });
+      toast.success("Category deleted successfully!");
+    } catch (error) {
+      console.error("Error deleting category:", error);
+      toast.error(error.response?.data?.message || "Failed to delete category");
+    }
   };
 
   const handleCancelDelete = () => {
@@ -154,28 +162,25 @@ const CategoryMaster = () => {
     });
   };
 
-  const handleSaveSubCategory = (subCategoryName) => {
-    const updatedCategories = categories.map((cat) =>
-      cat.id === editSubCategoryDialog.categoryId
-        ? {
-            ...cat,
-            subCategories: cat.subCategories.map((sub) =>
-              sub.id === editSubCategoryDialog.subCategory.id
-                ? { ...sub, name: subCategoryName }
-                : sub,
-            ),
-          }
-        : cat,
-    );
-    setCategories(updatedCategories);
-    setEditSubCategoryDialog({
-      isOpen: false,
-      categoryId: null,
-      subCategory: null,
-    });
-    setMessage("SubCategory updated successfully!");
-    setTimeout(() => setMessage(""), 3000);
-    calculateStats();
+  const handleSaveSubCategory = async (subCategoryName) => {
+    try {
+      await subCategoryApi.updateSubCategory(
+        editSubCategoryDialog.categoryId,
+        editSubCategoryDialog.subCategory.id,
+        { name: subCategoryName },
+      );
+
+      setEditSubCategoryDialog({
+        isOpen: false,
+        categoryId: null,
+        subCategory: null,
+      });
+      toast.success("SubCategory updated successfully!");
+      await fetchCategories();
+    } catch (error) {
+      console.error("Error updating subcategory:", error);
+      toast.error(error.response?.data?.message || "Failed to update subcategory");
+    }
   };
 
   const handleDeleteSubCategoryClick = (category, subCategory) => {
@@ -187,27 +192,25 @@ const CategoryMaster = () => {
     });
   };
 
-  const handleConfirmDeleteSubCategory = () => {
-    const updatedCategories = categories.map((cat) =>
-      cat.id === deleteSubCategoryDialog.categoryId
-        ? {
-            ...cat,
-            subCategories: cat.subCategories.filter(
-              (sub) => sub.id !== deleteSubCategoryDialog.subCategoryId,
-            ),
-          }
-        : cat,
-    );
-    setCategories(updatedCategories);
-    setDeleteSubCategoryDialog({
-      isOpen: false,
-      categoryId: null,
-      subCategoryId: null,
-      subCategoryName: "",
-    });
-    setMessage("SubCategory deleted successfully!");
-    setTimeout(() => setMessage(""), 3000);
-    calculateStats();
+  const handleConfirmDeleteSubCategory = async () => {
+    try {
+      await subCategoryApi.deleteSubCategory(
+        deleteSubCategoryDialog.categoryId,
+        deleteSubCategoryDialog.subCategoryId,
+      );
+
+      setDeleteSubCategoryDialog({
+        isOpen: false,
+        categoryId: null,
+        subCategoryId: null,
+        subCategoryName: "",
+      });
+      toast.success("SubCategory deleted successfully!");
+      await fetchCategories();
+    } catch (error) {
+      console.error("Error deleting subcategory:", error);
+      toast.error(error.response?.data?.message || "Failed to delete subcategory");
+    }
   };
 
   const handleCancelDeleteSubCategory = () => {
@@ -249,7 +252,7 @@ const CategoryMaster = () => {
             </div>
             <button
               onClick={handleAddCategory}
-              className="flex items-center gap-2 bg-white text-gray-800 border-2 border-gray-900 px-6 py-2 rounded-lg hover:bg-gray-50 transition font-medium"
+              className="flex items-center gap-2 bg-white text-gray-800 border border-gray-900 px-6 py-2 rounded-lg hover:bg-gray-50 transition font-medium"
             >
               <Plus className="w-5 h-5" />
               Add Categories
@@ -259,14 +262,14 @@ const CategoryMaster = () => {
 
         {/* Stats Cards */}
         <div className="grid grid-cols-2 gap-6 mb-8">
-          <div className="bg-white p-3 rounded-lg border-2 border-gray-200 h-[120px] flex flex-col justify-between">
+          <div className="bg-white p-3 rounded-lg border border-gray-200 h-[120px] flex flex-col justify-between">
             <h3 className="text-gray-500 ">Total Categories</h3>
             <p className="text-4xl font-semibold text-gray-900">
               {stats.totalCategories}
             </p>
           </div>
 
-          <div className="bg-white p-3 rounded-lg border-2 border-gray-200 h-[120px] flex flex-col justify-between">
+          <div className="bg-white p-3 rounded-lg border border-gray-200 h-[120px] flex flex-col justify-between">
             <h3 className="text-gray-500 ">Total Sub Categories</h3>
             <p className="text-4xl font-semibold text-gray-900">
               {stats.totalSubCategories}
@@ -274,27 +277,14 @@ const CategoryMaster = () => {
           </div>
         </div>
 
-        {/* Message Alert */}
-        {message && (
-          <div className="mb-6 p-4 rounded-lg bg-green-50 text-green-800 border border-green-200 flex items-center justify-between">
-            <span>{message}</span>
-            <button
-              onClick={() => setMessage("")}
-              className="text-gray-500 hover:text-gray-700"
-            >
-              <X className="w-4 h-4" />
-            </button>
-          </div>
-        )}
-
         {/* Search and Filter */}
           <SearchFilter
             searchQuery={searchQuery}
             setSearchQuery={setSearchQuery}
             typeFilter={typeFilter}
             setTypeFilter={setTypeFilter}
-             filterOptions={["Customer", "Vendor", "Both"]}
-            filterPlaceholder="Type"
+            filterOptions={["With SubCategories", "Without SubCategories"]}
+            filterPlaceholder="Filter"
           />
 
         {/* Categories Grid */}

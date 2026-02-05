@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from "react";
-import { ChevronRight, X } from "lucide-react";
+import { X } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import SidebarLayout from "../../../components/SidebarLayout";
 import ConfirmationDialog from "../../../components/ConfirmationDialog";
 import PartiesTable from "../../../components/Party/PartiesTable";
 import EditPartyDialog from "../../../components/Party/EditPartyDialog";
-import PartiesData from "../../../Data/partydata";
+import { partyApi } from "../../../services/apiService";
+import toast from "react-hot-toast";
 
 const AddParty = () => {
   const navigate = useNavigate();
@@ -14,12 +15,11 @@ const AddParty = () => {
     email: "",
     phone: "",
     gstNumber: "",
-    partyType: "Supplier",
+    partyType: "",
   });
 
-  const [parties, setParties] = useState(PartiesData);
+  const [parties, setParties] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [typeFilter, setTypeFilter] = useState("");
   const [isTypeOpen, setIsTypeOpen] = useState(false);
@@ -34,18 +34,30 @@ const AddParty = () => {
     data: null,
   });
 
-  // Fetch parties data on component mount
   useEffect(() => {
     fetchParties();
   }, []);
 
-  const fetchParties = () => {
+  const fetchParties = async () => {
     try {
       setLoading(true);
-      // Use mock data instead of API
-      setParties([...PartiesData]);
+      const response = await partyApi.getAllParties();
+      const partiesData = response.data;
+
+      const transformedParties = partiesData.map((party) => ({
+        id: party.id,
+        name: party.name,
+        email: party.email,
+        phone: party.contactNo,
+        contact: party.contactNo,
+        gstin: party.gst,
+        type: party.partyType === "CUSTOMER" ? "Customer" : "Vendor",
+      }));
+
+      setParties(transformedParties);
     } catch (error) {
       console.error("Error fetching parties:", error);
+      toast.error(error.response?.data?.message || "Failed to fetch parties");
     } finally {
       setLoading(false);
     }
@@ -61,30 +73,40 @@ const AddParty = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!formData.partyName.trim()) {
+      toast.error("Please enter party name");
+      return;
+    }
+    if (!formData.partyType) {
+      toast.error("Please select party type");
+      return;
+    }
+
     setLoading(true);
     try {
-      // Simulate adding party to mock data
-      const newParty = {
-        id: Math.max(...parties.map((p) => p.id), 0) + 1,
+      const createData = {
         name: formData.partyName,
         email: formData.email,
-        phone: formData.phone,
-        gstin: formData.gstNumber,
-        type: formData.partyType,
-        contact: formData.phone,
+        contactNo: formData.phone,
+        gst: formData.gstNumber,
+        partyType: formData.partyType === "Customer" ? "CUSTOMER" : "VENDOR",
       };
-      setParties([...parties, newParty]);
-      setMessage("Party added successfully!");
+
+      await partyApi.createParty(createData);
+
+      toast.success("Party added successfully!");
       setFormData({
         partyName: "",
         email: "",
         phone: "",
         gstNumber: "",
-        partyType: "Supplier",
+        partyType: "",
       });
-      setTimeout(() => setMessage(""), 3000);
+
+      await fetchParties();
     } catch (error) {
-      setMessage("Error adding party: " + error.message);
+      console.error("Error adding party:", error);
+      toast.error(error.response?.data?.message || "Failed to add party");
     } finally {
       setLoading(false);
     }
@@ -96,9 +118,9 @@ const AddParty = () => {
       email: "",
       phone: "",
       gstNumber: "",
-      partyType: "Supplier",
+      partyType: "",
     });
-    setMessage("");
+    setIsTypeOpen(false); // Close the dropdown
   };
 
   const handleEdit = (party) => {
@@ -108,24 +130,25 @@ const AddParty = () => {
     });
   };
 
-  const handleSaveEdit = (formData) => {
-    const updatedParties = parties.map((party) =>
-      party.id === editDialog.data.id
-        ? {
-            ...party,
-            name: formData.name,
-            email: formData.email,
-            phone: formData.phone,
-            contact: formData.phone,
-            gstin: formData.gstin,
-            type: formData.type,
-          }
-        : party
-    );
-    setParties(updatedParties);
-    setEditDialog({ isOpen: false, data: null });
-    setMessage("Party updated successfully!");
-    setTimeout(() => setMessage(""), 3000);
+  const handleSaveEdit = async (formData) => {
+    try {
+      const updateData = {
+        name: formData.name,
+        email: formData.email,
+        contactNo: formData.phone,
+        gst: formData.gstin,
+        partyType: formData.type === "Customer" ? "CUSTOMER" : "VENDOR",
+      };
+
+      await partyApi.updateParty(editDialog.data.id, updateData);
+      await fetchParties();
+
+      setEditDialog({ isOpen: false, data: null });
+      toast.success("Party updated successfully!");
+    } catch (error) {
+      console.error("Error updating party:", error);
+      toast.error(error.response?.data?.message || "Failed to update party");
+    }
   };
 
   const handleDeleteClick = (party) => {
@@ -138,14 +161,14 @@ const AddParty = () => {
 
   const handleConfirmDelete = async () => {
     try {
-      // Remove party from mock data
-      setParties(parties.filter((p) => p.id !== deleteDialog.partyId));
-      setMessage("Party deleted successfully!");
+      await partyApi.deleteParty(deleteDialog.partyId);
+      await fetchParties();
+
       setDeleteDialog({ isOpen: false, partyId: null, partyName: "" });
-      setTimeout(() => setMessage(""), 3000);
+      toast.success("Party deleted successfully!");
     } catch (error) {
       console.error("Error deleting party:", error);
-      setMessage("Error deleting party: " + error.message);
+      toast.error(error.response?.data?.message || "Failed to delete party");
     }
   };
 
@@ -153,7 +176,6 @@ const AddParty = () => {
     setDeleteDialog({ isOpen: false, partyId: null, partyName: "" });
   };
 
-  // Filter parties based on search and type
   const filteredParties = parties.filter((party) => {
     const matchesSearch =
       party.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -175,25 +197,6 @@ const AddParty = () => {
             and sales operations.
           </p>
         </div>
-
-        {/* Message Alert */}
-        {message && (
-          <div
-            className={`mb-6 p-4 rounded-lg flex items-center justify-between ${
-              message.includes("Error")
-                ? "bg-red-50 text-red-800 border border-red-200"
-                : "bg-green-50 text-green-800 border border-green-200"
-            }`}
-          >
-            <span>{message}</span>
-            <button
-              onClick={() => setMessage("")}
-              className="text-gray-500 hover:text-gray-700"
-            >
-              <X className="w-4 h-4" />
-            </button>
-          </div>
-        )}
 
         {/* Form */}
         <form
@@ -264,13 +267,11 @@ const AddParty = () => {
           </div>
 
           {/* Type */}
-
           <div className="mb-8 relative">
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Type <span className="text-red-500">*</span>
             </label>
 
-            {/* Dropdown Button */}
             <button
               type="button"
               onClick={() => setIsTypeOpen(!isTypeOpen)}
@@ -278,12 +279,12 @@ const AddParty = () => {
             >
               <span
                 className={
-                  formData.partyType === "Supplier"
+                  formData.partyType === ""
                     ? "text-gray-400"
                     : "text-gray-900"
                 }
               >
-                {formData.partyType === "Supplier"
+                {formData.partyType === ""
                   ? "Select Type"
                   : formData.partyType}
               </span>
@@ -305,10 +306,9 @@ const AddParty = () => {
               </svg>
             </button>
 
-            {/* Dropdown Menu */}
             {isTypeOpen && (
               <div className="absolute z-20 mt-2 w-full bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden">
-                {["Customer", "Vendor", "Both"].map((type) => (
+                {["Customer", "Vendor"].map((type) => (
                   <button
                     key={type}
                     type="button"
@@ -330,14 +330,14 @@ const AddParty = () => {
             <button
               type="submit"
               disabled={loading}
-              className="px-10 py-2  bg-black text-white rounded-xl hover:bg-gray-900 transition font-medium disabled:opacity-50"
+              className="px-12 py-2 bg-[#343434] text-white rounded-2xl hover:bg-gray-900 transition font-medium disabled:opacity-50"
             >
               {loading ? "Saving..." : "Save"}
             </button>
             <button
               type="button"
               onClick={handleCancel}
-              className="px-8 py-2 border-2 border-gray-900 text-gray-900 rounded-xl hover:bg-gray-50 transition font-medium"
+              className="px-12 py-2 border border-[#343434] text-[#343434] rounded-2xl hover:bg-gray-50 transition font-medium"
             >
               Cancel
             </button>

@@ -1,38 +1,88 @@
+/* Import Kantumruy font from Google Fonts */
+@import url('https://fonts.googleapis.com/css2?family=Kantumruy:wght@300;400;500;600;700&display=swap');
+
 @import "tailwindcss";
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
+/* Apply Kantumruy font globally */
+@layer base {
+  * {
+    font-family: 'Kantumruy', sans-serif;
+  }
+}
 
 :root {
-    --black-colo:#343434;
-    --gray-color :#8E8E8E;
-    
+  --black-colo: #343434;
+  --gray-color: #8E8E8E;
+
 }
 
-.bg-blacks{
-  background-color: var(--black-color)!important;
+.bg-blacks {
+  background-color: var(--black-color) !important;
 }
-.text-black{
-    color:var(--black)!important
+
+.text-black {
+  color: var(--black) !important
 }
 
 /* Hide scrollbar while maintaining scroll functionality */
 .scrollbar-hide::-webkit-scrollbar {
   display: none;
 }
+
 .scrollbar-hide {
   -ms-overflow-style: none;
   scrollbar-width: none;
 }
+
 /* Hide scrollbar but allow scroll */
 .hide-scrollbar {
-  -ms-overflow-style: none; /* IE & Edge */
-  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none;
+  /* IE & Edge */
+  scrollbar-width: none;
+  /* Firefox */
 }
 
 .hide-scrollbar::-webkit-scrollbar {
-  display: none; /* Chrome, Safari */
+  display: none;
+  /* Chrome, Safari */
 }
 
+/* Custom scrollbar styles */
+.scrollbar-custom::-webkit-scrollbar {
+  width: 6px;
+}
 
+.scrollbar-custom::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 10px;
+}
+
+.scrollbar-custom::-webkit-scrollbar-thumb {
+  background: #888;
+  border-radius: 10px;
+}
+
+.scrollbar-custom::-webkit-scrollbar-thumb:hover {
+  background: #555;
+}
+
+/* Thin scrollbar for subcategories */
+.scrollbar-thin::-webkit-scrollbar {
+  width: 4px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  background: #d1d5db;
+  border-radius: 10px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb:hover {
+  background: #9ca3af;
+}

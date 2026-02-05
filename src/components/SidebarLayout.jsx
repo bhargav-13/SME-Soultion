@@ -1,5 +1,5 @@
-import React, { useState } from "react";
-import { Link, useLocation, useNavigate } from "react-router-dom";
+import React, { useState, useRef, useEffect, useCallback } from "react";
+import { Link, useLocation } from "react-router-dom";
 import {
   Menu,
   X,
@@ -10,17 +10,45 @@ import {
   ChevronRight,
   User,
   ListTodo,
-} from "lucide-react"; // icons
+} from "lucide-react";
 
 import Navbar from "./navbar";
 import logo from "../assets/logo.png";
 
 const SidebarLayout = ({ children }) => {
   const [isOpen, setIsOpen] = useState(false);
-  const [mastersOpen, setMastersOpen] = useState(false);
-  const location = useLocation(); // for active tab
-  const isActive = (path) => location.pathname === path;
+  const location = useLocation();
   const isMastersActive = location.pathname.startsWith("/masters");
+  const [mastersOpen, setMastersOpen] = useState(false);
+  const [popoverPos, setPopoverPos] = useState({ top: 0, left: 0 });
+  const mastersRef = useRef(null);
+  const closeTimer = useRef(null);
+
+  const openPopover = useCallback(() => {
+    clearTimeout(closeTimer.current);
+    if (mastersRef.current) {
+      const rect = mastersRef.current.getBoundingClientRect();
+      setPopoverPos({
+        top: rect.top,
+        left: rect.right + 8,
+      });
+    }
+    setMastersOpen(true);
+  }, []);
+
+  const closePopover = useCallback(() => {
+    closeTimer.current = setTimeout(() => {
+      setMastersOpen(false);
+    }, 150);
+  }, []);
+
+  const cancelClose = useCallback(() => {
+    clearTimeout(closeTimer.current);
+  }, []);
+
+  useEffect(() => {
+    return () => clearTimeout(closeTimer.current);
+  }, []);
 
   // Masters submenu links
   const masterLinks = [
@@ -65,13 +93,6 @@ const SidebarLayout = ({ children }) => {
       label: "In House Plating",
       icon: <Layers className="w-5 h-5" />,
     },
-    // { to: "/packing-list", label: "Packing List", icon: <ShoppingCart className="w-5 h-5" /> },
-    // { to: "/plating-job", label: "Plating Job - Work", icon: <Zap className="w-5 h-5" /> },
-    // { to: "/shreya", label: "Shreya (maal banavanu)", icon: <Settings className="w-5 h-5" /> },
-    // { to: "/other-job", label: "Other Job Work", icon: <Layers className="w-5 h-5" /> },
-    // { to: "/purchase", label: "Purchase", icon: <ShoppingBag className="w-5 h-5" /> },
-    // { to: "/selling", label: "Selling", icon: <ShoppingCart className="w-5 h-5" /> },
-    // { to: "/admin", label: "Admin", icon: <UserCircle className="w-5 h-5" /> },
   ];
 
   return (
@@ -96,100 +117,84 @@ const SidebarLayout = ({ children }) => {
           </div>
 
           {/* Sidebar Links */}
-          <nav className="p-4 space-y-1">
+          <nav className="px-3 py-4 space-y-1">
             {links.map((link) => (
               <div key={link.to}>
                 {link.submenu ? (
-                  // Masters with submenu popover
-                  <div className="relative">
+                  // Masters with right-side popover
+                  <div
+                    ref={mastersRef}
+                    onMouseEnter={openPopover}
+                    onMouseLeave={closePopover}
+                  >
                     <button
-                      // onClick={() => setMastersOpen(!mastersOpen)}
-                      onMouseEnter={() => setMastersOpen(true)}
-                      onMouseLeave={() => setMastersOpen(false)}
-                      className={`w-full flex items-center px-4 py-2 `}
+                      className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg transition-all duration-200 ${
+                        mastersOpen || isMastersActive
+                          ? "bg-white text-black font-semibold border border-black ml-2"
+                          : "text-black hover:bg-gray-50"
+                      }`}
                     >
-                      <div
-                        className={`flex items-center justify-between py-2  rounded-lg transition-all duration-300 ease-out ${
-                          mastersOpen || location.pathname.includes("/masters")
-                            ? "bg-white text-black font-semibold border-2 border-black px-3"
-                            : "text-black hover:bg-gray-50"
-                        }`}
-                      >
-                        <div className="flex items-center">
-                          <span className="mr-3 text-black">
-                            {link.icon}
-                          </span>
-                          <span className="text-sm font-medium">
-                            {link.label}
-                          </span>
-                        </div>
-                        <ChevronRight
-                          className={`w-5 h-5 text-black transition-transform ms-4 ${mastersOpen ? "rotate-90" : ""}`}
-                        />
+                      <div className="flex items-center">
+                        <span className="mr-3 text-black">{link.icon}</span>
+                        <span className="text-sm font-medium">{link.label}</span>
                       </div>
+                      <ChevronRight
+                        className={`w-4 h-4 text-black transition-transform duration-200 ${mastersOpen ? "rotate-90" : ""}`}
+                      />
                     </button>
-
-                    {/* Submenu popover */}
-                    {mastersOpen && (
-                      <div
-                        className="fixed bg-white rounded-lg shadow-lg border  border-gray-200 z-50 w-48"
-                        style={{
-                          left: "15%",
-                          top: "23%",
-                        }}
-                      >
-                        {link.submenu.map((sublink) => (
-                          <Link
-                            key={sublink.to}
-                            to={sublink.to}
-                            // onClick={() => {
-                            //   setIsOpen(false);
-                            //   setMastersOpen(false);
-                            // }}
-                            onMouseEnter={() => setMastersOpen(true)}
-                            onMouseLeave={() => setMastersOpen(false)}
-                            className={`flex items-center px-4 py-3 transition-colors text-sm border-b border-b-black last:border-b-0 ${
-                              location.pathname === sublink.to
-                                ? "bg-white text-gray-900 font-semibold "
-                                : "text-gray-700 hover:bg-gray-50"
-                            }`}
-                          >
-                            {sublink.icon && (
-                              <span className="mr-3 text-gray-600">
-                                {sublink.icon}
-                              </span>
-                            )}
-                            <span>{sublink.label}</span>
-                          </Link>
-                        ))}
-                      </div>
-                    )}
                   </div>
                 ) : (
                   // Regular links
                   <Link
                     to={link.to}
                     onClick={() => setIsOpen(false)}
-                    className={`flex items-center justify-between rounded-lg transition-all duration-300 ease-out ${
+                    className={`flex items-center px-3 py-2.5 rounded-lg transition-all duration-200 ${
                       location.pathname === link.to
-                        ? "bg-white text-gray-900 font-semibold  rounded-lg px-4  border-black"
-                        : "text-gray-700  rounded-lg hover:px-4"
+                        ? "bg-white text-gray-900 font-semibold border border-black ml-2"
+                        : "text-gray-700 hover:bg-gray-50"
                     }`}
                   >
-                    <div className={`flex items-center py-2 ${
-                      location.pathname === link.to
-                        ? "bg-white text-gray-900 font-semibold border-2 rounded-lg px-3  border-black"
-                        : "text-gray-700 hover:border-2 rounded-lg border-black px-3"
-                    }`}>
-                      <span className="mr-3 text-gray-600">{link.icon}</span>
-                      <span className="text-sm font-medium">{link.label}</span>
-                    </div>
+                    <span className="mr-3 text-gray-600">{link.icon}</span>
+                    <span className="text-sm font-medium">{link.label}</span>
                   </Link>
                 )}
               </div>
             ))}
           </nav>
         </aside>
+
+        {/* Masters submenu popover - rendered outside sidebar to avoid overflow clipping */}
+        <div
+          className={`fixed z-50 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-1 transition-opacity duration-150 ${
+            mastersOpen
+              ? "opacity-100 pointer-events-auto"
+              : "opacity-0 pointer-events-none"
+          }`}
+          style={{ top: popoverPos.top, left: popoverPos.left }}
+          onMouseEnter={cancelClose}
+          onMouseLeave={closePopover}
+        >
+          {masterLinks.map((sublink) => (
+            <Link
+              key={sublink.to}
+              to={sublink.to}
+              onClick={() => {
+                setMastersOpen(false);
+                setIsOpen(false);
+              }}
+              className={`flex items-center px-4 py-2.5 transition-colors text-sm ${
+                location.pathname === sublink.to
+                  ? "bg-gray-50 text-gray-900 font-semibold"
+                  : "text-gray-700 hover:bg-gray-50"
+              }`}
+            >
+              {sublink.icon && (
+                <span className="mr-2.5 text-gray-500">{sublink.icon}</span>
+              )}
+              <span>{sublink.label}</span>
+            </Link>
+          ))}
+        </div>
 
         {/* Main content */}
         <main className="flex-1 w-full overflow-y-auto scrollbar-hide">

@@ -1,5 +1,7 @@
 import React from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
+import ProtectedRoute from "./components/ProtectedRoute";
+import Login from "./pages/Auth/Login";
 import Admin from "./pages/Admin";
 import AddParty from "./pages/Masters/Party/AddParty";
 import PartyMaster from "./pages/Masters/Party/PartyMaster";
@@ -11,37 +13,73 @@ const AppRoutes = () => {
 
   return (
     <Routes>
+      {/* Public Routes */}
+      <Route path="/login" element={<Login />} />
+
+      {/* Protected Routes */}
       <Route
         path="/"
-        element={ <Admin />}
+        element={
+          <ProtectedRoute>
+            <Admin />
+          </ProtectedRoute>
+        }
       />
       <Route
         path="/masters/party"
-        element={ <PartyMaster />}
+        element={
+          <ProtectedRoute>
+            <PartyMaster />
+          </ProtectedRoute>
+        }
       />
       <Route
         path="/masters/party/add"
-        element={ <AddParty />}
+        element={
+          <ProtectedRoute>
+            <AddParty />
+          </ProtectedRoute>
+        }
       />
       <Route
         path="/masters/party/edit/:id"
-        element={ <AddParty />}
+        element={
+          <ProtectedRoute>
+            <AddParty />
+          </ProtectedRoute>
+        }
       />
       <Route
         path="/add-party"
-        element={ <AddParty />}
+        element={
+          <ProtectedRoute>
+            <AddParty />
+          </ProtectedRoute>
+        }
       />
       <Route
         path="/masters/category"
-        element={ <CategoryMaster />}
+        element={
+          <ProtectedRoute>
+            <CategoryMaster />
+          </ProtectedRoute>
+        }
       />
       <Route
         path="/masters/item"
-        element={ <ItemMaster />}
+        element={
+          <ProtectedRoute>
+            <ItemMaster />
+          </ProtectedRoute>
+        }
       />
       <Route
         path="/masters/item/add"
-        element={ <AddItem />}
+        element={
+          <ProtectedRoute>
+            <AddItem />
+          </ProtectedRoute>
+        }
       />
 
     </Routes>

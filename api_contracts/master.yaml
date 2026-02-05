@@ -1,0 +1,801 @@
+openapi: 3.0.3
+
+info:
+  title: Master Management API
+  version: 1.0.0
+  description: OpenAPI for Master management
+
+servers:
+  - url: http://localhost:8080
+    description: Local development server
+  - url: http://localhost:8080
+    description: Production Server
+
+tags:
+  - name: Party
+    description: Party Endpoints
+  - name: Category
+    description: Category Endpoints
+  - name: SubCategory
+    description: Sub Category Endpoints
+  - name: Item
+    description: Item Endpoints
+
+security:
+  - oauth2: [ ]
+
+paths:
+
+  # -------------------- CATEGORY --------------------
+  /api/v1/categories:
+    get:
+      operationId: getAllCategories
+      tags:
+        - Category
+      summary: Get all categories
+      parameters:
+        - $ref: '#/components/parameters/searchParam'
+      responses:
+        '200':
+          description: Category list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Category'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+    post:
+      operationId: createCategory
+      tags:
+        - Category
+      summary: Create category
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NewCategory'
+      responses:
+        '201':
+          description: Category created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Category'
+
+  /api/v1/categories/{id}:
+    get:
+      operationId: getCategoryById
+      tags:
+        - Category
+      summary: Get category by id
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: Category details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Category'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+
+    put:
+      operationId: updateCategory
+      tags:
+        - Category
+      summary: Update category
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NewCategory'
+      responses:
+        '200':
+          description: Category updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Category'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+
+    delete:
+      operationId: deleteCategory
+      tags:
+        - Category
+      summary: Delete category
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '204':
+          description: Category deleted
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+
+  # -------------------- SUB-CATEGORY --------------------
+  /api/v1/categories/{categoryId}/sub-categories:
+    get:
+      operationId: getAllSubCategories
+      tags:
+        - SubCategory
+      summary: Get all sub categories
+      parameters:
+        - name: categoryId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - $ref: '#/components/parameters/searchParam'
+      responses:
+        '200':
+          description: SubCategory list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/SubCategory'
+
+    post:
+      operationId: createSubCategory
+      tags:
+        - SubCategory
+      summary: Create sub category
+      parameters:
+        - name: categoryId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NewSubCategory'
+      responses:
+        '201':
+          description: SubCategory created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SubCategory'
+
+  /api/v1/categories/{categoryId}/sub-categories/{id}:
+    get:
+      operationId: getSubCategoryById
+      tags:
+        - SubCategory
+      summary: Get sub category by id
+      parameters:
+        - name: categoryId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: SubCategory details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SubCategory'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+
+    put:
+      operationId: updateSubCategory
+      tags:
+        - SubCategory
+      summary: Update sub category
+      parameters:
+        - name: categoryId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NewSubCategory'
+      responses:
+        '200':
+          description: SubCategory updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SubCategory'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+
+    delete:
+      operationId: deleteSubCategory
+      tags:
+        - SubCategory
+      summary: Delete sub category
+      parameters:
+        - name: categoryId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '204':
+          description: SubCategory deleted
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+
+  # -------------------- ITEM --------------------
+  /api/v1/items:
+    get:
+      operationId: getAllItems
+      tags:
+        - Item
+      summary: Get items (paginated)
+      parameters:
+        - name: filterByStatus
+          in: query
+          description: Filter item by stock status
+          schema:
+            type: string
+            enum:
+              - IN_STOCK
+              - LOW_STOCK
+        - $ref: '#/components/parameters/searchParam'
+        - $ref: '#/components/parameters/pageParam'
+        - $ref: '#/components/parameters/sizeParam'
+        - $ref: '#/components/parameters/SortByFields'
+        - $ref: '#/components/parameters/directionParam'
+      responses:
+        '200':
+          description: Paginated item list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedResultItem'
+
+    post:
+      operationId: createItem
+      tags:
+        - Item
+      summary: Create item
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NewItem'
+      responses:
+        '201':
+          description: Item created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Item'
+  
+  /api/v1/items/{id}:
+    get:
+      operationId: getItemById
+      tags:
+        - Item
+      summary: Get item by id
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: Item details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Item'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+
+    put:
+      operationId: updateItem
+      tags:
+        - Item
+      summary: Update item
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NewItem'
+      responses:
+        '200':
+          description: Item updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Item'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+
+    delete:
+      operationId: deleteItem
+      tags:
+        - Item
+      summary: Delete item
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '204':
+          description: Item deleted
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+
+  # -------------------- PARTY --------------------
+  /api/v1/parties:
+    get:
+      operationId: getAllParties
+      tags:
+        - Party
+      summary: Get all parties
+      parameters:
+        - name: partyType
+          in: query
+          description: Filter parties by type
+          schema:
+            type: string
+            enum:
+              - CUSTOMER
+              - VENDOR
+        - $ref: '#/components/parameters/searchParam'
+      responses:
+        '200':
+          description: Party list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Party'
+
+    post:
+      operationId: createParty
+      tags:
+        - Party
+      summary: Create party
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NewParty'
+      responses:
+        '201':
+          description: Party created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Party'
+
+  /api/v1/parties/{id}:
+    get:
+      operationId: getPartyById
+      tags:
+        - Party
+      summary: Get party by id
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: Party details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Party'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+
+    put:
+      operationId: updateParty
+      tags:
+        - Party
+      summary: Update party
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NewParty'
+      responses:
+        '200':
+          description: Party updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Party'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+
+    delete:
+      operationId: deleteParty
+      tags:
+        - Party
+      summary: Delete party
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '204':
+          description: Party deleted
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+components:
+
+  securitySchemes:
+    oauth2:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    pageParam:
+      name: page
+      in: query
+      description: Page number starting from 0
+      schema:
+        type: integer
+        default: 0
+
+    sizeParam:
+      name: size
+      in: query
+      description: Number of items per page
+      schema:
+        type: integer
+        default: 10
+
+    directionParam:
+      name: direction
+      in: query
+      description: Sort direction
+      schema:
+        type: string
+        enum:
+          - ASC
+          - DESC
+    searchParam:
+      name: search
+      in: query
+      description: Search text to filter results by name or relevant fields
+      schema:
+        type: string
+
+    SortByFields:
+      name: sortByFields
+      in: query
+      description: Field to sort by
+      schema:
+        type: string
+        enum:
+          - lastUpdatedAt
+          - createdAt
+
+  schemas:
+    NewCategory:
+      required:
+        - name
+      type: object
+      properties:
+        name:
+          type: string
+        subCategories:
+          type: array
+          items:
+            $ref: '#/components/schemas/NewSubCategory'
+    Category:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        name:
+          type: string
+        subCategories:
+          type: array
+          items:
+            $ref: '#/components/schemas/SubCategory'
+    NewSubCategory:
+      required:
+        - name
+      type: object
+      properties:
+        name:
+          type: string
+    SubCategory:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        name:
+          type: string
+    ItemCategory:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        name:
+          type: string
+    ItemSubCategory:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        name:
+          type: string
+
+    NewItem:
+      required:
+        - sizeInch
+        - sizeMm
+        - categoryId
+        - subCategoryId
+        - itemKg
+        - weightPerPc
+        - totalPc
+        - dozenWeight
+        - lowStockWarning
+        - stockStatus
+      type: object
+      properties:
+        sizeInch:
+          type: string
+        sizeMm:
+          type: string
+        categoryId:
+          type: integer
+          format: int64
+        subCategoryId:
+          type: integer
+          format: int64
+        itemKg:
+          type: number
+          format: double
+        weightPerPc:
+          type: number
+          format: double
+        totalPc:
+          type: number
+          format: double
+        dozenWeight:
+          type: number
+          format: double
+        lowStockWarning:
+          type: number
+          format: double
+        stockStatus:
+          $ref: '#/components/schemas/StockStatus'
+    Item:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        sizeInch:
+          type: string
+        sizeMm:
+          type: string
+        itemCategory:
+          $ref: '#/components/schemas/ItemCategory'
+        itemSubCategory:
+          $ref: '#/components/schemas/ItemSubCategory'
+        itemKg:
+          type: number
+          format: double
+        weightPerPc:
+          type: number
+          format: double
+        totalPc:
+          type: number
+          format: double
+        dozenWeight:
+          type: number
+          format: double
+        lowStockWarning:
+          type: number
+          format: double
+        stockStatus:
+          $ref: '#/components/schemas/StockStatus'
+    NewParty:
+      required:
+        - name
+        - gst
+        - contactNo
+        - email
+        - partyType
+      type: object
+      properties:
+        name:
+          type: string
+        gst:
+          type: string
+        contactNo:
+          type: string
+        email:
+          type: string
+        partyType:
+          $ref: '#/components/schemas/PartyType'
+    Party:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        name:
+          type: string
+        gst:
+          type: string
+        contactNo:
+          type: string
+        email:
+          type: string
+        partyType:
+          $ref: '#/components/schemas/PartyType'
+
+    PartyType:
+      type: string
+      enum:
+        - CUSTOMER
+        - VENDOR
+
+    StockStatus:
+      type: string
+      enum:
+        - IN_STOCK
+        - LOW_STOCK
+
+    ErrorResponse:
+      type: object
+      properties:
+        message:
+          type: string
+        code:
+          type: string
+        detail:
+          type: object
+
+    PaginatedResultItem:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Item'
+        empty:
+          type: boolean
+          description: Indicates if the current page is empty
+        last:
+          type: boolean
+          description: Indicates if the current page is the last page
+        first:
+          type: boolean
+          description: Indicates if the current page is the first page
+        totalPages:
+          type: integer
+          description: Total number of pages available
+        totalElements:
+          type: integer
+          description: Total number of elements
+        size:
+          type: integer
+          description: Number of items per page
+  
+  responses:
+    UnauthorizedError:
+      description: Unauthorized
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+    ForbiddenError:
+      description: Forbidden
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+    NotFoundError:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+    InternalServerError:
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'

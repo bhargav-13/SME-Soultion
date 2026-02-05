@@ -5,12 +5,13 @@ import SidebarLayout from "../../../components/SidebarLayout";
 import ConfirmationDialog from "../../../components/ConfirmationDialog";
 import PartiesTable from "../../../components/Party/PartiesTable";
 import EditPartyDialog from "../../../components/Party/EditPartyDialog";
-import PartiesData from "../../../Data/partydata";
+import { partyApi } from "../../../services/apiService";
+import toast from 'react-hot-toast';
 
 const PartyMaster = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const [parties, setParties] = useState(PartiesData);
+  const [parties, setParties] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [typeFilter, setTypeFilter] = useState("");
@@ -35,25 +36,40 @@ const PartyMaster = () => {
     fetchParties();
   }, []);
 
-  const fetchParties = () => {
+  const fetchParties = async () => {
     try {
       setLoading(true);
-      // Use mock data instead of API
-      setParties([...PartiesData]);
+      const response = await partyApi.getAllParties();
+      const partiesData = response.data;
+      
+      // Transform API data to match component expectations
+      const transformedParties = partiesData.map(party => ({
+        id: party.id,
+        name: party.name,
+        email: party.email,
+        phone: party.contactNo,
+        contact: party.contactNo,
+        gstin: party.gst,
+        type: party.partyType === 'CUSTOMER' ? 'Customer' : 'Vendor',
+      }));
+      
+      setParties(transformedParties);
+      
       // Calculate stats
-      const customers = PartiesData.filter((p) => p.type === "Customer").length;
-      const vendors = PartiesData.filter((p) => p.type === "Vendor").length;
+      const customers = transformedParties.filter((p) => p.type === "Customer").length;
+      const vendors = transformedParties.filter((p) => p.type === "Vendor").length;
       setStats({
         customers,
         vendors,
-        total: PartiesData.length,
+        total: transformedParties.length,
       });
     } catch (error) {
       console.error("Error fetching parties:", error);
+      toast.error(error.response?.data?.message || 'Failed to fetch parties');
       setStats({
-        customers: 32,
-        vendors: 24,
-        total: 56,
+        customers: 0,
+        vendors: 0,
+        total: 0,
       });
     } finally {
       setLoading(false);
@@ -81,24 +97,27 @@ const PartyMaster = () => {
     });
   };
 
-  const handleSaveEdit = (formData) => {
-    const updatedParties = parties.map((party) =>
-      party.id === editDialog.data.id
-        ? {
-            ...party,
-            name: formData.name,
-            email: formData.email,
-            phone: formData.phone,
-            contact: formData.phone,
-            gstin: formData.gstin,
-            type: formData.type,
-          }
-        : party,
-    );
-    setParties(updatedParties);
-    setEditDialog({ isOpen: false, data: null });
-    setMessage("Party updated successfully!");
-    setTimeout(() => setMessage(""), 3000);
+  const handleSaveEdit = async (formData) => {
+    try {
+      const updateData = {
+        name: formData.name,
+        email: formData.email,
+        contactNo: formData.phone,
+        gst: formData.gstin,
+        partyType: formData.type === 'Customer' ? 'CUSTOMER' : 'VENDOR',
+      };
+      
+      await partyApi.updateParty(editDialog.data.id, updateData);
+      
+      // Refresh the list
+      await fetchParties();
+      
+      setEditDialog({ isOpen: false, data: null });
+      toast.success("Party updated successfully!");
+    } catch (error) {
+      console.error("Error updating party:", error);
+      toast.error(error.response?.data?.message || 'Failed to update party');
+    }
   };
 
   const handleDeleteClick = (party) => {
@@ -111,13 +130,16 @@ const PartyMaster = () => {
 
   const handleConfirmDelete = async () => {
     try {
-      // Remove party from mock data
-      setParties(parties.filter((p) => p.id !== deleteDialog.partyId));
-      setMessage("Party deleted successfully!");
+      await partyApi.deleteParty(deleteDialog.partyId);
+      
+      // Refresh the list
+      await fetchParties();
+      
       setDeleteDialog({ isOpen: false, partyId: null, partyName: "" });
-      setTimeout(() => setMessage(""), 3000);
+      toast.success("Party deleted successfully!");
     } catch (error) {
       console.error("Error deleting party:", error);
+      toast.error(error.response?.data?.message || 'Failed to delete party');
     }
   };
 
@@ -141,7 +163,7 @@ const PartyMaster = () => {
             </div>
             <button
               onClick={() => navigate("/masters/party/add")}
-              className="flex items-center gap-2 bg-white text-gray-800 border-2 border-gray-900 px-6 py-2 rounded-lg hover:bg-gray-50 transition font-medium"
+              className="flex items-center gap-2 bg-white text-gray-800 border border-gray-900 px-6 py-2 rounded-lg hover:bg-gray-50 transition font-medium"
             >
               <Plus className="w-5 h-5" />
               Add Party

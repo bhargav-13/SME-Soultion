@@ -1,0 +1,382 @@
+openapi: 3.0.3
+info:
+  title: User Management API
+  version: 1.0.0
+  description: OpenAPI for Auth (signin, refresh) and user management
+servers:
+  - url: http://localhost:8080
+    description: Local development server
+  - url: http://ec2-65-1-248-131.ap-south-1.compute.amazonaws.com
+    description: Production Server
+
+tags:
+  - name: Authentication
+    description: Auth related endpoints (signin, refresh)
+  - name: User Management
+    description: User CRUD operations and registration
+
+paths:
+  /api/v1/auth/signin:
+    post:
+      tags:
+        - Authentication
+      operationId: signIn
+      summary: Sign in with username and password
+      description: Returns an access token and a refresh token on successful authentication.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SignInRequest'
+      responses:
+        '200':
+          description: Authentication successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '400':
+          description: Bad request (validation error)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v1/auth/refresh:
+    post:
+      tags:
+        - Authentication
+      operationId: refreshToken
+      summary: Refresh access token using refresh token
+      description: Returns a new access token using a valid refresh token.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RefreshTokenRequest'
+      responses:
+        '200':
+          description: Token refresh successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '401':
+          description: Invalid or expired refresh token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      security:
+        - oauth2: [ ]
+
+  /api/v1/users/register:
+    post:
+      tags:
+        - User Management
+      operationId: registerUser
+      summary: Register a new user
+      description: Create a new user account with email, password, and user group
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserRegistrationRequest'
+      responses:
+        '201':
+          description: User registered successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '400':
+          description: Bad request (user already exists or validation error)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v1/users:
+    get:
+      tags:
+        - User Management
+      operationId: getAllUsers
+      summary: Get all users with pagination (Admin only)
+      description: Returns a paginated list of all registered users
+      parameters:
+        - $ref: '#/components/parameters/pageParam'
+        - $ref: '#/components/parameters/sizeParam'
+        - name: search
+          in: query
+          required: false
+          schema:
+            type: string
+        - $ref: '#/components/parameters/SortByFields'
+        - $ref: '#/components/parameters/directionParam'
+      responses:
+        '200':
+          description: Paginated list of users
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedResultUser'
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden - Admin access required
+      security:
+        - oauth2: [ ]
+
+  /api/v1/users/{id}:
+    get:
+      tags:
+        - User Management
+      operationId: getUserById
+      summary: Get user by ID (Admin only)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: User details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '404':
+          description: User not found
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden
+      security:
+        - oauth2: [ ]
+
+    delete:
+      tags:
+        - User Management
+      operationId: deleteUser
+      summary: Delete user by ID (Admin only)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '204':
+          description: User deleted successfully
+        '404':
+          description: User not found
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden
+      security:
+        - oauth2: [ ]
+
+  /api/v1/users/{id}/group:
+    put:
+      tags:
+        - User Management
+      operationId: updateUserGroup
+      summary: Update user's group (Admin only)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateUserGroupRequest'
+      responses:
+        '200':
+          description: User group updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '404':
+          description: User not found
+        '400':
+          description: Invalid request
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden
+      security:
+        - oauth2: [ ]
+
+components:
+  securitySchemes:
+    oauth2:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    pageParam:
+      name: page
+      in: query
+      description: Page number starting from 0
+      required: false
+      schema:
+        type: integer
+        default: 0
+
+    sizeParam:
+      name: size
+      in: query
+      description: Number of items (records) per page
+      required: false
+      schema:
+        type: integer
+        default: 10
+
+    directionParam:
+      name: direction
+      in: query
+      description: Sort direction
+      schema:
+        type: string
+        enum: [ ASC, DESC ]
+
+    SortByFields:
+      name: sortByFields
+      in: query
+      description: Field to sort by
+      schema:
+        type: string
+        enum: [ lastUpdatedAt , createdAt ]
+  schemas:
+    SignInRequest:
+      type: object
+      required:
+        - username
+        - password
+      properties:
+        username:
+          type: string
+          description: Username or email
+          format: email
+        password:
+          type: string
+          description: Plain-text password (sent over HTTPS only)
+
+    RefreshTokenRequest:
+      type: object
+      required:
+        - refreshToken
+      properties:
+        refreshToken:
+          type: string
+          description: Valid refresh token
+
+    AuthResponse:
+      type: object
+      properties:
+        accessToken:
+          type: string
+          description: JWT used for authorization
+        refreshToken:
+          type: string
+          description: Token used to obtain new access tokens
+    ErrorResponse:
+      type: object
+      properties:
+        message:
+          type: string
+        code:
+          type: string
+        detail:
+          type: object
+
+    UserRegistrationRequest:
+      type: object
+      required:
+        - email
+        - password
+        - userGroup
+      properties:
+        email:
+          type: string
+          format: email
+          description: User's email address (used as username)
+        password:
+          type: string
+          description: Plain-text password (min 6 characters)
+        userGroup:
+          $ref: '#/components/schemas/UserGroup'
+
+    User:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+          description: User ID
+        email:
+          type: string
+          description: User's email
+        userGroup:
+          $ref: '#/components/schemas/UserGroup'
+        enabled:
+          type: boolean
+          description: Whether the account is enabled
+
+    UpdateUserGroupRequest:
+      type: object
+      required:
+        - userGroup
+      properties:
+        userGroup:
+          $ref: '#/components/schemas/UserGroup'
+    UserGroup:
+      type: string
+      enum:
+        - Admin
+      description: User Group
+    PaginatedResultUser:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/User'
+        empty:
+          type: boolean
+          description: Indicates if the current page is empty
+        last:
+          type: boolean
+          description: Indicates if the current page is the last page
+        first:
+          type: boolean
+          description: Indicates if the current page is the first page
+        totalPages:
+          type: integer
+          description: Total number of pages available
+        totalElements:
+          type: integer
+          description: Total number of elements
+        size:
+          type: integer
+          description: Number of items per page

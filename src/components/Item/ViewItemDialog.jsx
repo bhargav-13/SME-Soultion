@@ -196,7 +196,7 @@ const ViewItemDialog = ({
           </button>
           <button
             onClick={handleDelete}
-            className="border-2 border-gray-800 text-gray-800 px-4 py-2 rounded-lg hover:bg-gray-50 transition font-medium text-sm"
+            className="border border-gray-800 text-gray-800 px-4 py-2 rounded-lg hover:bg-gray-50 transition font-medium text-sm"
           >
             Delete
           </button>
