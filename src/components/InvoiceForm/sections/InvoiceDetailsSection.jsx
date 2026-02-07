@@ -1,7 +1,7 @@
 import React from "react";
 import FormInput from "../FormInput";
 
-const InvoiceDetailsSection = ({ formData, onChange, readOnly = false }) => {
+const InvoiceDetailsSection = ({ formData, onChange, disabled = false }) => {
   return (
     <>
       <div className="grid grid-cols-3 gap-4">
@@ -10,8 +10,8 @@ const InvoiceDetailsSection = ({ formData, onChange, readOnly = false }) => {
           name="invoiceNo"
           value={formData.invoiceNo}
           onChange={onChange}
+          disabled={disabled}
           placeholder="01"
-          disabled={readOnly}
         />
         <FormInput
           label="Invoice Date"
@@ -19,87 +19,87 @@ const InvoiceDetailsSection = ({ formData, onChange, readOnly = false }) => {
           type="date"
           value={formData.invoiceDate}
           onChange={onChange}
-          disabled={readOnly}
+          disabled={disabled}
         />
         <FormInput
           label="GST No"
           name="gstNo"
           value={formData.gstNo}
           onChange={onChange}
+          disabled={disabled}
           placeholder="24AAMCC7842H1ZG"
-          disabled={readOnly}
         />
         <FormInput
           label="IEC Code"
           name="iecCode"
           value={formData.iecCode}
           onChange={onChange}
+          disabled={disabled}
           placeholder="AAGFI3929N"
-          disabled={readOnly}
         />
         <FormInput
           label="P/O No."
           name="poNo"
           value={formData.poNo}
           onChange={onChange}
+          disabled={disabled}
           placeholder="67937969"
-          disabled={readOnly}
         />
         <FormInput
           label="Incoterms"
           name="incoterms"
           value={formData.incoterms}
           onChange={onChange}
+          disabled={disabled}
           placeholder="F.O.B"
-          disabled={readOnly}
         />
         <FormInput
           label="Payment Terms"
           name="paymentTerms"
           value={formData.paymentTerms}
           onChange={onChange}
+          disabled={disabled}
           placeholder="T/T Net 15 B/L"
-          disabled={readOnly}
         />
         <FormInput
           label="Pre Carriage"
           name="preCarriage"
           value={formData.preCarriage}
           onChange={onChange}
+          disabled={disabled}
           placeholder="Jamnagar"
-          disabled={readOnly}
         />
         <FormInput
           label="Country of Origin"
           name="countryOfOrigin"
           value={formData.countryOfOrigin}
           onChange={onChange}
+          disabled={disabled}
           placeholder="India"
-          disabled={readOnly}
         />
         <FormInput
           label="Country of Final Destination"
           name="countryOfFinalDestination"
           value={formData.countryOfFinalDestination}
           onChange={onChange}
+          disabled={disabled}
           placeholder="Denmark"
-          disabled={readOnly}
         />
         <FormInput
           label="Port of Loading"
           name="portOfLoading"
           value={formData.portOfLoading}
           onChange={onChange}
+          disabled={disabled}
           placeholder="Nhava Sheva"
-          disabled={readOnly}
         />
         <FormInput
           label="Port of Discharge"
           name="portOfDischarge"
           value={formData.portOfDischarge}
           onChange={onChange}
+          disabled={disabled}
           placeholder="Dallas Port"
-          disabled={readOnly}
         />
       </div>
     </>

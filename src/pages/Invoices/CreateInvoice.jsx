@@ -1,7 +1,8 @@
-import React, { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import React, { useState, useEffect } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
 import { Plus } from "lucide-react";
 import SidebarLayout from "../../components/SidebarLayout";
+import toast from "react-hot-toast";
 
 // Reusable UI Components
 import FormSection from "../../components/InvoiceForm/FormSection";
@@ -15,9 +16,14 @@ import PackingDetailsSection from "../../components/InvoiceForm/sections/Packing
 import AdditionalChargesSection from "../../components/InvoiceForm/sections/AdditionalChargesSection";
 import BankDetailsSection from "../../components/InvoiceForm/sections/BankDetailsSection";
 import TextAreaSection from "../../components/InvoiceForm/sections/TextAreaSection";
+import { invoiceApi } from "../../services/apiService";
 
 const CreateInvoice = () => {
   const navigate = useNavigate();
+  const location = useLocation();
+
+  const [mode, setMode] = useState('create'); 
+  const [invoiceId, setInvoiceId] = useState(null);
 
   const [formData, setFormData] = useState({
     // Exporter
@@ -26,12 +32,14 @@ const CreateInvoice = () => {
     exporterAddress: "",
 
     // Bill To (Importer)
+    billToCountry: "",
     billToToTheOrder: "",
     billToName: "",
     billToContactNo: "",
     billToAddress: "",
 
     // Ship To (Importer)
+    shipToCountry: "",
     shipToToTheOrder: "",
     shipToName: "",
     shipToContactNo: "",
@@ -69,376 +77,367 @@ const CreateInvoice = () => {
     rexNo: "",
   });
 
-  const [items, setItems] = useState([
-    {
-      itemNo: "",
-      itemDescription: "",
-      hsCode: "",
-      itemQty: "",
-      unitPrice: "",
-      currency: "EUR",
-      currencyCurrentPrice: "",
-    },
-  ]);
+  const [items, setItems] = useState([{
+    itemNo: "", itemDescription: "", hsCode: "", itemQty: "",
+    unitPrice: "", currency: "EUR", currencyCurrentPrice: "",
+  }]);
 
-  const [packings, setPackings] = useState([
-    {
-      packingItemNo: "",
-      packingDescription: "",
-      totalQtyPcs: "",
-      qtyInEachCarton: "",
-      noOfCarton: "",
-      grossWeight: "",
-      netWeight: "",
-      totalCartonWith: "",
-      woodenPallet: "",
-    },
-  ]);
+  const [packings, setPackings] = useState([{
+    packingItemNo: "", packingDescription: "", totalQtyPcs: "",
+    qtyInEachCarton: "", noOfCarton: "", grossWeight: "",
+    netWeight: "", totalCartonWith: "", woodenPallet: "",
+  }]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData((prev) => ({
-      ...prev,
-      [name]: value,
-    }));
+    setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
-  const handleItemsChange = (newItems) => {
-    setItems(newItems);
-  };
-
+  const handleItemsChange = (newItems) => setItems(newItems);
+  
   const handleAddItem = () => {
-    const newItem = {
-      itemNo: "",
-      itemDescription: "",
-      hsCode: "",
-      itemQty: "",
-      unitPrice: "",
-      currency: "EUR",
-      currencyCurrentPrice: "",
-    };
-    setItems((prev) => [...prev, newItem]);
+    setItems((prev) => [...prev, {
+      itemNo: "", itemDescription: "", hsCode: "", itemQty: "",
+      unitPrice: "", currency: "EUR", currencyCurrentPrice: "",
+    }]);
   };
 
-  const handlePackingsChange = (newPackings) => {
-    setPackings(newPackings);
-  };
+  const handlePackingsChange = (newPackings) => setPackings(newPackings);
 
   const handleAddPacking = () => {
-    const newPacking = {
-      packingItemNo: "",
-      packingDescription: "",
-      totalQtyPcs: "",
-      qtyInEachCarton: "",
-      noOfCarton: "",
-      grossWeight: "",
-      netWeight: "",
-      totalCartonWith: "",
-      woodenPallet: "",
-    };
-    setPackings((prev) => [...prev, newPacking]);
+    setPackings((prev) => [...prev, {
+      packingItemNo: "", packingDescription: "", totalQtyPcs: "",
+      qtyInEachCarton: "", noOfCarton: "", grossWeight: "",
+      netWeight: "", totalCartonWith: "", woodenPallet: "",
+    }]);
   };
 
-  const handleSubmit = () => {
-    const formattedDate = formatDateForList(formData.invoiceDate);
-    const partyName =
-      formData.billToName || formData.exporterCompanyName || "Unknown Party";
-    const invoiceNo = formData.invoiceNo || "NA";
+  // ✅ FIXED USE EFFECT: Correctly maps ALL fields including Country and To The Order
+  useEffect(() => {
+    const invoice = location?.state?.invoice;
+    const modeFromState = location?.state?.mode || 'create';
+    
+    setMode(modeFromState);
+    const incomingId = invoice?.id ?? invoice?.invoiceId ?? invoice?._id ?? null;
+    if (incomingId != null) setInvoiceId(Number(incomingId));
 
-    const invoiceTypes = ["Export", "Commercial", "Packing List"];
-    const newInvoices = invoiceTypes.map((invoiceType, index) => ({
-      id: `local-${Date.now()}-${index}`,
-      invoiceNo,
-      date: formattedDate,
-      partyName,
-      invoiceType,
-      details: {
-        formData: { ...formData },
-        items: items.map((item) => ({ ...item })),
-        packings: packings.map((packing) => ({ ...packing })),
-      },
+    if (!invoice) return;
+
+    console.log("VIEW MODE DATA:", invoice); // 🔍 Check Console to see if 'billToCountry' exists here
+
+    setFormData((prev) => ({
+      ...prev,
+      // Exporter
+      exporterCompanyName: invoice.exporterCompanyName || "",
+      exporterContactNo: invoice.exporterContactNo || "",
+      exporterAddress: invoice.exporterAddress || "",
+
+      // Bill To - ✅ Added Missing Fields
+      billToCountry: invoice.billToCountry || "", 
+      billToToTheOrder: invoice.billToToTheOrder || "", 
+      billToName: invoice.billToName || "",
+      billToContactNo: invoice.billToContactNo || "",
+      billToAddress: invoice.billToAddress || "",
+
+      // Ship To - ✅ Added Missing Fields
+      shipToCountry: invoice.shipToCountry || "",
+      shipToToTheOrder: invoice.shipToToTheOrder || "",
+      shipToName: invoice.shipToName || "",
+      shipToContactNo: invoice.shipToContactNo || "",
+      shipToAddress: invoice.shipToAddress || "",
+
+      // General Details
+      invoiceNo: invoice.invoiceNo || "",
+      invoiceDate: invoice.invoiceDate || invoice.createdAt || "",
+      gstNo: invoice.gstNo || "",
+      iecCode: invoice.iecCode || "",
+      poNo: invoice.poNo || "",
+      incoterms: invoice.incoterms || "",
+      paymentTerms: invoice.paymentTerms || "",
+      preCarriage: invoice.preCarriage || "",
+      countryOfOrigin: invoice.countryOfOrigin || "",
+      countryOfFinalDestination: invoice.countryOfFinalDestination || "",
+      portOfLoading: invoice.portOfLoading || "",
+      portOfDischarge: invoice.portOfDischarge || "",
+
+      // Charges & Bank
+      freightCost: invoice.freightCost || "",
+      insuranceCost: invoice.insuranceCost || "",
+      otherCharges: invoice.otherCost || "",
+      beneficiaryName: invoice.beneficiaryName || "",
+      beneficiaryBank: invoice.bankName || "",
+      branch: invoice.branch || "",
+      beneficiaryAcNo: invoice.accountNo || "",
+      switchCode: invoice.swiftCode || "",
+
+      // Text Fields
+      arnNo: invoice.arnNo || "",
+      rodtep: invoice.rodtep || "",
+      rexNo: invoice.rexNo || "",
     }));
 
-    const existingInvoices = getStoredInvoices();
-    localStorage.setItem(
-      "invoices",
-      JSON.stringify([...existingInvoices, ...newInvoices])
-    );
+    // Map items
+    if (Array.isArray(invoice.items) && invoice.items.length > 0) {
+      const mappedItems = invoice.items.map((it) => ({
+        itemNo: it.itemNo || "",
+        itemDescription: it.description || "",
+        hsCode: it.hsCode || "",
+        itemQty: it.quantity != null ? String(it.quantity) : "",
+        unitPrice: it.unitPriceUsd != null ? String(it.unitPriceUsd) : "",
+        currency: it.currency || "USD",
+        currencyCurrentPrice: it.currencyCurrentPrice != null ? String(it.currencyCurrentPrice) : "",
+      }));
+      setItems(mappedItems);
+    }
 
-    downloadInvoicePdf({
-      formData,
-      items,
-      packings,
-      partyName,
-      invoiceNo,
-      formattedDate,
-    });
+    // Map packing details
+    if (Array.isArray(invoice.packingDetails) && invoice.packingDetails.length > 0) {
+      const mappedPackings = invoice.packingDetails.map((p) => ({
+        packingItemNo: p.itemNo || "",
+        packingDescription: p.description || "",
+        totalQtyPcs: p.totalQty != null ? String(p.totalQty) : "",
+        qtyInEachCarton: p.qtyPerCarton != null ? String(p.qtyPerCarton) : "",
+        noOfCarton: p.noOfCartons != null ? String(p.noOfCartons) : "",
+        grossWeight: p.grossWeightKg != null ? String(p.grossWeightKg) : "",
+        netWeight: p.netWeightKg != null ? String(p.netWeightKg) : "",
+        totalCartonWith: "",
+        woodenPallet: p.woodenPallets != null ? String(p.woodenPallets) : "",
+      }));
+      setPackings(mappedPackings);
+    }
+  }, [location]);
 
-    navigate("/invoices");
-  };
-
-  const getStoredInvoices = () => {
+  // Helper to download a specific PDF type
+  // 1. Helper function to handle the download
+  const downloadPdf = async (id, type, fileName) => {
     try {
-      const raw = localStorage.getItem("invoices");
-      return raw ? JSON.parse(raw) : [];
-    } catch {
-      return [];
+      const response = await invoiceApi.getInvoicePdf(id, type, { responseType: 'blob' });
+      
+      // Create a URL for the blob
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', fileName);
+      
+      // Append to body, click, and clean up
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+      
+      return true; // Success
+    } catch (error) {
+      console.error(`Failed to download ${type}:`, error);
+      return false; // Failed
     }
   };
 
-  const formatDateForList = (dateValue) => {
-    if (!dateValue) return "";
-    const [year, month, day] = dateValue.split("-");
-    if (!year || !month || !day) return dateValue;
-    return `${day}/${month}/${year}`;
+  // 2. Main Submit Function
+  const handleSubmit = async () => {
+    try {
+      // --- Validation ---
+      if (!formData.invoiceNo) return toast.error("Invoice Number is required");
+      if (!formData.exporterCompanyName) return toast.error("Exporter Company Name is required");
+      if (items.length === 0 || !items[0].itemDescription) return toast.error("At least one item is required");
+
+      // --- Prepare Data (Your existing mapping logic) ---
+      const formattedItems = items.map(item => ({
+        itemNo: item.itemNo || "",
+        description: item.itemDescription || "",
+        hsCode: item.hsCode || "",
+        quantity: item.itemQty ? parseInt(item.itemQty) : 0,
+        unitPriceUsd: item.unitPrice ? parseFloat(item.unitPrice) : 0,
+        currencyCurrentPrice: item.currencyCurrentPrice ? parseFloat(item.currencyCurrentPrice) : 0
+      }));
+
+      const formattedPackings = packings.map(packing => ({
+        itemNo: packing.packingItemNo || "",
+        description: packing.packingDescription || "",
+        totalQty: packing.totalQtyPcs ? parseInt(packing.totalQtyPcs) : 0,
+        qtyPerCarton: packing.qtyInEachCarton ? parseInt(packing.qtyInEachCarton) : 0,
+        noOfCartons: packing.noOfCarton ? parseInt(packing.noOfCarton) : 0,
+        grossWeightKg: packing.grossWeight ? parseFloat(packing.grossWeight) : 0,
+        netWeightKg: packing.netWeight ? parseFloat(packing.netWeight) : 0,
+        woodenPallets: packing.woodenPallet ? parseInt(packing.woodenPallet) : 0
+      }));
+
+      const invoicePayload = {
+        exporterCompanyName: formData.exporterCompanyName,
+        exporterContactNo: formData.exporterContactNo,
+        exporterAddress: formData.exporterAddress,
+        billToCountry: formData.billToCountry,
+        billToToTheOrder: formData.billToToTheOrder,
+        billToName: formData.billToName,
+        billToContactNo: formData.billToContactNo,
+        billToAddress: formData.billToAddress,
+        shipToCountry: formData.shipToCountry,
+        shipToToTheOrder: formData.shipToToTheOrder,
+        shipToName: formData.shipToName,
+        shipToContactNo: formData.shipToContactNo,
+        shipToAddress: formData.shipToAddress,
+        currency: "USD",
+        invoiceNo: formData.invoiceNo,
+        invoiceDate: formData.invoiceDate || new Date().toISOString().split('T')[0],
+        gstNo: formData.gstNo,
+        iecCode: formData.iecCode,
+        poNo: formData.poNo,
+        incoterms: formData.incoterms,
+        paymentTerms: formData.paymentTerms,
+        preCarriage: formData.preCarriage,
+        countryOfOrigin: formData.countryOfOrigin,
+        countryOfFinalDestination: formData.countryOfFinalDestination,
+        portOfLoading: formData.portOfLoading,
+        portOfDischarge: formData.portOfDischarge,
+        items: formattedItems,
+        packingDetails: formattedPackings,
+        beneficiaryName: formData.beneficiaryName,
+        bankName: formData.beneficiaryBank,
+        branch: formData.branch,
+        accountNo: formData.beneficiaryAcNo,
+        swiftCode: formData.switchCode,
+        freightCost: formData.freightCost ? parseFloat(formData.freightCost) : 0,
+        insuranceCost: formData.insuranceCost ? parseFloat(formData.insuranceCost) : 0,
+        otherCost: formData.otherCharges ? parseFloat(formData.otherCharges) : 0,
+        arnNo: formData.arnNo || null,
+        rodtep: formData.rodtep || null,
+        rexNo: formData.rexNo || null
+      };
+
+      // --- API Calls ---
+      let savedInvoiceId = invoiceId;
+
+      if (mode === 'edit') {
+        if (!savedInvoiceId) return toast.error("Invoice ID not found for update");
+        await invoiceApi.updateInvoice(savedInvoiceId, invoicePayload);
+        toast.success("Invoice Updated!");
+      } else {
+        const response = await invoiceApi.createInvoice(invoicePayload);
+        // Handle array response if necessary
+        const responseData = Array.isArray(response.data) ? response.data[0] : response.data;
+        savedInvoiceId = responseData.id || responseData.invoiceId || responseData._id;
+        toast.success("Invoice Saved!");
+      }
+
+      // --- SEQUENTIAL DOWNLOADS (The Fix) ---
+      if (savedInvoiceId) {
+        const baseFilename = `Invoice-${formData.invoiceNo}`;
+        toast.loading("Downloading files...");
+
+        // 1. Download Export Invoice
+        await downloadPdf(savedInvoiceId, 'EXPORT', `${baseFilename}-Export.pdf`);
+        
+        // 2. Wait 500ms
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
+        // 3. Download Commercial Invoice
+        await downloadPdf(savedInvoiceId, 'COMMERCIAL', `${baseFilename}-Commercial.pdf`);
+
+        // 4. Wait 500ms
+        await new Promise(resolve => setTimeout(resolve, 500));
+
+        // 5. Download Packing List
+        await downloadPdf(savedInvoiceId, 'PACKAGING_LIST', `${baseFilename}-PackingList.pdf`);
+        
+        toast.dismiss();
+        toast.success("All files downloaded!");
+      }
+
+      // Navigate back after downloads
+      setTimeout(() => {
+        navigate("/invoices");
+      }, 1000);
+
+    } catch (error) {
+      console.error("Error submitting invoice:", error);
+      toast.dismiss();
+      const errMsg = error.response?.data?.message || "Failed to save/download";
+      toast.error(errMsg);
+    }
   };
-
-  const downloadInvoicePdf = ({
-    formData: invoiceForm,
-    items: invoiceItems,
-    packings: invoicePackings,
-    partyName,
-    invoiceNo,
-    formattedDate,
-  }) => {
-    const printWindow = window.open("", "_blank");
-    if (!printWindow) return;
-
-    const itemsRows = invoiceItems
-      .map(
-        (item, index) => `
-          <tr>
-            <td>${index + 1}</td>
-            <td>${item.itemDescription || "-"}</td>
-            <td>${item.hsCode || "-"}</td>
-            <td>${item.itemQty || "-"}</td>
-            <td>${item.unitPrice || "-"}</td>
-          </tr>
-        `
-      )
-      .join("");
-
-    const packingsRows = invoicePackings
-      .map(
-        (packing, index) => `
-          <tr>
-            <td>${index + 1}</td>
-            <td>${packing.packingDescription || "-"}</td>
-            <td>${packing.totalQtyPcs || "-"}</td>
-            <td>${packing.noOfCarton || "-"}</td>
-            <td>${packing.grossWeight || "-"}</td>
-          </tr>
-        `
-      )
-      .join("");
-
-    printWindow.document.write(`
-      <!doctype html>
-      <html>
-        <head>
-          <title>Invoice ${invoiceNo}</title>
-          <style>
-            body { font-family: Arial, sans-serif; color: #111; padding: 32px; }
-            h1 { margin: 0 0 8px; font-size: 24px; }
-            p { margin: 4px 0; }
-            table { width: 100%; border-collapse: collapse; margin-top: 16px; }
-            th, td { border: 1px solid #ddd; padding: 8px; font-size: 12px; }
-            th { background: #f3f4f6; text-align: left; }
-            .section { margin-top: 24px; }
-          </style>
-        </head>
-        <body>
-          <h1>Invoice ${invoiceNo}</h1>
-          <p><strong>Date:</strong> ${formattedDate || "-"}</p>
-          <p><strong>Party:</strong> ${partyName}</p>
-          <p><strong>Exporter:</strong> ${
-            invoiceForm.exporterCompanyName || "-"
-          }</p>
-          <p><strong>Bill To:</strong> ${invoiceForm.billToName || "-"}</p>
-          <p><strong>Ship To:</strong> ${invoiceForm.shipToName || "-"}</p>
-
-          <div class="section">
-            <h2>Items</h2>
-            <table>
-              <thead>
-                <tr>
-                  <th>#</th>
-                  <th>Description</th>
-                  <th>HS Code</th>
-                  <th>Qty</th>
-                  <th>Unit Price</th>
-                </tr>
-              </thead>
-              <tbody>${itemsRows || "<tr><td colspan='5'>No items</td></tr>"}</tbody>
-            </table>
-          </div>
-
-          <div class="section">
-            <h2>Packing</h2>
-            <table>
-              <thead>
-                <tr>
-                  <th>#</th>
-                  <th>Description</th>
-                  <th>Total Qty</th>
-                  <th>Cartons</th>
-                  <th>Gross Wt</th>
-                </tr>
-              </thead>
-              <tbody>${packingsRows || "<tr><td colspan='5'>No packing details</td></tr>"}</tbody>
-            </table>
-          </div>
-        </body>
-      </html>
-    `);
-
-    printWindow.document.close();
-    printWindow.focus();
-    setTimeout(() => {
-      printWindow.print();
-      printWindow.close();
-    }, 300);
-  };
-
   return (
     <SidebarLayout>
       <div className="space-y-6">
-        {/* Exporter Section */}
         <FormSection title="Exporter">
-          <ExporterSection formData={formData} onChange={handleChange} />
+          <ExporterSection formData={formData} onChange={handleChange} disabled={mode === 'view'} />
         </FormSection>
 
-        {/* Bill To Section */}
         <FormSection title="Importer (Bill To)">
           <ImporterSection
             title="Bill To"
             prefix="billTo"
             formData={formData}
             onChange={handleChange}
+            disabled={mode === 'view'}
           />
         </FormSection>
 
-        {/* Ship To Section */}
         <FormSection title="Importer (Ship To)">
           <ImporterSection
             title="Ship To"
             prefix="shipTo"
             formData={formData}
             onChange={handleChange}
+            disabled={mode === 'view'}
           />
         </FormSection>
 
-        {/* Invoice Details Section */}
         <FormSection title="Invoice Details">
-          <InvoiceDetailsSection
-            formData={formData}
-            onChange={handleChange}
-          />
+          <InvoiceDetailsSection formData={formData} onChange={handleChange} disabled={mode === 'view'} />
         </FormSection>
 
-        {/* Items Details Section */}
-        <FormSection
-          title="Items Details"
-          action={
-            <button
-              type="button"
-              onClick={handleAddItem}
-              className="inline-flex items-center gap-2 bg-gray-900 text-white px-3 py-2 rounded-lg hover:bg-gray-800 transition"
-            >
-              Add Item
-              <Plus className="w-3 h-3" />
-            </button>
+        <FormSection title="Items Details" action={
+            mode !== 'view' && (
+              <button type="button" onClick={handleAddItem} className="inline-flex items-center gap-2 bg-gray-900 text-white px-3 py-2 rounded-lg hover:bg-gray-800 transition">
+                Add Item <Plus className="w-3 h-3" />
+              </button>
+            )
           }
         >
-          <ItemsDetailsSection
-            items={items}
-            onItemsChange={handleItemsChange}
-          />
+          <ItemsDetailsSection items={items} onItemsChange={handleItemsChange} disabled={mode === 'view'} />
         </FormSection>
 
-        {/* Packing Details Section */}
-        <FormSection
-          title="Packing Details"
-          action={
-            <button
-              type="button"
-              onClick={handleAddPacking}
-              className="inline-flex items-center gap-2 bg-gray-900 text-white px-3 py-2 rounded-lg hover:bg-gray-800 transition"
-            >
-              Add Item
-              <Plus className="w-3 h-3" />
-            </button>
+        <FormSection title="Packing Details" action={
+            mode !== 'view' && (
+              <button type="button" onClick={handleAddPacking} className="inline-flex items-center gap-2 bg-gray-900 text-white px-3 py-2 rounded-lg hover:bg-gray-800 transition">
+                Add Item <Plus className="w-3 h-3" />
+              </button>
+            )
           }
         >
-          <PackingDetailsSection
-            packings={packings}
-            onPackingsChange={handlePackingsChange}
-          />
+          <PackingDetailsSection packings={packings} onPackingsChange={handlePackingsChange} disabled={mode === 'view'} />
         </FormSection>
 
-        {/* Additional Charges Section */}
         <FormSection title="Extra Changes">
-          <AdditionalChargesSection
-            formData={formData}
-            onChange={handleChange}
-          />
+          <AdditionalChargesSection formData={formData} onChange={handleChange} disabled={mode === 'view'} />
         </FormSection>
 
-        {/* Bank Details Section */}
         <FormSection title="Bank Details">
-          <BankDetailsSection formData={formData} onChange={handleChange} />
+          <BankDetailsSection formData={formData} onChange={handleChange} disabled={mode === 'view'} />
         </FormSection>
 
-        {/* ARN No Section */}
         <FormSection title="ARN No">
-          <TextAreaSection
-            title="Enter ARN No."
-            name="arnNo"
-            value={formData.arnNo}
-            onChange={handleChange}
-            placeholder="SUPPLY MEANT FOR EXPORT UNDER BOND OR LUT WITHOUT PAYMENT OF INTEGRATED TAX (IGST), LUT ARN..."
-          />
+          <TextAreaSection title="Enter ARN No." name="arnNo" value={formData.arnNo} onChange={handleChange} placeholder="ARN..." disabled={mode === 'view'} />
         </FormSection>
 
-        {/* RoDTEP Section */}
         <FormSection title="RoDTEP">
-          <TextAreaSection
-            title="Enter RoDTEP"
-            name="rodtep"
-            value={formData.rodtep}
-            onChange={handleChange}
-            placeholder="WE INTEND TO CLAIM REWARDS UNDER THE 'REMISSION OF DUTIES AND TAXES ON EXPORTED PRODUCT (RoDTEP)' SCHEME."
-          />
+          <TextAreaSection title="Enter RoDTEP" name="rodtep" value={formData.rodtep} onChange={handleChange} placeholder="RoDTEP..." disabled={mode === 'view'} />
         </FormSection>
 
-        {/* REX No Section */}
         <FormSection title="REX No.">
-          <TextAreaSection
-            title="Enter REX No."
-            name="rexNo"
-            value={formData.rexNo}
-            onChange={handleChange}
-            placeholder="Ishita Industries having REX reg n [NREXEJP]xxxxx of the products covered by this document declares that, except..."
-          />
+          <TextAreaSection title="Enter REX No." name="rexNo" value={formData.rexNo} onChange={handleChange} placeholder="REX..." disabled={mode === 'view'} />
         </FormSection>
 
-{/* Submit Button */}
         <div className="flex justify-center gap-4 pt-4">
-           <button
-            onClick={handleSubmit}
-            className="px-6 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition"
-          >
-           Save & Download
+           {mode !== 'view' && (
+             <button onClick={handleSubmit} className="px-6 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition">
+              {mode === 'edit' ? 'Update Invoice' : 'Save & Download'}
+             </button>
+           )}
+          <button onClick={() => navigate("/invoices")} className="px-6 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition">
+            {mode === 'view' ? 'Back' : 'Cancel'}
           </button>
-          <button
-            onClick={() => navigate("/invoices")}
-            className="px-6 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition"
-          >
-            Cancel
-          </button>
-         
         </div>
-        </div>
+      </div>
     </SidebarLayout>
   );
 };

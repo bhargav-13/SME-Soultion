@@ -1,9 +1,8 @@
 import React from "react";
 import ItemCard from "../components/ItemCard";
 
-const ItemsDetailsSection = ({ items, onItemsChange, readOnly = false }) => {
+const ItemsDetailsSection = ({ items, onItemsChange, disabled = false }) => {
   const removeItem = (index) => {
-    if (readOnly) return;
     if (items.length > 1) {
       const updatedItems = items.filter((_, i) => i !== index);
       onItemsChange(updatedItems);
@@ -30,7 +29,7 @@ const ItemsDetailsSection = ({ items, onItemsChange, readOnly = false }) => {
             onChange={handleItemChange}
             onRemove={removeItem}
             canRemove={items.length > 1}
-            readOnly={readOnly}
+            disabled={disabled}
           />
         </div>
       ))}

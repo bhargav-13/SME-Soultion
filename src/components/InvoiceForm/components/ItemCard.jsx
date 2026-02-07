@@ -3,25 +3,25 @@ import { X } from "lucide-react";
 import FormInput from "../FormInput";
 import FormSelect from "../FormSelect";
 
-const ItemCard = ({
-  item,
-  index,
-  onChange,
-  onRemove,
+const ItemCard = ({ 
+  item, 
+  index, 
+  onChange, 
+  onRemove, 
   canRemove,
-  readOnly = false,
+  disabled = false,
   currencyOptions = [
     { value: "USD", label: "USD" },
     { value: "EUR", label: "Euro" },
-  ],
+    
+  ]
 }) => {
   return (
     <div className="bg-white border border-gray-200 rounded-xl p-5 relative">
+      {/* Item Number and Remove Button */}
       <div className="flex items-center justify-between mb-4">
-        <span className="text-sm font-medium text-gray-500">
-          Item #{index + 1}
-        </span>
-        {canRemove && !readOnly && (
+        <span className="text-sm font-medium text-gray-500">Item #{index + 1}</span>
+        {canRemove && (
           <button
             type="button"
             onClick={() => onRemove(index)}
@@ -39,7 +39,7 @@ const ItemCard = ({
           value={item.itemNo || ""}
           onChange={(e) => onChange(index, e)}
           placeholder="01"
-          disabled={readOnly}
+          disabled={disabled}
         />
         <FormInput
           label="Description"
@@ -47,7 +47,7 @@ const ItemCard = ({
           value={item.itemDescription || ""}
           onChange={(e) => onChange(index, e)}
           placeholder="FNESPBL 10-32 X 5/16 A/F E.S.P Hex Nut"
-          disabled={readOnly}
+          disabled={disabled}
         />
         <FormInput
           label="HS Code"
@@ -55,7 +55,7 @@ const ItemCard = ({
           value={item.hsCode || ""}
           onChange={(e) => onChange(index, e)}
           placeholder="1001"
-          disabled={readOnly}
+          disabled={disabled}
         />
         <FormInput
           label="Qty (Pcs)"
@@ -63,7 +63,7 @@ const ItemCard = ({
           value={item.itemQty || ""}
           onChange={(e) => onChange(index, e)}
           placeholder="1232"
-          disabled={readOnly}
+          disabled={disabled}
         />
         <div className="flex gap-2">
           <div className="">
@@ -73,7 +73,7 @@ const ItemCard = ({
               value={item.unitPrice || ""}
               onChange={(e) => onChange(index, e)}
               placeholder="135.45"
-              disabled={readOnly}
+              disabled={disabled}
             />
           </div>
           <div className="relative w-26 ">
@@ -85,8 +85,8 @@ const ItemCard = ({
               options={currencyOptions}
               defaultValue="EUR"
               showIcon
-              iconText="â‚¬"
-              disabled={readOnly}
+              iconText="€"
+              disabled={disabled}
             />
           </div>
         </div>
@@ -96,7 +96,7 @@ const ItemCard = ({
           value={item.currencyCurrentPrice || ""}
           onChange={(e) => onChange(index, e)}
           placeholder="91.10"
-          disabled={readOnly}
+          disabled={disabled}
         />
       </div>
     </div>
@@ -104,3 +104,4 @@ const ItemCard = ({
 };
 
 export default ItemCard;
+
