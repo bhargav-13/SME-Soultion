@@ -13,6 +13,7 @@ import InvoicesList from "./pages/Invoices/InvoicesList";
 import CreateInvoice from "./pages/Invoices/CreateInvoice";
 
 const AppRoutes = () => {
+
   return (
     <Routes>
       {/* Public Routes */}
@@ -24,7 +25,7 @@ const AppRoutes = () => {
         element={
           <ProtectedRoute>
             <Admin />
-          </ProtectedRoute>
+           </ProtectedRoute>
         }
       />
       <Route
@@ -48,7 +49,7 @@ const AppRoutes = () => {
         element={
           <ProtectedRoute>
             <AddParty />
-          </ProtectedRoute>
+          </ProtectedRoute> 
         }
       />
       <Route
@@ -56,7 +57,7 @@ const AppRoutes = () => {
         element={
           <ProtectedRoute>
             <AddParty />
-          </ProtectedRoute>
+           </ProtectedRoute>
         }
       />
       <Route
@@ -64,7 +65,7 @@ const AppRoutes = () => {
         element={
           <ProtectedRoute>
             <CategoryMaster />
-          </ProtectedRoute>
+           </ProtectedRoute>
         }
       />
       <Route
@@ -90,19 +91,20 @@ const AppRoutes = () => {
       <Route
         path="/invoices"
         element={
-          <ProtectedRoute>
+           <ProtectedRoute>
             <InvoicesList />
-          </ProtectedRoute>
-        }
+            </ProtectedRoute>}
+         
       />
-      <Routes
+      <Route
         path="/invoices/create"
         element={
-          <ProtectedRoute>
+           <ProtectedRoute>
             <CreateInvoice />
-          </ProtectedRoute>
+            </ProtectedRoute>
         }
       />
+
     </Routes>
   );
 };
