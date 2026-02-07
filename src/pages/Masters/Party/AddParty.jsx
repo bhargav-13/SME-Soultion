@@ -34,9 +34,9 @@ const AddParty = () => {
     data: null,
   });
   const PARTY_TYPES = [
-    { label: "Customer", value: "Customer" },
-    { label: "Vendor", value: "Vendor" },
-    { label: "Both", value: "Customer/Vendor" },
+    { label: "Customer", value: "CUSTOMER" },
+    { label: "Vendor", value: "VENDOR"},
+    { label: "Both", value: "BOTH" },
   ];
 
   useEffect(() => {
