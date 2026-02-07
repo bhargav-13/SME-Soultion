@@ -1,7 +1,12 @@
 import React, { useState, useEffect } from "react";
 import { X } from "lucide-react";
 
-const EditPartyDialog = ({ isOpen, onClose, onSave, initialData = null }) => {
+const EditPartyDialog = ({
+  isOpen,
+  onClose,
+  onSave,
+  initialData = null,
+}) => {
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -10,11 +15,6 @@ const EditPartyDialog = ({ isOpen, onClose, onSave, initialData = null }) => {
     type: "Supplier",
   });
   const [isTypeOpen, setIsTypeOpen] = useState(false);
-  const PARTY_TYPES = [
-    { label: "Customer", value: "Customer" },
-    { label: "Vendor", value: "Vendor" },
-    { label: "Both", value: "Customer/Vendor" },
-  ];
 
   useEffect(() => {
     if (initialData) {
@@ -160,20 +160,17 @@ const EditPartyDialog = ({ isOpen, onClose, onSave, initialData = null }) => {
 
             {isTypeOpen && (
               <div className="absolute z-20 mt-2 w-full bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden">
-                {PARTY_TYPES.map((item) => (
+                {["Customer", "Vendor", "Both"].map((type) => (
                   <button
-                    key={item.label}
+                    key={type}
                     type="button"
                     onClick={() => {
-                      setFormData((prev) => ({
-                        ...prev,
-                        partyType: item.value, // ✅ saved value
-                      }));
+                      setFormData((prev) => ({ ...prev, type }));
                       setIsTypeOpen(false);
                     }}
                     className="w-full text-left px-4 py-2 text-sm hover:bg-gray-100 transition"
                   >
-                    {item.label}
+                    {type}
                   </button>
                 ))}
               </div>

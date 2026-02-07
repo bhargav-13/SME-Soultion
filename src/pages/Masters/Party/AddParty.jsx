@@ -24,11 +24,6 @@ const AddParty = () => {
   const [typeFilter, setTypeFilter] = useState("");
   const [isTypeOpen, setIsTypeOpen] = useState(false);
 
-  const PARTY_TYPES = [
-  { label: "Customer", value: "Customer" },
-  { label: "Vendor", value: "Vendor" },
-  { label: "Both", value: "Customer/Vendor" },
-];
   const [deleteDialog, setDeleteDialog] = useState({
     isOpen: false,
     partyId: null,
@@ -56,7 +51,7 @@ const AddParty = () => {
         phone: party.contactNo,
         contact: party.contactNo,
         gstin: party.gst,
-        type: party.partyType,
+        type: party.partyType === "CUSTOMER" ? "Customer" : "Vendor",
       }));
 
       setParties(transformedParties);
@@ -94,7 +89,7 @@ const AddParty = () => {
         email: formData.email,
         contactNo: formData.phone,
         gst: formData.gstNumber,
-        partyType: formData.partyType,
+        partyType: formData.partyType === "Customer" ? "CUSTOMER" : "VENDOR",
       };
 
       await partyApi.createParty(createData);
@@ -142,7 +137,7 @@ const AddParty = () => {
         email: formData.email,
         contactNo: formData.phone,
         gst: formData.gstin,
-        partyType: formData.type,
+        partyType: formData.type === "Customer" ? "CUSTOMER" : "VENDOR",
       };
 
       await partyApi.updateParty(editDialog.data.id, updateData);
@@ -313,24 +308,20 @@ const AddParty = () => {
 
             {isTypeOpen && (
               <div className="absolute z-20 mt-2 w-full bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden">
-  {PARTY_TYPES.map((item) => (
-    <button
-      key={item.label}
-      type="button"
-      onClick={() => {
-        setFormData((prev) => ({
-          ...prev,
-          partyType: item.value, 
-        }));
-        setIsTypeOpen(false);
-      }}
-      className="w-full text-left px-4 py-2 text-sm hover:bg-gray-100 transition"
-    >
-      {item.label}
-    </button>
-  ))}
-</div>
-
+                {["Customer", "Vendor","Both"].map((type) => (
+                  <button
+                    key={type}
+                    type="button"
+                    onClick={() => {
+                      setFormData((prev) => ({ ...prev, partyType: type }));
+                      setIsTypeOpen(false);
+                    }}
+                    className="w-full text-left px-4 py-2 text-sm hover:bg-gray-100 transition"
+                  >
+                    {type}
+                  </button>
+                ))}
+              </div>
             )}
           </div>
 
