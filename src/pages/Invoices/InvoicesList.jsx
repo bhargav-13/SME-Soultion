@@ -245,7 +245,7 @@ const InvoicesList = () => {
         <div className="mb-8">
           <div className="bg-white border border-gray-300 rounded-lg px-3 py-2 h-[110px] flex flex-col justify-between">
             <p className="text-gray-500">Total Invoices</p>
-            <p className="text-3xl font-medium text-black">
+            <p className="text-2xl font-medium text-black">
               {filteredInvoices.length}
             </p>
           </div>
@@ -266,22 +266,22 @@ const InvoicesList = () => {
           <table className="w-full">
             <thead>
               <tr className="bg-gray-100 border-b border-gray-200">
-                <th className="px-6 py-4 text-center text-sm font-medium">
+                <th className="px-6 py-4 text-center text-sm font-semibold text-bold">
                   Invoice No
                 </th>
-                <th className="px-6 py-4 text-center text-sm font-medium">
+                <th className="px-6 py-4 text-center text-sm font-semibold text-bold">
                   Date
                 </th>
-                <th className="px-6 py-4 text-center text-sm font-medium">
+                <th className="px-6 py-4 text-center text-sm font-semibold text-bold">
                   Party Name
                 </th>
-                <th className="px-6 py-4 text-center text-sm font-medium">
+                <th className="px-6 py-4 text-center text-sm font-semibold text-bold">
                   Invoice Type
                 </th>
-                <th className="px-6 py-4 text-center text-sm font-medium">
+                <th className="px-6 py-4 text-center text-sm font-semibold text-bold">
                   Get Invoices
                 </th>
-                <th className="px-6 py-4 text-center text-sm font-medium">
+                <th className="px-6 py-4 text-center text-sm font-semibold text-bold">
                   Action
                 </th>
               </tr>
@@ -299,13 +299,13 @@ const InvoicesList = () => {
                       <td className="px-6 py-4 text-center text-sm font-medium">
                         {invoice.invoiceNo}
                       </td>
-                      <td className="px-6 py-4 text-center text-sm ">
+                      <td className="px-6 py-4 text-center text-sm">
                         {invoice.date}
                       </td>
-                      <td className="px-6 py-4 text-center text-sm ">
+                      <td className="px-6 py-4 text-center text-sm">
                         {invoice.partyName}
                       </td>
-                      <td className="px-6 py-4 text-center text-sm ">
+                      <td className="px-6 py-4 text-center text-sm">
                         {invoice.invoiceType}
                       </td>
                       <td className="px-6 py-4 text-center">

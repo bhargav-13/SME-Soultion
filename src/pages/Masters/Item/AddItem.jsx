@@ -62,23 +62,25 @@ const AddItem = () => {
 
       const rawItems = itemsData.data || itemsData;
 
-      const transformedItems = (Array.isArray(rawItems) ? rawItems : []).map((item) => ({
-        id: item.id,
-        sizeInch: item.sizeInch || "",
-        sizeMM: item.sizeMm || "",
-        category: item.itemCategory?.name || "",
-        categoryId: item.itemCategory?.id,
-        subCategory: item.itemSubCategory?.name || "",
-        subCategoryId: item.itemSubCategory?.id,
-        totalKg: item.itemKg,
-        itemKg: item.itemKg,
-        weightPerPL: item.weightPerPc,
-        totalPL: item.totalPc,
-        dozenWeight: item.dozenWeight,
-        lowStockWarning: item.lowStockWarning,
-        lowStock: item.stockStatus === "LOW_STOCK" ? "Low Stock" : "In Stock",
-        stockStatus: item.stockStatus,
-      }));
+      const transformedItems = (Array.isArray(rawItems) ? rawItems : []).map(
+        (item) => ({
+          id: item.id,
+          sizeInch: item.sizeInch || "",
+          sizeMM: item.sizeMm || "",
+          category: item.itemCategory?.name || "",
+          categoryId: item.itemCategory?.id,
+          subCategory: item.itemSubCategory?.name || "",
+          subCategoryId: item.itemSubCategory?.id,
+          totalKg: item.itemKg,
+          itemKg: item.itemKg,
+          weightPerPL: item.weightPerPc,
+          totalPL: item.totalPc,
+          dozenWeight: item.dozenWeight,
+          lowStockWarning: item.lowStockWarning,
+          lowStock: item.stockStatus === "LOW_STOCK" ? "Low Stock" : "In Stock",
+          stockStatus: item.stockStatus,
+        }),
+      );
 
       setItems(transformedItems);
     } catch (error) {
@@ -102,7 +104,7 @@ const AddItem = () => {
             id: sub.id,
             name: sub.name,
           })),
-        }))
+        })),
       );
     } catch (error) {
       console.error("Error fetching categories:", error);
@@ -132,7 +134,7 @@ const AddItem = () => {
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    
+
     setFormData((prev) => {
       const newFormData = {
         ...prev,
@@ -140,27 +142,33 @@ const AddItem = () => {
       };
 
       // Auto-calculate Total Pc when Item Kg or Weight/Pc changes
-      if (name === 'itemKg' || name === 'weightPerPL') {
-        const itemKg = name === 'itemKg' ? parseFloat(value) || 0 : parseFloat(prev.itemKg) || 0;
-        const weightPerPc = name === 'weightPerPL' ? parseFloat(value) || 0 : parseFloat(prev.weightPerPL) || 0;
-        
+      if (name === "itemKg" || name === "weightPerPL") {
+        const itemKg =
+          name === "itemKg"
+            ? parseFloat(value) || 0
+            : parseFloat(prev.itemKg) || 0;
+        const weightPerPc =
+          name === "weightPerPL"
+            ? parseFloat(value) || 0
+            : parseFloat(prev.weightPerPL) || 0;
+
         if (itemKg > 0 && weightPerPc > 0) {
           // Total Pc = Item Kg / Weight per Pc
           newFormData.totalPL = (itemKg / weightPerPc).toFixed(2);
         } else {
-          newFormData.totalPL = '';
+          newFormData.totalPL = "";
         }
       }
 
       // Auto-calculate Dozen Weight when Weight/Pc changes
-      if (name === 'weightPerPL') {
+      if (name === "weightPerPL") {
         const weightPerPc = parseFloat(value) || 0;
-        
+
         if (weightPerPc > 0) {
           // Dozen Weight = Weight per Pc × 12
           newFormData.dozenWeight = (weightPerPc * 12).toFixed(2);
         } else {
-          newFormData.dozenWeight = '';
+          newFormData.dozenWeight = "";
         }
       }
 
@@ -171,7 +179,11 @@ const AddItem = () => {
   const handleSave = async (e) => {
     e.preventDefault();
 
-    if (!formData.sizeInch.trim() || !formData.categoryId || !formData.itemKg.trim()) {
+    if (
+      !formData.sizeInch.trim() ||
+      !formData.categoryId ||
+      !formData.itemKg.trim()
+    ) {
       toast.error("Please fill in all required fields");
       return;
     }
@@ -326,14 +338,24 @@ const AddItem = () => {
   return (
     <SidebarLayout>
       <div className="max-w-7xl mx-auto">
-        {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-medium text-gray-900">Add New Item</h1>
-          <p className="text-md text-gray-500">
-            Create and define item specifications including size, weight,
-            category, and stock thresholds.
-          </p>
+        <div className="flex justify-between">
+          <div className="mb-8">
+            <h1 className="text-3xl font-medium text-gray-900">Add New Item</h1>
+            <p className="text-md text-gray-500">
+              Create and define item specifications including size, weight,
+              category, and stock thresholds.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => navigate("/masters/item")}
+            className="inline-flex items-center justify-center w-9 h-9 rounded-full border border-gray-300 text-gray-600 hover:text-gray-900 hover:border-gray-400 hover:bg-gray-50 transition"
+            aria-label="Close and go back to invoices"
+          >
+            <X className="w-4 h-4" />
+          </button>
         </div>
+        {/* Header */}
 
         {/* Form */}
         <form
@@ -530,13 +552,17 @@ const AddItem = () => {
                       onClick={() => setIsWeightUnitOpen(!isWeightUnitOpen)}
                       className="w-full flex items-center justify-between px-4 py-2.5 border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-gray-500 transition"
                     >
-                      <span className={` font-medium ${ formData.weightUnit === ""
-                          ? "text-gray-500 text-sm"
-                          : "text-gray-900"}`}>
+                      <span
+                        className={` font-medium ${
+                          formData.weightUnit === ""
+                            ? "text-gray-500 text-sm"
+                            : "text-gray-900"
+                        }`}
+                      >
                         {/* {formData.weightUnit  } */}
                         {formData.weightUnit === ""
-                        ? "Gram/Kg"
-                        : formData.weightUnit}
+                          ? "Gram/Kg"
+                          : formData.weightUnit}
                       </span>
                       <svg
                         className={`w-4 h-4 text-gray-500 transition-transform ${
@@ -584,7 +610,10 @@ const AddItem = () => {
             <div className="grid grid-cols-2 gap-6">
               <div>
                 <label className="block font-medium text-black mb-2">
-                  Total Pc. <span className="text-gray-500 text-xs">(Auto-calculated)</span>
+                  Total Pc.{" "}
+                  <span className="text-gray-500 text-xs">
+                    (Auto-calculated)
+                  </span>
                 </label>
                 <input
                   type="text"
@@ -597,7 +626,10 @@ const AddItem = () => {
               </div>
               <div>
                 <label className="block font-medium text-black mb-2">
-                  Dozen Weight <span className="text-gray-500 text-xs">(Auto-calculated)</span>
+                  Dozen Weight{" "}
+                  <span className="text-gray-500 text-xs">
+                    (Auto-calculated)
+                  </span>
                 </label>
                 <input
                   type="text"
@@ -627,7 +659,7 @@ const AddItem = () => {
 
             {/* Action Buttons */}
             <div className="flex gap-4 justify-center">
-                <button
+              <button
                 type="submit"
                 disabled={loading}
                 className="px-12 py-2 bg-black text-white rounded-xl hover:bg-gray-800 transition font-medium disabled:opacity-50"

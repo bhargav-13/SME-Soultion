@@ -178,7 +178,7 @@ const ItemMaster = () => {
             <h1 className="text-3xl font-medium text-black">
               Item Master
             </h1>
-            <p className="text-gray-500  text-md">
+            <p className="text-gray-500  text-md mb-2">
               Centralised management of all items with sizes, weights,
               categories, and stock details.
             </p>

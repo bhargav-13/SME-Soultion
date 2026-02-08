@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Plus } from "lucide-react";
+import { Plus, X } from "lucide-react";
 import SidebarLayout from "../../components/SidebarLayout";
 
 // Reusable UI Components
@@ -303,8 +303,18 @@ const CreateInvoice = () => {
   return (
     <SidebarLayout>
       <div className="space-y-6">
+        <div className="flex justify-end">
+          <button
+            type="button"
+            onClick={() => navigate("/invoices")}
+            className="inline-flex items-center justify-center w-9 h-9 rounded-full border border-gray-300 text-gray-600 hover:text-gray-900 hover:border-gray-400 hover:bg-gray-50 transition"
+            aria-label="Close and go back to invoices"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
         {/* Exporter Section */}
-        <FormSection title="Exporter">
+        <FormSection title="Exporter" isClose={true} >
           <ExporterSection formData={formData} onChange={handleChange} />
         </FormSection>
 
@@ -343,7 +353,7 @@ const CreateInvoice = () => {
             <button
               type="button"
               onClick={handleAddItem}
-              className="inline-flex items-center gap-2 bg-gray-900 text-white px-3 py-2 rounded-lg hover:bg-gray-800 transition"
+              className="inline-flex items-center gap-2 bg-gray-900 text-white px-3 py-2 rounded-lg hover:bg-gray-800 transition cursor-pointer"
             >
               Add Item
               <Plus className="w-3 h-3" />
@@ -363,7 +373,7 @@ const CreateInvoice = () => {
             <button
               type="button"
               onClick={handleAddPacking}
-              className="inline-flex items-center gap-2 bg-gray-900 text-white px-3 py-2 rounded-lg hover:bg-gray-800 transition"
+              className="inline-flex items-center gap-2 bg-gray-900 text-white px-3 py-2 rounded-lg hover:bg-gray-800 transition cursor-pointer"
             >
               Add Item
               <Plus className="w-3 h-3" />
@@ -426,13 +436,13 @@ const CreateInvoice = () => {
         <div className="flex justify-center gap-4 pt-4">
            <button
             onClick={handleSubmit}
-            className="px-6 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition"
+            className="px-6 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition cursor-pointer"
           >
            Save & Download
           </button>
           <button
             onClick={() => navigate("/invoices")}
-            className="px-6 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition"
+            className="px-6 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition cursor-pointer"
           >
             Cancel
           </button>

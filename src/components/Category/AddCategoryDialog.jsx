@@ -50,6 +50,13 @@ const AddCategoryDialog = ({
     }));
   };
 
+  const removeSubCategoryField = (index) => {
+    setFormData((prev) => ({
+      ...prev,
+      subCategories: prev.subCategories.filter((_, i) => i !== index),
+    }));
+  };
+
   const handleSave = () => {
     if (!formData.categoryName.trim()) {
       alert("Please enter category name");
@@ -57,7 +64,7 @@ const AddCategoryDialog = ({
     }
 
     const filteredSubCategories = formData.subCategories.filter(
-      (sub) => sub.trim() !== ""
+      (sub) => sub.trim() !== "",
     );
 
     if (filteredSubCategories.length === 0) {
@@ -79,7 +86,6 @@ const AddCategoryDialog = ({
   return (
     <div className="fixed inset-0 bg-black/20 flex items-center justify-center z-50">
       <div className="bg-white rounded-xl shadow-2xl w-full max-w-xl max-h-[80vh] overflow-hidden px-16 py-8 ">
-        
         {/* Header */}
         <div className="flex items-center justify-center mb-1">
           <h2 className="text-xl font-medium text-black">
@@ -95,7 +101,7 @@ const AddCategoryDialog = ({
         </p>
 
         {/* Scrollable Form Section */}
-        <div className="space-y-4 mb-6 overflow-y-auto max-h-[45vh] pr-2 scrollbar-custom">
+        <div className="space-y-4 mb-6 overflow-y-auto max-h-[45vh] pr-2 scrollbar-custom hide-scrollbar ">
           <div>
             <label className="block text-md font-medium text-black mb-2">
               Enter New Category<span className="text-black">*</span>
@@ -113,25 +119,40 @@ const AddCategoryDialog = ({
             <label className="block text-md font-medium text-black mb-2">
               Enter New Sub Category<span className="text-black">*</span>
             </label>
-
-            <div className="space-y-2 max-h-[30vh] overflow-y-auto pr-1 scrollbar-thin">
+            <div className="space-y-2 pr-1">
               {formData.subCategories.map((subCategory, index) => (
-                <div key={index} className="flex gap-2">
-                  <input
-                    type="text"
-                    value={subCategory}
-                    onChange={(e) =>
-                      handleSubCategoryChange(index, e.target.value)
-                    }
-                    placeholder="Enter Sub Category"
-                    className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:border-[#343434] outline-none transition placeholder:text-sm placeholder:text-gray-500 "
-                  />
+                <div key={index} className="flex gap-2 items-center">
+                  {/* Input wrapper */}
+                  <div className="relative flex-1">
+                    <input
+                      type="text"
+                      value={subCategory}
+                      onChange={(e) =>
+                        handleSubCategoryChange(index, e.target.value)
+                      }
+                      placeholder="Enter Sub Category"
+                      className="w-full px-4 py-2 pr-10 border border-gray-300 rounded-lg focus:border-[#343434] outline-none transition placeholder:text-sm placeholder:text-gray-500"
+                    />
 
+                    {/* X icon inside input */}
+                    {index > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => removeSubCategoryField(index)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-600 transition cursor-pointer "
+                        aria-label="Remove sub category"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Add More button */}
                   {index === formData.subCategories.length - 1 && (
                     <button
                       type="button"
                       onClick={addSubCategoryField}
-                      className="px-4 py-2 border border-[#343434] text-[#343434] rounded-lg hover:bg-gray-50 transition font-medium whitespace-nowrap"
+                      className="px-4 py-2 border border-[#343434] text-black rounded-lg hover:bg-gray-50 transition font-medium whitespace-nowrap cursor-pointer"
                     >
                       Add More +
                     </button>
@@ -146,13 +167,13 @@ const AddCategoryDialog = ({
         <div className="flex gap-4 justify-center">
           <button
             onClick={handleSave}
-            className="bg-black text-white px-12 py-2 rounded-xl hover:bg-gray-900 transition font-medium"
+            className="bg-black text-white px-12 py-2 rounded-xl hover:bg-gray-900 transition font-medium cursor-pointer"
           >
             Save
           </button>
           <button
             onClick={onClose}
-            className="border border-black text-black px-12 py-2 rounded-xl hover:bg-gray-50 transition font-medium"
+            className="border border-black text-black px-12 py-2 rounded-xl hover:bg-gray-50 transition font-medium cursor-pointer"
           >
             Cancel
           </button>
