@@ -7,14 +7,14 @@ const EditPartyDialog = ({ isOpen, onClose, onSave, initialData = null }) => {
     email: "",
     phone: "",
     gstin: "",
-    type: "Supplier",
+    partyType: "",
   });
   const [isTypeOpen, setIsTypeOpen] = useState(false);
   const PARTY_TYPES = [
     { label: "Customer", value: "CUSTOMER" },
     { label: "Vendor", value: "VENDOR"},
     { label: "Both", value: "BOTH" },
-  ];
+  ]; 
 
   useEffect(() => {
     if (initialData) {
@@ -23,7 +23,7 @@ const EditPartyDialog = ({ isOpen, onClose, onSave, initialData = null }) => {
         email: initialData.email || "",
         phone: initialData.phone || initialData.contact || "",
         gstin: initialData.gstin || "",
-        type: initialData.type || "Supplier",
+        partyType: initialData.partyType || initialData.type || "",
       });
     }
     setIsTypeOpen(false);
@@ -47,6 +47,9 @@ const EditPartyDialog = ({ isOpen, onClose, onSave, initialData = null }) => {
   };
 
   if (!isOpen) return null;
+
+  const selectedType =
+    PARTY_TYPES.find((item) => item.value === formData.partyType) || null;
 
   return (
     <div className="fixed inset-0 bg-black/50  flex items-center justify-center z-50">
@@ -136,10 +139,12 @@ const EditPartyDialog = ({ isOpen, onClose, onSave, initialData = null }) => {
             >
               <span
                 className={
-                  formData.type === "" ? "text-gray-400" : "text-gray-900"
+                  formData.partyType === "" ? "text-gray-400" : "text-gray-900"
                 }
               >
-                {formData.type === "" ? "Select Type" : formData.type}
+                {formData.partyType === ""
+                  ? "Select Type"
+                  : selectedType?.label || formData.partyType}
               </span>
               <svg
                 className={`w-4 h-4 text-gray-500 transition-transform ${
@@ -167,7 +172,7 @@ const EditPartyDialog = ({ isOpen, onClose, onSave, initialData = null }) => {
                     onClick={() => {
                       setFormData((prev) => ({
                         ...prev,
-                        partyType: item.value, // ✅ saved value
+                        partyType: item.value,
                       }));
                       setIsTypeOpen(false);
                     }}

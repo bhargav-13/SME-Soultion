@@ -142,7 +142,7 @@ const AddParty = () => {
         email: formData.email,
         contactNo: formData.phone,
         gst: formData.gstin,
-        partyType: formData.type,
+        partyType: formData.partyType,
       };
 
       await partyApi.updateParty(editDialog.data.id, updateData);
