@@ -357,16 +357,6 @@ const CreateInvoice = () => {
   return (
     <SidebarLayout>
       <div className="space-y-6">
-        <div className="flex justify-end">
-          <button
-            type="button"
-            onClick={() => navigate("/invoices")}
-            className="inline-flex items-center justify-center w-9 h-9 rounded-full border border-gray-300 text-gray-600 hover:text-gray-900 hover:border-gray-400 hover:bg-gray-50 transition"
-            aria-label="Close and go back to invoices"
-          >
-            <X className="w-4 h-4" />
-          </button>
-        </div>
         {/* Exporter Section */}
         <FormSection title="Exporter" isClose={true} >
           <ExporterSection formData={formData} onChange={handleChange} />
