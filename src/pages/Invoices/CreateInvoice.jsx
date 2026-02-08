@@ -439,17 +439,13 @@ const CreateInvoice = () => {
         </FormSection>
 
         <div className="flex justify-center gap-4 pt-4">
-           <button
-            onClick={handleSubmit}
-            className="px-6 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition"
-          >
-           Save & Download
-          </button>
-          <button
-            onClick={() => navigate("/invoices")}
-            className="px-6 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition"
-          >
-            Cancel
+           {mode !== 'view' && (
+             <button onClick={handleSubmit} className="px-6 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition">
+              {mode === 'edit' ? 'Update Invoice' : 'Save & Download'}
+             </button>
+           )}
+          <button onClick={() => navigate("/invoices")} className="px-6 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition">
+            {mode === 'view' ? 'Back' : 'Cancel'}
           </button>
         </div>
       </div>
