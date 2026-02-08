@@ -6,7 +6,7 @@ const ImporterSection = ({ title, prefix, formData, onChange, disabled }) => {
       
       {/* 1. Country Field (Likely missing previously) */}
       <div className="md:col-span-2">
-        <label className="block text-sm font-medium text-gray-700 mb-1">
+        <label className="block font-medium text-black mb-1">
           Country
         </label>
         <input
@@ -16,7 +16,7 @@ const ImporterSection = ({ title, prefix, formData, onChange, disabled }) => {
           onChange={onChange}
           disabled={disabled}
           placeholder="e.g. USA, India, UAE"
-          className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent disabled:bg-gray-100"
+          className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent disabled:bg-gray-100 placeholder:text-gray-500 placeholder:text-sm"
         />
       </div>
 
@@ -25,7 +25,7 @@ const ImporterSection = ({ title, prefix, formData, onChange, disabled }) => {
 
       {/* 3. Company / Party Name */}
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
+        <label className="block font-medium text-black mb-1">
           {title} Name
         </label>
         <input
@@ -35,7 +35,7 @@ const ImporterSection = ({ title, prefix, formData, onChange, disabled }) => {
           onChange={onChange}
           disabled={disabled}
           placeholder="Company Name"
-          className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent disabled:bg-gray-100"
+          className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent disabled:bg-gray-100 placeholder:text-gray-500 placeholder:text-sm"
         />
       </div>
 
