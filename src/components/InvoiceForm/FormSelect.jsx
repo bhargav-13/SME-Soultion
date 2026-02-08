@@ -11,6 +11,7 @@ const FormSelect = ({
   colSpan = "1",
   placeholder = "Select...",
   showIcon = false,
+  iconText = "M",
   disabled = false,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
@@ -18,7 +19,6 @@ const FormSelect = ({
   const selectedOption = options.find((opt) => opt.value === value);
 
   const handleSelect = (optionValue) => {
-    if (disabled) return;
     onChange({ target: { name, value: optionValue } });
     setIsOpen(false);
   };
@@ -32,17 +32,14 @@ const FormSelect = ({
       <div className="relative mt-8">
         {showIcon && (
           <span className="pointer-events-none absolute left-0 top-1/2 -translate-y-1/2 h-8 w-8 rounded-full text-lg font-normal flex items-center justify-center">
-           €
+            {iconText}
           </span>
         )}
         <button
           type="button"
-          onClick={() => {
-            if (!disabled) setIsOpen(!isOpen);
-          }}
-          className={`w-full text-sm flex items-center justify-between px-4 py-2 border border-gray-300 rounded-lg bg-white focus:ring-1 focus:ring-black transition ${
-            showIcon ? "pl-8" : ""
-          } ${disabled ? "bg-gray-100 text-gray-600 cursor-not-allowed" : ""}`}
+          onClick={() => !disabled && setIsOpen(!isOpen)}
+          disabled={disabled}
+          className={`w-full text-sm flex items-center justify-between px-4 py-2 border border-gray-300 rounded-lg ${disabled ? 'bg-gray-50 text-gray-600' : 'bg-white'} focus:ring-1 focus:ring-black transition ${showIcon ? "pl-8" : ""}`}
         >
           <span className={selectedOption ? "text-black" : "text-gray-400"}>
             {selectedOption ? selectedOption.label : placeholder}
@@ -57,7 +54,7 @@ const FormSelect = ({
             <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
           </svg>
         </button>
-        {isOpen && (
+        {!disabled && isOpen && (
           <div className="absolute z-20 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden max-h-60 overflow-y-auto">
             {options.map((option) => (
               <button

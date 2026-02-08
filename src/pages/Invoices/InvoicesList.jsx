@@ -1,234 +1,156 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useMemo, useState, useEffect } from "react";
 import { Plus, Download, SquarePen, Eye, Trash2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import SidebarLayout from "../../components/SidebarLayout";
 import SearchFilter from "../../components/SearchFilter";
-import InvoiceData from "../../Data/invoicedata";
-import InvoiceViewDialog from "../../components/Invoice/InvoiceViewDialog";
-import InvoiceEditDialog from "../../components/Invoice/InvoiceEditDialog";
 import ConfirmationDialog from "../../components/ConfirmationDialog";
-
-const defaultFormData = {
-  exporterCompanyName: "",
-  exporterContactNo: "",
-  exporterAddress: "",
-  billToToTheOrder: "",
-  billToName: "",
-  billToContactNo: "",
-  billToAddress: "",
-  shipToToTheOrder: "",
-  shipToName: "",
-  shipToContactNo: "",
-  shipToAddress: "",
-  invoiceNo: "",
-  invoiceDate: "",
-  gstNo: "",
-  iecCode: "",
-  poNo: "",
-  incoterms: "",
-  paymentTerms: "",
-  preCarriage: "",
-  countryOfOrigin: "",
-  countryOfFinalDestination: "",
-  portOfLoading: "",
-  portOfDischarge: "",
-  freightCost: "",
-  insuranceCost: "",
-  otherCharges: "",
-  beneficiaryName: "",
-  beneficiaryBank: "",
-  branch: "",
-  beneficiaryAcNo: "",
-  switchCode: "",
-  arnNo: "",
-  rodtep: "",
-  rexNo: "",
-};
-
-const defaultItems = [
-  {
-    itemNo: "",
-    itemDescription: "",
-    hsCode: "",
-    itemQty: "",
-    unitPrice: "",
-    currency: "EUR",
-    currencyCurrentPrice: "",
-  },
-];
-
-const defaultPackings = [
-  {
-    packingItemNo: "",
-    packingDescription: "",
-    totalQtyPcs: "",
-    qtyInEachCarton: "",
-    noOfCarton: "",
-    grossWeight: "",
-    netWeight: "",
-    totalCartonWith: "",
-    woodenPallet: "",
-  },
-];
+import { invoiceApi } from "../../services/apiService";
+import toast from "react-hot-toast";
 
 const InvoicesList = () => {
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState("");
   const [typeFilter, setTypeFilter] = useState("");
-  const [storedInvoices, setStoredInvoices] = useState([]);
-  const [selectedInvoice, setSelectedInvoice] = useState(null);
-  const [isViewOpen, setIsViewOpen] = useState(false);
-  const [isEditOpen, setIsEditOpen] = useState(false);
-  const [editFormData, setEditFormData] = useState(defaultFormData);
-  const [editItems, setEditItems] = useState(defaultItems);
-  const [editPackings, setEditPackings] = useState(defaultPackings);
-  const [isDeleteOpen, setIsDeleteOpen] = useState(false);
-  const [deleteTarget, setDeleteTarget] = useState(null);
+
+  const [invoices, setInvoices] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [selectedToDelete, setSelectedToDelete] = useState(null);
+
+   const getApiInvoiceType = (uiType) => {
+    switch (uiType) {
+      case "Export": return "EXPORT";
+      case "Commercial": return "COMMERCIAL";
+      case "Packing List": return "PACKAGING_LIST";
+      default: return undefined; // Send undefined to show all
+    }
+  };
+
+  // Update fetchInvoices to accept filters
+  const fetchInvoices = async (search = "", type = "") => {
+    try {
+      setLoading(true);
+      
+      // Convert UI filter to API Enum
+      const apiType = getApiInvoiceType(type);
+
+      // Call API with search and type filters
+      const response = await invoiceApi.getAllInvoice(
+        apiType,             // filterByType
+        search || undefined, // search text
+        0,                   // page
+        100                  // size
+      );
+      
+      const invoiceData = response.data?.data || [];
+
+      const mapped = invoiceData.map((inv) => ({
+        id: inv.id || inv.invoiceId || inv._id,
+        invoiceNo: inv.invoiceNo || "N/A",
+        date: inv.invoiceDate || inv.createdAt || "N/A",
+        partyName: inv.exporterCompanyName || inv.billToName || "N/A",
+        invoiceType: inv.invoiceType || "EXPORT",
+      }));
+
+      setInvoices(mapped);
+    } catch (err) {
+      console.error(err);
+      toast.error('Failed to load invoices');
+      setInvoices([]);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
+    // Debounce: Wait 500ms after user stops typing to call API
+    const timer = setTimeout(() => {
+      fetchInvoices(searchTerm, typeFilter);
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [searchTerm, typeFilter]);
+
+  
+
+
+ 
+
+  const openDeleteConfirm = (id, invoiceNo) => {
+    setSelectedToDelete({ id, invoiceNo });
+    setConfirmOpen(true);
+  };
+
+  const handleConfirmDelete = async () => {
     try {
-      const raw = localStorage.getItem("invoices");
-      if (raw) {
-        setStoredInvoices(JSON.parse(raw));
-      } else {
-        localStorage.setItem("invoices", JSON.stringify(InvoiceData));
-        setStoredInvoices(InvoiceData);
-      }
-    } catch {
-      setStoredInvoices([]);
+      const id = selectedToDelete?.id;
+     console.log(id);
+     
+      await invoiceApi.deleteInvoice(id);
+      toast.success('Invoice deleted');
+      setConfirmOpen(false);
+      setSelectedToDelete(null);
+      await fetchInvoices();
+    } catch (err) {
+      console.error(err);
+      toast.error('Failed to delete invoice');
     }
-  }, []);
-
-  const allInvoices = useMemo(() => {
-    return storedInvoices;
-  }, [storedInvoices]);
-
-  const filteredInvoices = useMemo(() => {
-    return allInvoices.filter((invoice) => {
-      const matchesSearch =
-        invoice.invoiceNo.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        invoice.partyName.toLowerCase().includes(searchTerm.toLowerCase());
-
-      const matchesType = !typeFilter || invoice.invoiceType === typeFilter;
-
-      return matchesSearch && matchesType;
-    });
-  }, [allInvoices, searchTerm, typeFilter]);
-
-  const formatDateToInput = (dateValue) => {
-    if (!dateValue) return "";
-    const parts = dateValue.split("/");
-    if (parts.length !== 3) return dateValue;
-    const [day, month, year] = parts;
-    return `${year}-${month}-${day}`;
   };
 
-  const formatDateForList = (dateValue) => {
-    if (!dateValue) return "";
-    const [year, month, day] = dateValue.split("-");
-    if (!year || !month || !day) return dateValue;
-    return `${day}/${month}/${year}`;
+  const handleEditInvoice = async (id) => {
+    try {
+      
+      const resp = await invoiceApi.getInvoiceById(id);
+      const invoice = resp.data;
+      navigate('/invoices/create', { state: { invoice, mode: 'edit' } });
+    } catch (err) {
+      console.error(err);
+      toast.error('Failed to open editor');
+    }
   };
 
-  const handleOpenView = (invoice) => {
-    setSelectedInvoice(invoice);
-    setIsViewOpen(true);
+  const handleViewInvoice = async (id) => {
+    try {
+      
+      const resp = await invoiceApi.getInvoiceById(id);
+      const invoice = resp.data;
+      
+      navigate('/invoices/create', { state: { invoice, mode: 'view' } });
+      console.log(invoice);
+    } catch (err) {
+      console.error(err);
+      toast.error('Failed to open viewer');
+    }
   };
 
-  const handleOpenEdit = (invoice) => {
-    const details = invoice.details || {};
-    const formData = details.formData || {
-      ...defaultFormData,
-      invoiceNo: invoice.invoiceNo || "",
-      invoiceDate: formatDateToInput(invoice.date),
-      billToName: invoice.partyName || "",
-    };
-    setSelectedInvoice(invoice);
-    setEditFormData(formData);
-    setEditItems(details.items || defaultItems);
-    setEditPackings(details.packings || defaultPackings);
-    setIsEditOpen(true);
+  const handleDownload = async (id, invoiceType, invoiceNo) => {
+    try {
+      
+      const resp = await invoiceApi.getInvoicePdf(id, invoiceType, { responseType: 'blob' });
+      const blob = resp.data;
+      const url = window.URL.createObjectURL(new Blob([blob]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `invoice-${invoiceNo || id}.pdf`);
+      document.body.appendChild(link);
+      link.click();
+      link.parentNode.removeChild(link);
+    } catch (err) {
+      console.error(err);
+      toast.error('Failed to download PDF');
+    }
   };
 
-  const handleEditChange = (e) => {
-    const { name, value } = e.target;
-    setEditFormData((prev) => ({
-      ...prev,
-      [name]: value,
-    }));
-  };
-
-  const handleEditItemsChange = (newItems) => {
-    setEditItems(newItems);
-  };
-
-  const handleEditPackingsChange = (newPackings) => {
-    setEditPackings(newPackings);
-  };
-
-  const handleAddEditItem = () => {
-    setEditItems((prev) => [...prev, { ...defaultItems[0] }]);
-  };
-
-  const handleAddEditPacking = () => {
-    setEditPackings((prev) => [...prev, { ...defaultPackings[0] }]);
-  };
-
-  const handleSaveEdit = () => {
-    if (!selectedInvoice) return;
-    const updatedInvoices = storedInvoices.map((invoice) => {
-      if (invoice.id !== selectedInvoice.id) return invoice;
-
-      return {
-        ...invoice,
-        invoiceNo: editFormData.invoiceNo || invoice.invoiceNo,
-        date: editFormData.invoiceDate
-          ? formatDateForList(editFormData.invoiceDate)
-          : invoice.date,
-        partyName:
-          editFormData.billToName ||
-          editFormData.exporterCompanyName ||
-          invoice.partyName,
-        details: {
-          formData: { ...editFormData },
-          items: editItems.map((item) => ({ ...item })),
-          packings: editPackings.map((packing) => ({ ...packing })),
-        },
-      };
-    });
-
-    setStoredInvoices(updatedInvoices);
-    localStorage.setItem("invoices", JSON.stringify(updatedInvoices));
-    setIsEditOpen(false);
-  };
-
-  const handleOpenDelete = (invoice) => {
-    setDeleteTarget(invoice);
-    setIsDeleteOpen(true);
-  };
-
-  const handleConfirmDelete = () => {
-    if (!deleteTarget) return;
-    const updatedInvoices = storedInvoices.filter(
-      (invoice) => invoice.id !== deleteTarget.id
-    );
-    setStoredInvoices(updatedInvoices);
-    localStorage.setItem("invoices", JSON.stringify(updatedInvoices));
-    setIsDeleteOpen(false);
-    setDeleteTarget(null);
-  };
 
   return (
     <SidebarLayout>
       <div className="max-w-7xl mx-auto">
         <div className="mb-8">
-          {/* Header */}
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-3xl font-medium text-black mb-2">Invoices</h1>
               <p className="text-gray-500 text-md">
-                Centralised management of invoices with type, date, and download
-                options.
+                Centralised management of invoices with type, date, and download options.
               </p>
             </div>
 
@@ -241,17 +163,16 @@ const InvoicesList = () => {
             </button>
           </div>
         </div>
-        {/* Stats */}
+        
         <div className="mb-8">
           <div className="bg-white border border-gray-300 rounded-lg px-3 py-2 h-[110px] flex flex-col justify-between">
             <p className="text-gray-500">Total Invoices</p>
-            <p className="text-2xl font-medium text-black">
-              {filteredInvoices.length}
+            <p className="text-3xl font-medium text-black">
+              {invoices.length}
             </p>
           </div>
         </div>
 
-        {/* Search Filter */}
         <SearchFilter
           searchQuery={searchTerm}
           setSearchQuery={setSearchTerm}
@@ -261,37 +182,24 @@ const InvoicesList = () => {
           filterPlaceholder="Type"
         />
 
-        {/* Table */}
         <div className="bg-white rounded-lg overflow-hidden border border-gray-200">
           <table className="w-full">
             <thead>
               <tr className="bg-gray-100 border-b border-gray-200">
-                <th className="px-6 py-4 text-center text-sm font-semibold text-bold">
-                  Invoice No
-                </th>
-                <th className="px-6 py-4 text-center text-sm font-semibold text-bold">
-                  Date
-                </th>
-                <th className="px-6 py-4 text-center text-sm font-semibold text-bold">
-                  Party Name
-                </th>
-                <th className="px-6 py-4 text-center text-sm font-semibold text-bold">
-                  Invoice Type
-                </th>
-                <th className="px-6 py-4 text-center text-sm font-semibold text-bold">
-                  Get Invoices
-                </th>
-                <th className="px-6 py-4 text-center text-sm font-semibold text-bold">
-                  Action
-                </th>
+                <th className="px-6 py-4 text-center text-sm font-semibold">Invoice No</th>
+                <th className="px-6 py-4 text-center text-sm font-semibold">Date</th>
+                <th className="px-6 py-4 text-center text-sm font-semibold">Party Name</th>
+                <th className="px-6 py-4 text-center text-sm font-semibold">Invoice Type</th>
+                <th className="px-6 py-4 text-center text-sm font-semibold">Get Invoices</th>
+                <th className="px-6 py-4 text-center text-sm font-semibold">Action</th>
               </tr>
             </thead>
 
             <tbody>
-              {filteredInvoices.map((invoice, index) => {
+              {invoices.map((invoice, index) => {
                 const isLastOfGroup =
-                  index === filteredInvoices.length - 1 ||
-                  filteredInvoices[index + 1].invoiceNo !== invoice.invoiceNo;
+                  index === invoices.length - 1 ||
+                  invoices[index + 1].invoiceNo !== invoice.invoiceNo;
 
                 return (
                   <React.Fragment key={invoice.id}>
@@ -299,47 +207,43 @@ const InvoicesList = () => {
                       <td className="px-6 py-4 text-center text-sm font-medium">
                         {invoice.invoiceNo}
                       </td>
-                      <td className="px-6 py-4 text-center text-sm">
+                      <td className="px-6 py-4 text-center text-sm text-gray-600">
                         {invoice.date}
                       </td>
                       <td className="px-6 py-4 text-center text-sm">
                         {invoice.partyName}
                       </td>
-                      <td className="px-6 py-4 text-center text-sm">
+                      <td className="px-6 py-4 text-center text-sm text-gray-600">
                         {invoice.invoiceType}
                       </td>
                       <td className="px-6 py-4 text-center">
-                        <button className="inline-flex items-center gap-2 text-gray-800 hover:text-black text-sm">
+                        <button
+                          onClick={() => handleDownload(invoice.id, invoice.invoiceType, invoice.invoiceNo)}
+                          className="inline-flex items-center gap-2 text-gray-800 hover:text-black"
+                        >
                           Download
                           <Download className="w-4 h-4" />
                         </button>
                       </td>
                       <td className="px-6 py-4 flex justify-center gap-3">
-                        <button
-                          type="button"
-                          onClick={() => handleOpenEdit(invoice)}
-                          className="text-gray-700 hover:text-black"
-                        >
-                          <SquarePen className="w-4 h-4 cursor-pointer" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleOpenView(invoice)}
-                          className="text-gray-700 hover:text-black"
-                        >
-                          <Eye className="w-4 h-4 cursor-pointer" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleOpenDelete(invoice)}
-                          className="text-red-600 hover:text-red-700"
-                        >
-                          <Trash2 className="w-4 h-4 cursor-pointer" />
-                        </button>
+                        <SquarePen
+                          className="w-4 h-4 cursor-pointer"
+                          onClick={() => handleEditInvoice(invoice.id)}
+                          title="Edit"
+                        />
+                        <Eye
+                          className="w-4 h-4 cursor-pointer"
+                          onClick={() => handleViewInvoice(invoice.id)}
+                          title="View"
+                        />
+                        <Trash2
+                          className="w-4 h-4 cursor-pointer text-red-600"
+                          onClick={() => openDeleteConfirm(invoice.id, invoice.invoiceNo)}
+                          title="Delete"
+                        />
                       </td>
                     </tr>
 
-                    {/* 🔹 Group Spacer (THIS IS THE MAGIC) */}
                     {isLastOfGroup && (
                       <tr>
                         <td colSpan={6} className="h-4 bg-gray-50"></td>
@@ -351,44 +255,18 @@ const InvoicesList = () => {
             </tbody>
           </table>
         </div>
-
-        <InvoiceViewDialog
-          isOpen={isViewOpen}
-          onClose={() => setIsViewOpen(false)}
-          onEdit={() => {
-            if (!selectedInvoice) return;
-            setIsViewOpen(false);
-            handleOpenEdit(selectedInvoice);
-          }}
-          invoice={selectedInvoice}
-        />
-        <InvoiceEditDialog
-          isOpen={isEditOpen}
-          onClose={() => setIsEditOpen(false)}
-          onSave={handleSaveEdit}
-          formData={editFormData}
-          onChange={handleEditChange}
-          items={editItems}
-          onItemsChange={handleEditItemsChange}
-          onAddItem={handleAddEditItem}
-          packings={editPackings}
-          onPackingsChange={handleEditPackingsChange}
-          onAddPacking={handleAddEditPacking}
-        />
-        <ConfirmationDialog
-          isOpen={isDeleteOpen}
-          title="Delete Invoice"
-          message={`Are you sure you want to delete invoice ${deleteTarget?.invoiceNo || ""}?`}
-          confirmText="Delete"
-          cancelText="Cancel"
-          onConfirm={handleConfirmDelete}
-          onCancel={() => {
-            setIsDeleteOpen(false);
-            setDeleteTarget(null);
-          }}
-          isDangerous
-        />
       </div>
+
+      <ConfirmationDialog
+        isOpen={confirmOpen}
+        onCancel={() => setConfirmOpen(false)} // Changed from onClose to onCancel
+        onConfirm={handleConfirmDelete}
+        title="Delete Invoice"
+        message={`Are you sure you want to permanently delete invoice ${selectedToDelete?.invoiceNo}? This action cannot be undone.`}
+        isDangerous={true} // Makes it red
+        confirmText="Delete"
+        cancelText="Cancel"
+      />
     </SidebarLayout>
   );
 };

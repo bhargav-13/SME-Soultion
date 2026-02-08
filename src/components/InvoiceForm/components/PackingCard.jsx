@@ -8,14 +8,14 @@ const PackingCard = ({
   onChange, 
   onRemove, 
   canRemove,
-  readOnly = false,
+  disabled = false,
 }) => {
   return (
     <div className="bg-white border border-gray-200 rounded-xl p-5 relative">
       {/* Packing Number and Remove Button */}
       <div className="flex items-center justify-between mb-4">
         <span className="text-sm font-medium text-gray-500">Packing #{index + 1}</span>
-        {canRemove && !readOnly && (
+        {canRemove && (
           <button
             type="button"
             onClick={() => onRemove(index)}
@@ -33,7 +33,7 @@ const PackingCard = ({
           value={item.packingItemNo || ""}
           onChange={(e) => onChange(index, e)}
           placeholder="01"
-          disabled={readOnly}
+          disabled={disabled}
         />
         <FormInput
           label="Description"
@@ -41,7 +41,7 @@ const PackingCard = ({
           value={item.packingDescription || ""}
           onChange={(e) => onChange(index, e)}
           placeholder="FNESPBL 10-32 X 5/16 A/F E.S.P Hex Nut"
-          disabled={readOnly}
+          disabled={disabled}
         />
         <FormInput
           label="Total Qty (Pcs)"
@@ -49,7 +49,7 @@ const PackingCard = ({
           value={item.totalQtyPcs || ""}
           onChange={(e) => onChange(index, e)}
           placeholder="1232"
-          disabled={readOnly}
+          disabled={disabled}
         />
         <FormInput
           label="Qty In Each Carton"
@@ -57,7 +57,7 @@ const PackingCard = ({
           value={item.qtyInEachCarton || ""}
           onChange={(e) => onChange(index, e)}
           placeholder="22"
-          disabled={readOnly}
+          disabled={disabled}
         />
         <FormInput
           label="No. of Carton"
@@ -65,7 +65,7 @@ const PackingCard = ({
           value={item.noOfCarton || ""}
           onChange={(e) => onChange(index, e)}
           placeholder="56"
-          disabled={readOnly}
+          disabled={disabled}
         />
         <FormInput
           label="Gross Weight"
@@ -73,7 +73,7 @@ const PackingCard = ({
           value={item.grossWeight || ""}
           onChange={(e) => onChange(index, e)}
           placeholder="186.000kg"
-          disabled={readOnly}
+          disabled={disabled}
         />
         <FormInput
           label="Net Weight"
@@ -81,17 +81,17 @@ const PackingCard = ({
           value={item.netWeight || ""}
           onChange={(e) => onChange(index, e)}
           placeholder="136.500kg"
-          disabled={readOnly}
+          disabled={disabled}
         />
         <div className="flex items-end gap-3">
           <div className="flex-1">
             <FormInput
               label="Total Carton With"
               name={`totalCartonWith_${index}`}
-              value={item.totalCartonWith || ""}
+              value={item.noOfCarton || ""}
               onChange={(e) => onChange(index, e)}
               placeholder="56"
-              disabled={readOnly}
+              disabled={disabled}
             />
           </div>
           <div className="flex-1">
@@ -101,7 +101,7 @@ const PackingCard = ({
               value={item.woodenPallet || ""}
               onChange={(e) => onChange(index, e)}
               placeholder="02"
-              disabled={readOnly}
+              disabled={disabled}
             />
           </div>
         </div>

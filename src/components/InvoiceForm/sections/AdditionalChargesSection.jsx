@@ -1,7 +1,7 @@
 import React from "react";
 import FormInput from "../FormInput";
 
-const AdditionalChargesSection = ({ formData, onChange, readOnly = false }) => {
+const AdditionalChargesSection = ({ formData, onChange, disabled = false }) => {
   return (
     <>
       <div className="grid grid-cols-2 gap-6">
@@ -11,7 +11,7 @@ const AdditionalChargesSection = ({ formData, onChange, readOnly = false }) => {
           value={formData.freightCost}
           onChange={onChange}
           placeholder="10.400"
-          disabled={readOnly}
+          disabled={disabled}
         />
         <FormInput
           label="Insurance Cost"
@@ -19,7 +19,7 @@ const AdditionalChargesSection = ({ formData, onChange, readOnly = false }) => {
           value={formData.insuranceCost}
           onChange={onChange}
           placeholder="00"
-          disabled={readOnly}
+          disabled={disabled}
         />
         <div className="col-span-2">
           <FormInput
@@ -28,7 +28,7 @@ const AdditionalChargesSection = ({ formData, onChange, readOnly = false }) => {
             value={formData.otherCharges}
             onChange={onChange}
             placeholder="00"
-            disabled={readOnly}
+            disabled={disabled}
           />
         </div>
       </div>

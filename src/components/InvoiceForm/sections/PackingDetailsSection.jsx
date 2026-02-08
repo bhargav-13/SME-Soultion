@@ -1,9 +1,8 @@
 import React from "react";
 import PackingCard from "../components/PackingCard";
 
-const PackingDetailsSection = ({ packings, onPackingsChange, readOnly = false }) => {
+const PackingDetailsSection = ({ packings, onPackingsChange, disabled = false }) => {
   const removePacking = (index) => {
-    if (readOnly) return;
     if (packings.length > 1) {
       const updatedPackings = packings.filter((_, i) => i !== index);
       onPackingsChange(updatedPackings);
@@ -30,7 +29,7 @@ const PackingDetailsSection = ({ packings, onPackingsChange, readOnly = false })
             onChange={handlePackingChange}
             onRemove={removePacking}
             canRemove={packings.length > 1}
-            readOnly={readOnly}
+            disabled={disabled}
           />
         </div>
       ))}
