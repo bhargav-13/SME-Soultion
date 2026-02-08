@@ -1,0 +1,619 @@
+openapi: 3.0.3
+
+info:
+  title: Invoice Management API
+  version: 1.0.0
+  description: OpenAPI for Invoice management
+
+servers:
+  - url: http://localhost:8080
+    description: Local development server
+  - url: https://sme-erp-2.onrender.com
+    description: Production Server
+
+tags:
+  - name: Invoice
+    description: Invoice Endpoints
+
+security:
+  - oauth2: [ ]
+paths:
+  /api/v1/invoice:
+    get:
+      operationId: getAllInvoice
+      tags:
+        - Invoice
+      summary: Get all invoice
+      parameters:
+        - name: filterByType
+          in: query
+          description: Filter item by type
+          schema:
+            type: string
+            enum:
+              - EXPORT
+              - COMMERCIAL
+              - PACKAGING_LIST
+        - $ref: '#/components/parameters/searchParam'
+        - $ref: '#/components/parameters/pageParam'
+        - $ref: '#/components/parameters/sizeParam'
+        - $ref: '#/components/parameters/SortByFields'
+        - $ref: '#/components/parameters/directionParam'
+      responses:
+        '200':
+          description: Invoice list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedResultInvoice'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+    post:
+      operationId: createInvoice
+      tags:
+        - Invoice
+      summary: Create Invoice
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NewInvoice'
+      responses:
+        '201':
+          description: Invoice list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Invoice'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/v1/invoice/{id}:
+    get:
+      operationId: getInvoiceById
+      tags:
+        - Invoice
+      summary: Get Invoice by id
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: Category details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Invoice'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+
+    put:
+      operationId: updateInvoice
+      tags:
+        - Invoice
+      summary: Update Invoice
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NewInvoice'
+      responses:
+        '200':
+          description: Invoice updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Invoice'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+    delete:
+      operationId: deleteInvoice
+      tags:
+        - Invoice
+      summary: Delete Invoice
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '204':
+          description: Invoice deleted
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+  /api/v1/invoice/{id}/type/{invoiceType}/pdf:
+    get:
+      tags:
+        - Invoice
+      operationId: getInvoicePdf
+      summary: Get Invoice pdf
+      description: Returns Invoice pdf
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - name: invoiceType
+          in: path
+          required: true
+          description: The unique identifier of the invoice
+          schema:
+            $ref: '#/components/schemas/InvoiceType'
+      responses:
+        '200':
+          description: PDF generated successfully
+          content:
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+components:
+
+  securitySchemes:
+    oauth2:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    pageParam:
+      name: page
+      in: query
+      description: Page number starting from 0
+      schema:
+        type: integer
+        default: 0
+
+    sizeParam:
+      name: size
+      in: query
+      description: Number of items per page
+      schema:
+        type: integer
+        default: 10
+
+    directionParam:
+      name: direction
+      in: query
+      description: Sort direction
+      schema:
+        type: string
+        enum:
+          - ASC
+          - DESC
+    searchParam:
+      name: search
+      in: query
+      description: Search text to filter results by name or relevant fields
+      schema:
+        type: string
+
+    SortByFields:
+      name: sortByFields
+      in: query
+      description: Field to sort by
+      schema:
+        type: string
+        enum:
+          - lastUpdatedAt
+          - createdAt
+  schemas:
+    NewInvoice:
+      type: object
+      properties:
+        # Exporter
+        exporterCompanyName:
+          type: string
+        exporterContactNo:
+          type: string
+        exporterAddress:
+          type: string
+
+        # Importer (Bill To)
+        billToCountry:
+          type: string
+          example: USA
+        billToName:
+          type: string
+        billToContactNo:
+          type: string
+        billToAddress:
+          type: string
+
+        # Importer (Ship To)
+        shipToCountry:
+          type: string
+          example: USA
+        shipToName:
+          type: string
+        shipToContactNo:
+          type: string
+        shipToAddress:
+          type: string
+        currency:
+          type: string
+
+        # Invoice Details
+        invoiceNo:
+          type: string
+        invoiceDate:
+          type: string
+          format: date
+        gstNo:
+          type: string
+        iecCode:
+          type: string
+        poNo:
+          type: string
+        incoterms:
+          type: string
+          example: FOB
+        paymentTerms:
+          type: string
+        preCarriage:
+          type: string
+        countryOfOrigin:
+          type: string
+        countryOfFinalDestination:
+          type: string
+        portOfLoading:
+          type: string
+        portOfDischarge:
+          type: string
+
+        # Item Details
+        items:
+          type: array
+          minItems: 1
+          items:
+            type: object
+            required:
+              - itemNo
+              - description
+              - hsCode
+              - quantity
+              - unitPriceUsd
+            properties:
+              itemNo:
+                type: string
+              description:
+                type: string
+              hsCode:
+                type: string
+              quantity:
+                type: integer
+              unitPriceUsd:
+                type: number
+                format: double
+              currencyCurrentPrice:
+                type: number
+                format: double
+
+        # Packing Details
+        packingDetails:
+          type: array
+          items:
+            type: object
+            properties:
+              itemNo:
+                type: string
+              description:
+                type: string
+              totalQty:
+                type: integer
+              qtyPerCarton:
+                type: integer
+              noOfCartons:
+                type: integer
+              grossWeightKg:
+                type: number
+                format: double
+              netWeightKg:
+                type: number
+                format: double
+              woodenPallets:
+                type: integer
+
+        # Bank Details
+        beneficiaryName:
+          type: string
+        bankName:
+          type: string
+        branch:
+          type: string
+        accountNo:
+          type: string
+        swiftCode:
+          type: string
+
+        freightCost:
+          type: number
+          format: double
+        insuranceCost:
+          type: number
+          format: double
+        otherCost:
+          type: number
+          format: double
+
+        # Export Declarations
+        arnNo:
+          type: string
+          nullable: true
+        rodtep:
+          type: string
+          nullable: true
+        rexNo:
+          type: string
+          nullable: true
+    Invoice:
+      type: object
+      properties:
+        id:
+          type: integer
+        # Exporter
+        exporterCompanyName:
+          type: string
+        exporterContactNo:
+          type: string
+        exporterAddress:
+          type: string
+
+        # Importer (Bill To)
+        billToCountry:
+          type: string
+          example: USA
+        billToName:
+          type: string
+        billToContactNo:
+          type: string
+        billToAddress:
+          type: string
+
+        # Importer (Ship To)
+        shipToCountry:
+          type: string
+          example: USA
+        shipToName:
+          type: string
+        shipToContactNo:
+          type: string
+        shipToAddress:
+          type: string
+
+        # Invoice Details
+        invoiceNo:
+          type: string
+        invoiceDate:
+          type: string
+          format: date
+        gstNo:
+          type: string
+        iecCode:
+          type: string
+        poNo:
+          type: string
+        incoterms:
+          type: string
+          example: FOB
+        paymentTerms:
+          type: string
+        preCarriage:
+          type: string
+        countryOfOrigin:
+          type: string
+        countryOfFinalDestination:
+          type: string
+        portOfLoading:
+          type: string
+        portOfDischarge:
+          type: string
+        currency:
+          type: string
+
+        # Item Details
+        items:
+          type: array
+          minItems: 1
+          items:
+            type: object
+            required:
+              - itemNo
+              - description
+              - hsCode
+              - quantity
+              - unitPriceUsd
+            properties:
+              itemNo:
+                type: string
+              description:
+                type: string
+              hsCode:
+                type: string
+              quantity:
+                type: integer
+              unitPriceUsd:
+                type: number
+                format: double
+              currencyCurrentPrice:
+                type: number
+                format: double
+
+        # Packing Details
+        packingDetails:
+          type: array
+          items:
+            type: object
+            properties:
+              itemNo:
+                type: string
+              description:
+                type: string
+              totalQty:
+                type: integer
+              qtyPerCarton:
+                type: integer
+              noOfCartons:
+                type: integer
+              grossWeightKg:
+                type: number
+                format: double
+              netWeightKg:
+                type: number
+                format: double
+              woodenPallets:
+                type: integer
+        invoiceType:
+          $ref: '#/components/schemas/InvoiceType'
+        # Bank Details
+        beneficiaryName:
+          type: string
+        bankName:
+          type: string
+        branch:
+          type: string
+        accountNo:
+          type: string
+        swiftCode:
+          type: string
+
+        freightCost:
+          type: number
+          format: double
+        insuranceCost:
+          type: number
+          format: double
+        otherCost:
+          type: number
+          format: double
+
+        # Export Declarations
+        arnNo:
+          type: string
+          nullable: true
+        rodtep:
+          type: string
+          nullable: true
+        rexNo:
+          type: string
+          nullable: true
+    InvoiceType:
+      type: string
+      enum:
+        - EXPORT
+        - COMMERCIAL
+        - PACKAGING_LIST
+    InvoiceInfo:
+      type: object
+      properties:
+        invoiceNo:
+          type: string
+        createdAt:
+          type: string
+          format: date
+        exporterCompanyName:
+          type: string
+        invoiceType:
+          $ref: '#/components/schemas/InvoiceType'
+    ErrorResponse:
+      type: object
+      properties:
+        message:
+          type: string
+        code:
+          type: string
+        detail:
+          type: object
+    PaginatedResultInvoice:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/InvoiceInfo'
+        empty:
+          type: boolean
+          description: Indicates if the current page is empty
+        last:
+          type: boolean
+          description: Indicates if the current page is the last page
+        first:
+          type: boolean
+          description: Indicates if the current page is the first page
+        totalPages:
+          type: integer
+          description: Total number of pages available
+        totalElements:
+          type: integer
+          description: Total number of elements
+        size:
+          type: integer
+          description: Number of items per page
+  responses:
+    UnauthorizedError:
+      description: Unauthorized
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+    ForbiddenError:
+      description: Forbidden
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+    NotFoundError:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+    InternalServerError:
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'

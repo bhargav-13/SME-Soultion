@@ -1,7 +1,7 @@
 import React from "react";
 import FormInput from "../FormInput";
 
-const BankDetailsSection = ({ formData, onChange, readOnly = false }) => {
+const BankDetailsSection = ({ formData, onChange, disabled = false }) => {
   return (
     <>
       <div className="grid grid-cols-3 gap-4">
@@ -11,7 +11,7 @@ const BankDetailsSection = ({ formData, onChange, readOnly = false }) => {
           value={formData.beneficiaryName}
           onChange={onChange}
           placeholder="Ishita Industries"
-          disabled={readOnly}
+          disabled={disabled}
         />
         <FormInput
           label="Beneficiary Bank"
@@ -19,7 +19,7 @@ const BankDetailsSection = ({ formData, onChange, readOnly = false }) => {
           value={formData.beneficiaryBank}
           onChange={onChange}
           placeholder="HDFC Bank"
-          disabled={readOnly}
+          disabled={disabled}
         />
         <FormInput
           label="Branch"
@@ -27,7 +27,7 @@ const BankDetailsSection = ({ formData, onChange, readOnly = false }) => {
           value={formData.branch}
           onChange={onChange}
           placeholder="Dared"
-          disabled={readOnly}
+          disabled={disabled}
         />
         <div className="col-span-2">
           <FormInput
@@ -36,7 +36,7 @@ const BankDetailsSection = ({ formData, onChange, readOnly = false }) => {
           value={formData.beneficiaryAcNo}
           onChange={onChange}
           placeholder="50100469121007"
-          disabled={readOnly}
+          disabled={disabled}
           />
         </div>
         <FormInput
@@ -45,7 +45,7 @@ const BankDetailsSection = ({ formData, onChange, readOnly = false }) => {
           value={formData.switchCode}
           onChange={onChange}
           placeholder="HDFCINBB"
-          disabled={readOnly}
+          disabled={disabled}
         />
       </div>
     </>

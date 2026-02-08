@@ -7,6 +7,7 @@
 
 import axios from 'axios';
 import { Configuration } from '../api-clients/master';
+import { InvoiceApi} from '../api-clients/invoice-management';
 import { Configuration as UserMgmtConfiguration } from '../api-clients/user-management';
 import {
     CategoryApi,
@@ -138,7 +139,7 @@ let subCategoryApi = new SubCategoryApi(createApiConfig(), config.API_BASE_URL, 
 let itemApi = new ItemApi(createApiConfig(), config.API_BASE_URL, axiosInstance);
 let authApi = new AuthenticationApi(createUserMgmtConfig(), config.API_BASE_URL, axiosInstance);
 let userManagementApi = new UserManagementApi(createUserMgmtConfig(), config.API_BASE_URL, axiosInstance);
-
+let invoiceApi = new InvoiceApi(createApiConfig(), config.API_BASE_URL, axiosInstance)
 /**
  * Update all API clients with new token
  * Call this after login or token refresh
@@ -153,6 +154,7 @@ export const updateApiClients = () => {
     itemApi = new ItemApi(masterConfig, config.API_BASE_URL, axiosInstance);
     authApi = new AuthenticationApi(userConfig, config.API_BASE_URL, axiosInstance);
     userManagementApi = new UserManagementApi(userConfig, config.API_BASE_URL, axiosInstance);
+    invoiceApi = new InvoiceApi(masterConfig,config.API_BASE_URL, axiosInstance)
 };
 
 // Export API clients
@@ -164,6 +166,7 @@ export {
     authApi,
     userManagementApi,
     axiosInstance,
+    invoiceApi
 };
 
 // Export a default object with all APIs
@@ -175,4 +178,5 @@ export default {
     auth: authApi,
     userManagement: userManagementApi,
     updateClients: updateApiClients,
+    invoice : invoiceApi
 };
