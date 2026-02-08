@@ -333,7 +333,7 @@ const CategoryMaster = () => {
                 <div className="p-4">
                   <button
                     onClick={() => toggleExpand(category.id)}
-                    className="w-full flex items-center justify-between text-sm font-medium text-black hover:bg-gray-50 p-2 rounded transition"
+                    className="w-full flex items-center justify-between  text-sm font-medium text-black hover:bg-gray-50 p-2 rounded transition"
                   >
                     <span>
                       Sub Categories ({category.subCategories.length})
@@ -350,7 +350,7 @@ const CategoryMaster = () => {
                       {category.subCategories.map((subCat) => (
                         <div
                           key={subCat.id}
-                          className="flex items-center justify-between bg-gray-50 rounded text-sm"
+                          className="flex items-center p-2 justify-between bg-gray-50 rounded text-sm"
                         >
                           <span className="text-gray-700">{subCat.name}</span>
                           <div className="flex items-center gap-2">
