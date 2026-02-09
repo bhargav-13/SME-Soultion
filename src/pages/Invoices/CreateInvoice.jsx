@@ -79,8 +79,21 @@ const CreateInvoice = () => {
   });
 
   const [items, setItems] = useState([{
-    itemNo: "", itemDescription: "", hsCode: "", itemQty: "",
-    unitPrice: "", currency: "EUR", currencyCurrentPrice: "",
+    itemNo: "",
+    partNo: "",
+    itemDescription: "",
+    hsCode: "",
+    itemQty: "",
+    unitPrice: "",
+    currency: "",
+    currencyCurrentPrice: "",
+    totalQty: "",
+    qtyInEachCarton: "",
+    noOfCarton: "",
+    grossWeight: "",
+    netWeight: "",
+    totalCartonWith: "",
+    woodenPallet: "",
   }]);
 
   const [packings, setPackings] = useState([{
@@ -112,8 +125,21 @@ const CreateInvoice = () => {
   
   const handleAddItem = () => {
     setItems((prev) => [...prev, {
-      itemNo: "", itemDescription: "", hsCode: "", itemQty: "",
-      unitPrice: "", currency: "EUR", currencyCurrentPrice: "",
+      itemNo: "",
+      partNo: "",
+      itemDescription: "",
+      hsCode: "",
+      itemQty: "",
+      unitPrice: "",
+      currency: "",
+      currencyCurrentPrice: "",
+      totalQty: "",
+      qtyInEachCarton: "",
+      noOfCarton: "",
+      grossWeight: "",
+      netWeight: "",
+      totalCartonWith: "",
+      woodenPallet: "",
     }]);
   };
 
@@ -195,12 +221,20 @@ const CreateInvoice = () => {
     if (Array.isArray(invoice.items) && invoice.items.length > 0) {
       const mappedItems = invoice.items.map((it) => ({
         itemNo: it.itemNo || "",
+        partNo: it.partNo || "",
         itemDescription: it.description || "",
         hsCode: it.hsCode || "",
         itemQty: it.quantity != null ? String(it.quantity) : "",
         unitPrice: it.unitPriceUsd != null ? String(it.unitPriceUsd) : "",
         currency: it.currency || "USD",
         currencyCurrentPrice: it.currencyCurrentPrice != null ? String(it.currencyCurrentPrice) : "",
+        totalQty: it.totalQty != null ? String(it.totalQty) : "",
+        qtyInEachCarton: it.qtyInEachCarton != null ? String(it.qtyInEachCarton) : "",
+        noOfCarton: it.noOfCarton != null ? String(it.noOfCarton) : "",
+        grossWeight: it.grossWeight != null ? String(it.grossWeight) : "",
+        netWeight: it.netWeight != null ? String(it.netWeight) : "",
+        totalCartonWith: it.totalCartonWith != null ? String(it.totalCartonWith) : "",
+        woodenPallet: it.woodenPallet != null ? String(it.woodenPallet) : "",
       }));
       setItems(mappedItems);
     }
@@ -454,7 +488,7 @@ const CreateInvoice = () => {
           <ItemsDetailsSection items={items} onItemsChange={handleItemsChange} disabled={mode === 'view'} />
         </FormSection>
 
-        <FormSection title="Packing Details" action={
+        {/* <FormSection title="Packing Details" action={
             mode !== 'view' && (
               <button type="button" onClick={handleAddPacking} className="inline-flex items-center gap-2 bg-gray-900 text-white px-3 py-2 rounded-lg hover:bg-gray-800 transition">
                 Add Item <Plus className="w-3 h-3" />
@@ -463,7 +497,7 @@ const CreateInvoice = () => {
           }
         >
           <PackingDetailsSection packings={packings} onPackingsChange={handlePackingsChange} disabled={mode === 'view'} />
-        </FormSection>
+        </FormSection> */}
 
         <FormSection title="Extra Changes">
           <AdditionalChargesSection formData={formData} onChange={handleChange} disabled={mode === 'view'} />
@@ -474,7 +508,7 @@ const CreateInvoice = () => {
         </FormSection>
 
         <FormSection title="ARN No">
-          <TextAreaSection title="Enter ARN No." name="" value={formData.arnNo} onChange={handleChange} placeholder="Enter Something.." disabled={mode === 'view'} />
+          <TextAreaSection title="Enter ARN No." name="arnNo" value={formData.arnNo} onChange={handleChange} placeholder="Enter Something.." disabled={mode === 'view'} />
         </FormSection>
 
         <FormSection title="RoDTEP">

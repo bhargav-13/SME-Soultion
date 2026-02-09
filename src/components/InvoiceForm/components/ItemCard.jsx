@@ -3,24 +3,39 @@ import { X } from "lucide-react";
 import FormInput from "../FormInput";
 import FormSelect from "../FormSelect";
 
-const ItemCard = ({ 
-  item, 
-  index, 
-  onChange, 
-  onRemove, 
+const ItemCard = ({
+  item,
+  index,
+  onChange,
+  onRemove,
   canRemove,
   disabled = false,
   currencyOptions = [
-    { value: "USD", label: "USD" },
-    { value: "EUR", label: "Euro" },
-    
-  ]
+    { value: "EUR", label: "EUR", iconText: "€" },
+    { value: "USD", label: "USD", iconText: "$" },
+  ],
 }) => {
+  const currencyValue = item.currency || "";
+  const currencyIcon = currencyValue === "USD" ? "$" : "€";
+  const parsedQty = Number(item.itemQty);
+  const parsedUnitPrice = Number(item.unitPrice);
+  const parsedCurrencyRate = Number(item.currencyCurrentPrice);
+  const totalAmountInr =
+    Number.isFinite(parsedQty) &&
+    Number.isFinite(parsedUnitPrice) &&
+    Number.isFinite(parsedCurrencyRate) &&
+    parsedQty > 0 &&
+    parsedUnitPrice > 0 &&
+    parsedCurrencyRate > 0
+      ? (parsedQty * parsedUnitPrice * parsedCurrencyRate).toFixed(2)
+      : "";
+
   return (
     <div className="bg-white border border-gray-200 rounded-xl p-5 relative">
-      {/* Item Number and Remove Button */}
       <div className="flex items-center justify-between mb-4">
-        <span className="text-sm font-medium text-gray-500">Item #{index + 1}</span>
+        <span className="text-sm font-medium text-gray-500">
+          Item #{index + 1}
+        </span>
         {canRemove && (
           <button
             type="button"
@@ -32,11 +47,19 @@ const ItemCard = ({
         )}
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-3 gap-4">
         <FormInput
           label="Item No."
           name={`itemNo_${index}`}
           value={item.itemNo || ""}
+          onChange={(e) => onChange(index, e)}
+          placeholder="Enter No."
+          disabled={disabled}
+        />
+        <FormInput
+          label="Part No."
+          name={`partNo_${index}`}
+          value={item.partNo || ""}
           onChange={(e) => onChange(index, e)}
           placeholder="Enter No."
           disabled={disabled}
@@ -49,15 +72,16 @@ const ItemCard = ({
           placeholder="Enter Item Name"
           disabled={disabled}
         />
-        <FormInput
-          label="HS Code"
-          name={`hsCode_${index}`}
-          value={item.hsCode || ""}
-          onChange={(e) => onChange(index, e)}
-          placeholder="1001"
-          disabled={disabled}
-
-        />
+        <div className="col-span-2">
+          <FormInput
+            label="HS Code"
+            name={`hsCode_${index}`}
+            value={item.hsCode || ""}
+            onChange={(e) => onChange(index, e)}
+            placeholder="Enter HS Code"
+            disabled={disabled}
+          />
+        </div>
         <FormInput
           label="Qty (Pcs)"
           name={`itemQty_${index}`}
@@ -66,27 +90,27 @@ const ItemCard = ({
           placeholder="Enter Qty."
           disabled={disabled}
         />
-        <div className="flex gap-2">
-          <div className="">
+        <div className="col-span-2 flex gap-2">
+          <div className="flex-1">
             <FormInput
-              label="Unit Price (USD)"
+              label="Unit Price (USD/EURO)"
               name={`unitPrice_${index}`}
               value={item.unitPrice || ""}
               onChange={(e) => onChange(index, e)}
-              placeholder="Enter Price"
+              placeholder="Enter Unit Price"
               disabled={disabled}
             />
           </div>
-          <div className="relative w-26 ">
+          <div className="relative w-28">
             <FormSelect
               label=""
               name={`currency_${index}`}
-              value={item.currency || ""}
+              value={currencyValue}
               onChange={(e) => onChange(index, e)}
               options={currencyOptions}
-              defaultValue="EUR"
               showIcon
-              iconText="€"
+              iconText={currencyIcon}
+              placeholder="USD/EURO"
               disabled={disabled}
             />
           </div>
@@ -96,7 +120,79 @@ const ItemCard = ({
           name={`currencyCurrentPrice_${index}`}
           value={item.currencyCurrentPrice || ""}
           onChange={(e) => onChange(index, e)}
-          placeholder="ENter Price"
+          placeholder="Enter Current Price"
+          disabled={disabled}
+        />
+        <div className="col-span-3">
+          <FormInput
+            label="Total Amount In INR (Auto-Calculate)"
+            name={`totalAmountInr_${index}`}
+            value={totalAmountInr}
+            onChange={() => {}}
+            placeholder="Enter Current Price"
+            disabled
+          />
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-4 mt-4">
+        <FormInput
+          label="Total Qty (Pcs)"
+          name={`totalQty_${index}`}
+          value={item.totalQty || ""}
+          onChange={(e) => onChange(index, e)}
+          placeholder="Enter Qty."
+          disabled={disabled}
+        />
+        <FormInput
+          label="Qty In Each Carton"
+          name={`qtyInEachCarton_${index}`}
+          value={item.qtyInEachCarton || ""}
+          onChange={(e) => onChange(index, e)}
+          placeholder="Enter Each Carton"
+          disabled={disabled}
+        />
+        <FormInput
+          label="No. of carton"
+          name={`noOfCarton_${index}`}
+          value={item.noOfCarton || ""}
+          onChange={(e) => onChange(index, e)}
+          placeholder="Enter No."
+          disabled={disabled}
+        />
+        <FormInput
+          label="Gross Weight"
+          name={`grossWeight_${index}`}
+          value={item.grossWeight || ""}
+          onChange={(e) => onChange(index, e)}
+          placeholder="Enter Gross Weight"
+          disabled={disabled}
+        />
+      </div>
+
+      <div className="grid grid-cols-3 gap-4 mt-4">
+        <FormInput
+          label="Net Weight"
+          name={`netWeight_${index}`}
+          value={item.netWeight || ""}
+          onChange={(e) => onChange(index, e)}
+          placeholder="Enter Net Weight"
+          disabled={disabled}
+        />
+        <FormInput
+          label="Total Carton with"
+          name={`totalCartonWith_${index}`}
+          value={item.totalCartonWith || ""}
+          onChange={(e) => onChange(index, e)}
+          placeholder="Enter"
+          disabled={disabled}
+        />
+        <FormInput
+          label="Wooden pallet"
+          name={`woodenPallet_${index}`}
+          value={item.woodenPallet || ""}
+          onChange={(e) => onChange(index, e)}
+          placeholder="Enter"
           disabled={disabled}
         />
       </div>
@@ -105,4 +201,3 @@ const ItemCard = ({
 };
 
 export default ItemCard;
-
