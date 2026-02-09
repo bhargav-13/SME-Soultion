@@ -72,7 +72,8 @@ const ItemCard = ({
           placeholder="Enter Item Name"
           disabled={disabled}
         />
-        <div className="col-span-2">
+        </div>
+         <div className="grid grid-cols-2 gap-4 mt-4">
           <FormInput
             label="HS Code"
             name={`hsCode_${index}`}
@@ -81,8 +82,7 @@ const ItemCard = ({
             placeholder="Enter HS Code"
             disabled={disabled}
           />
-        </div>
-        <FormInput
+          <FormInput
           label="Qty (Pcs)"
           name={`itemQty_${index}`}
           value={item.itemQty || ""}
@@ -90,7 +90,7 @@ const ItemCard = ({
           placeholder="Enter Qty."
           disabled={disabled}
         />
-        <div className="col-span-2 flex gap-2">
+          <div className="flex gap-2">
           <div className="flex-1">
             <FormInput
               label="Unit Price (USD/EURO)"
@@ -110,7 +110,7 @@ const ItemCard = ({
               options={currencyOptions}
               showIcon
               iconText={currencyIcon}
-              placeholder="USD/EURO"
+              placeholder="USD/EUR"
               disabled={disabled}
             />
           </div>
@@ -123,7 +123,10 @@ const ItemCard = ({
           placeholder="Enter Current Price"
           disabled={disabled}
         />
-        <div className="col-span-3">
+        </div>
+        
+      
+        <div className="col-span-3 mt-4">
           <FormInput
             label="Total Amount In INR (Auto-Calculate)"
             name={`totalAmountInr_${index}`}
@@ -133,7 +136,7 @@ const ItemCard = ({
             disabled
           />
         </div>
-      </div>
+      
 
       <div className="grid grid-cols-2 gap-4 mt-4">
         <FormInput
@@ -184,7 +187,7 @@ const ItemCard = ({
           name={`totalCartonWith_${index}`}
           value={item.totalCartonWith || ""}
           onChange={(e) => onChange(index, e)}
-          placeholder="Enter"
+          placeholder="--"
           disabled={disabled}
         />
         <FormInput
@@ -192,7 +195,7 @@ const ItemCard = ({
           name={`woodenPallet_${index}`}
           value={item.woodenPallet || ""}
           onChange={(e) => onChange(index, e)}
-          placeholder="Enter"
+          placeholder="--"
           disabled={disabled}
         />
       </div>
