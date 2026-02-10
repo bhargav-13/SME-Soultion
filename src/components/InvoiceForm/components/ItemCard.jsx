@@ -87,7 +87,7 @@ const ItemCard = ({
           name={`itemQty_${index}`}
           value={item.itemQty || ""}
           onChange={(e) => onChange(index, e)}
-          placeholder="Enter Qty."
+          placeholder="Total Qty (Pcs)"
           disabled={disabled}
         />
           <div className="flex gap-2">
@@ -189,7 +189,7 @@ const ItemCard = ({
           name={`woodenPallet_${index}`}
           value={item.woodenPallet || ""}
           onChange={(e) => onChange(index, e)}
-          placeholder="--"
+          placeholder="Enter No"
           disabled={disabled}
         />
       </div>
