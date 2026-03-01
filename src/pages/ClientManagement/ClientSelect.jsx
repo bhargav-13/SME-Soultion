@@ -197,7 +197,7 @@ const ClientSelect = () => {
               <PrimaryActionButton
                 onClick={openClientDialogForDetails}
               >
-                View Client Item
+                View Client wise Item
               </PrimaryActionButton>
             }
           />
