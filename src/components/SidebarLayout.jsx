@@ -95,6 +95,12 @@ const SidebarLayout = ({ children }) => {
       icon: <Package className="w-5 h-5" />,
     },
     {
+      to: "/client-management/select",
+      label: "Client Management",
+      icon: <User className="w-5 h-5" />,
+      activePaths: ["/client-management/select", "/client-management"],
+    },
+    {
       to: "/invoices",
       label: "Invoices",
       icon: <FileText className="w-5 h-5" />,
@@ -156,11 +162,19 @@ const SidebarLayout = ({ children }) => {
                   </div>
                 ) : (
                   // Regular links
+                  (() => {
+                    const isActive = link.activePaths
+                      ? link.activePaths.some((path) =>
+                          location.pathname.startsWith(path),
+                        )
+                      : location.pathname === link.to;
+
+                    return (
                   <Link
                     to={link.to}
                     onClick={() => setIsOpen(false)}
                     className={`flex items-center px-3 py-2.5 rounded-lg transition-all duration-200 ${
-                      location.pathname === link.to
+                      isActive
                         ? "bg-white text-gray-900 font-semibold border border-black ml-2"
                         : "text-black hover:border-1 hover:border-black hover:ml-2"
                     }`}
@@ -168,6 +182,8 @@ const SidebarLayout = ({ children }) => {
                     <span className="mr-3 text-gray-500">{link.icon}</span>
                     <span className="text-sm font-medium">{link.label}</span>
                   </Link>
+                    );
+                  })()
                 )}
               </div>
             ))}

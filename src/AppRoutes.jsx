@@ -14,6 +14,8 @@ import CreateInvoice from "./pages/Invoices/CreateInvoice";
 import OrderList from "./pages/Orders/OrderList";
 import AddOrder from "./pages/Orders/AddOrder";
 import OrderManagement from "./pages/Orders/OrderManagement";
+import ClientSelect from "./pages/ClientManagement/ClientSelect";
+import ClientManagement from "./pages/ClientManagement/ClientManagement";
 
 const AppRoutes = () => {
 
@@ -114,6 +116,22 @@ const AppRoutes = () => {
       <Route
         path="/inventory"
         element={ <Inventory />}
+      />
+      <Route
+        path="/client-management/select"
+        element={
+          <ProtectedRoute>
+            <ClientSelect />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/client-management"
+        element={
+          <ProtectedRoute>
+            <ClientManagement />
+          </ProtectedRoute>
+        }
       />
       <Route
         path="/invoices"
