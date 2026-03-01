@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import EditableClientTable from "./EditableClientTable";
 import ConfirmationDialog from "../ConfirmationDialog";
+import { Edit2, X } from "lucide-react";
 
 const ClientDetailsDialog = ({
   isOpen,
@@ -18,9 +19,13 @@ const ClientDetailsDialog = ({
   onClose,
 }) => {
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
+  const [isEditMode, setIsEditMode] = useState(false);
 
   useEffect(() => {
-    if (!isOpen) setIsDeleteConfirmOpen(false);
+    if (!isOpen) {
+      setIsDeleteConfirmOpen(false);
+      setIsEditMode(false);
+    }
   }, [isOpen]);
 
   if (!isOpen || !clientName) return null;
@@ -36,12 +41,12 @@ const ClientDetailsDialog = ({
           <EditableClientTable
             columns={columns}
             rows={rows}
-            selectedCell={selectedCell}
-            editingCell={editingCell}
-            onCellClick={onCellClick}
-            onCellChange={onCellChange}
-            onCellBlur={onCellBlur}
-            onLastCellTab={onLastCellTab}
+            selectedCell={isEditMode ? selectedCell : null}
+            editingCell={isEditMode ? editingCell : null}
+            onCellClick={isEditMode ? onCellClick : () => {}}
+            onCellChange={isEditMode ? onCellChange : () => {}}
+            onCellBlur={isEditMode ? onCellBlur : () => {}}
+            onLastCellTab={isEditMode ? onLastCellTab : () => {}}
           />
 
           {rows.length === 0 && <p className="mt-2 text-xs text-gray-500">No matching rows.</p>}
@@ -49,13 +54,27 @@ const ClientDetailsDialog = ({
 
         <div className="sticky bottom-0 z-20 bg-white border-t border-gray-200 px-4 md:px-6 py-4">
           <div className="flex items-center justify-start gap-4">
-            <button
-              type="button"
-              onClick={onSave}
-              className="px-12 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition text-sm cursor-pointer"
-            >
-              Save
-            </button>
+            {isEditMode ? (
+              <button
+                type="button"
+                onClick={() => {
+                  onSave();
+                  setIsEditMode(false);
+                }}
+                className="px-12 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition text-sm cursor-pointer"
+              >
+                Save
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setIsEditMode(true)}
+                className="px-12 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition text-sm cursor-pointer"
+             >
+                Edit
+              </button>
+            )}
+           
             <button
               type="button"
               onClick={() => setIsDeleteConfirmOpen(true)}

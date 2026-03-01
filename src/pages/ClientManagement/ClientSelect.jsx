@@ -7,7 +7,7 @@ import ClientFilterBar from "../../components/Client/ClientFilterBar";
 import ClientListDialog from "../../components/Client/ClientListDialog";
 import ClientDetailsDialog from "../../components/Client/ClientDetailsDialog";
 import EditableClientTable from "../../components/Client/EditableClientTable";
-import { CLIENTS, CLIENT_TABLE_COLUMNS, DEFAULT_CLIENT_TABLE_DATA } from "../../Data/clientmanagementdata";
+import { CLIENTS, CLIENT_TABLE_COLUMNS, DEFAULT_CLIENT_TABLE_DATA } from "../../data/clientmanagementdata";
 import useClientTables from "../../hooks/useClientTables";
 import PrimaryActionButton from "../../components/PrimaryActionButton";
 import { Plus } from "lucide-react";
@@ -197,7 +197,7 @@ const ClientSelect = () => {
               <PrimaryActionButton
                 onClick={openClientDialogForDetails}
               >
-                View Client  Item
+                View Client wise Item
               </PrimaryActionButton>
             }
           />

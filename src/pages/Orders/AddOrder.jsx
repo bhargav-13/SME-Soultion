@@ -181,9 +181,8 @@ const AddOrder = () => {
                   name="poDate"
                   value={orderForm.poDate}
                   onChange={handleOrderChange}
-                  className="w-full border border-gray-300 rounded-md px-3 py-2.5 pr-10 text-md focus:outline-none focus:ring-1 focus:ring-gray-400"
+                  className="w-full border border-gray-300 rounded-md px-3 py-2.5 text-md focus:outline-none focus:ring-1 focus:ring-gray-400"
                 />
-                <Calendar className="w-4 h-4 text-gray-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
               </div>
             </div>
           </div>

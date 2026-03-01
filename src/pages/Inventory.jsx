@@ -3,6 +3,8 @@ import SidebarLayout from "../components/SidebarLayout";
 import SearchFilter from "../components/SearchFilter";
 import StatsCard from "../components/StatsCard";
 
+const createEmptyRow = (columnCount) => Array(columnCount).fill("");
+
 const Inventory = () => {
   const columns = useMemo(
     () => [
@@ -29,7 +31,7 @@ const Inventory = () => {
     ],
     [],
   );
-  const initialRows = 10;
+  const initialRows = 1;
   const [tableData, setTableData] = useState(() =>
     Array.from({ length: initialRows }, () => Array(columns.length).fill("")),
   );
@@ -72,6 +74,18 @@ const Inventory = () => {
 
     setSelectedCell(cellId);
     setEditingCell(null);
+  };
+
+  const handleCellBlur = (cellId) => {
+    setEditingCell(null);
+    setSelectedCell(cellId);
+  };
+
+  const handleLastCellTab = () => {
+    const nextRowIndex = filteredRows.length;
+    setTableData((prevRows) => [...prevRows, createEmptyRow(columns.length)]);
+    setSelectedCell(`${nextRowIndex}-0`);
+    setEditingCell(`${nextRowIndex}-0`);
   };
 
   const handleSave = () => {
@@ -141,13 +155,21 @@ const Inventory = () => {
                               autoFocus
                               value={value}
                               onChange={(e) => updateCell(rowIndex, colIndex, e.target.value)}
-                              onBlur={() => {
-                                setEditingCell(null);
-                                setSelectedCell(cellId);
-                              }}
+                              onBlur={() => handleCellBlur(cellId)}
                               onKeyDown={(e) => {
                                 if (e.key === "Enter") {
                                   e.currentTarget.blur();
+                                  return;
+                                }
+
+                                if (
+                                  e.key === "Tab" &&
+                                  !e.shiftKey &&
+                                  rowIndex === filteredRows.length - 1 &&
+                                  colIndex === columns.length - 1
+                                ) {
+                                  e.preventDefault();
+                                  handleLastCellTab();
                                 }
                               }}
                               className="w-full rounded text-start text-sm focus:outline-none focus:ring-none focus:ring-gray-300"
@@ -170,21 +192,26 @@ const Inventory = () => {
             <p className="mt-2 text-xs text-gray-500">No matching rows.</p>
           )}
 
-          <div className="flex items-center justify-center gap-4 mt-6">
-            <button
-              type="button"
-              onClick={handleSave}
-              className="px-10 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition text-sm"
-            >
-              Save
-            </button>
-            <button
-              type="button"
-              onClick={handleCancel}
-              className="px-10 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition text-sm"
-            >
-              Cancel
-            </button>
+          <div className="mt-4">
+            <p className="text-xs text-gray-500 text-right mb-2">
+              Select last column cell and press Tab to add new row.
+            </p>
+            <div className="flex items-center justify-center gap-4">
+              <button
+                type="button"
+                onClick={handleSave}
+                className="px-10 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition text-sm"
+              >
+                Save
+              </button>
+              <button
+                type="button"
+                onClick={handleCancel}
+                className="px-10 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition text-sm"
+              >
+                Cancel
+              </button>
+            </div>
           </div>
         </div>
       </div>

@@ -244,6 +244,21 @@ const OrderManagement = () => {
     }));
   };
 
+  const convertToDateInput = (dateString) => {
+    if (!dateString) return "";
+    const parts = dateString.split("/");
+    if (parts.length === 3) {
+      return `${parts[2]}-${parts[1]}-${parts[0]}`;
+    }
+    return dateString;
+  };
+
+  const convertFromDateInput = (dateInputValue) => {
+    if (!dateInputValue) return "";
+    const [year, month, day] = dateInputValue.split("-");
+    return `${day}/${month}/${year}`;
+  };
+
   const renderOrderDetails = (order, isEditable = false) => {
     const fields = [
       ["Party Name", "partyName"],
@@ -295,6 +310,18 @@ const OrderManagement = () => {
                     {editOrder?.[key] ? "Enabled" : "Disabled"}
                   </span>
                 </div>
+              ) : key === "date" || key === "dispatchDate" ? (
+                <input
+                  type="date"
+                  value={convertToDateInput(editOrder?.[key] ?? "")}
+                  onChange={(e) =>
+                    setEditOrder((prev) => ({
+                      ...prev,
+                      [key]: convertFromDateInput(e.target.value),
+                    }))
+                  }
+                  className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-gray-400"
+                />
               ) : (
                 <input
                   value={editOrder?.[key] ?? ""}
@@ -366,19 +393,19 @@ const OrderManagement = () => {
                 <tr className="bg-gray-100 border-b border-gray-200">
                   <th
                     rowSpan={2}
-                    className="px-3 py-4 text-left text-sm font-semibold border-r border-gray-200 whitespace-nowrap"
+                    className="px-3 py-4 text-center text-sm font-semibold border-r border-gray-200 whitespace-nowrap"
                   >
                     Party Name
                   </th>
                   <th
                     rowSpan={2}
-                    className="px-3 py-4 text-left text-sm font-semibold border-r border-gray-200 whitespace-nowrap"
+                    className="px-3 py-4 text-center text-sm font-semibold border-r border-gray-200 whitespace-nowrap"
                   >
                     Date
                   </th>
                   <th
                     rowSpan={2}
-                    className="px-3 py-4 text-left text-sm font-semibold border-r border-gray-200 whitespace-nowrap"
+                    className="px-3 py-4 text-center text-sm font-semibold border-r border-gray-200 whitespace-nowrap"
                   >
                     Size
                   </th>
