@@ -1,13 +1,13 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import ReactDOM from "react-dom";
-import { Plus, Pencil, Trash2, X, Eye } from "lucide-react";
+import { Plus, Pencil, Trash2, X, Eye, Search, Check } from "lucide-react";
 import SidebarLayout from "../components/SidebarLayout";
 import SearchFilter from "../components/SearchFilter";
 import StatsCard from "../components/StatsCard";
 import PageHeader from "../components/PageHeader";
 import PrimaryActionButton from "../components/PrimaryActionButton";
 import ConfirmationDialog from "../components/ConfirmationDialog";
-import { itemBlueprintApi, sizeApi, inventoryApi } from "../services/apiService";
+import { itemBlueprintApi, sizeApi, inventoryApi, axiosInstance } from "../services/apiService";
 import toast from "react-hot-toast";
 
 const columns = [
@@ -177,6 +177,13 @@ const Inventory = () => {
   const [viewItemsDialog, setViewItemsDialog] = useState(false);
   const [newItemName, setNewItemName] = useState("");
   const [addingItem, setAddingItem] = useState(false);
+
+  // View Items dialog state
+  const [viewItemSearch, setViewItemSearch]       = useState("");
+  const [editingItemId, setEditingItemId]         = useState(null);
+  const [editingItemName, setEditingItemName]     = useState("");
+  const [itemActionLoading, setItemActionLoading] = useState(false);
+  const [deleteItemTarget, setDeleteItemTarget]   = useState(null); // {id, name}
 
   const [saving, setSaving] = useState(false);
 
@@ -873,43 +880,174 @@ const Inventory = () => {
         </div>
       )}
 
-      {/* View Items dialog — read-only list of all item blueprints */}
-      {viewItemsDialog && (
-        <div className="fixed inset-0 bg-black/20 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4 overflow-hidden flex flex-col max-h-[80vh]">
-            <div className="bg-gray-50 px-6 py-4 border-b border-gray-200 flex items-center justify-between">
-              <h2 className="text-lg font-semibold text-gray-900">
-                All Items
-                <span className="ml-2 text-sm font-normal text-gray-400">({items.length})</span>
-              </h2>
-              <button
-                type="button"
-                onClick={() => setViewItemsDialog(false)}
-                className="text-gray-400 hover:text-gray-600 transition"
-                aria-label="Close"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-            <div className="overflow-y-auto flex-1 divide-y divide-gray-100">
-              {items.length === 0 ? (
-                <p className="px-6 py-8 text-sm text-center text-gray-400">No items found.</p>
-              ) : (
-                items.map((item, i) => (
-                  <div key={item.id} className="flex items-center gap-3 px-6 py-3 hover:bg-gray-50">
-                    <span className="text-xs text-gray-400 w-6 text-right shrink-0">{i + 1}.</span>
-                    <span className="text-sm text-gray-800">{item.itemName || `Item #${item.id}`}</span>
+      {/* View Items dialog — search + edit + delete */}
+      {viewItemsDialog && (() => {
+        const filtered = items.filter(it =>
+          (it.itemName || "").toLowerCase().includes(viewItemSearch.toLowerCase())
+        );
+        return (
+          <div className="fixed inset-0 bg-black/20 flex items-center justify-center z-50">
+            <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl mx-4 flex flex-col max-h-[80vh]">
+
+              {/* Header */}
+              <div className="px-5 py-4 border-b border-gray-200 flex items-center justify-between">
+                <h2 className="text-base font-semibold text-gray-900">
+                  All Items
+                  <span className="ml-2 text-sm font-normal text-gray-400">({filtered.length})</span>
+                </h2>
+                <button type="button" onClick={() => { setViewItemsDialog(false); setEditingItemId(null); setViewItemSearch(""); }} className="text-gray-400 hover:text-gray-600 transition">
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* Search */}
+              <div className="px-4 py-3 border-b border-gray-100">
+                <div className="flex items-center gap-2 border border-gray-300 rounded-lg px-3 py-2">
+                  <Search className="w-4 h-4 text-gray-400 shrink-0" />
+                  <input
+                    autoFocus
+                    type="text"
+                    placeholder="Search items…"
+                    value={viewItemSearch}
+                    onChange={e => setViewItemSearch(e.target.value)}
+                    className="flex-1 text-sm bg-transparent focus:outline-none text-gray-700 placeholder-gray-400"
+                  />
+                  {viewItemSearch && (
+                    <button type="button" onClick={() => setViewItemSearch("")} className="text-gray-400 hover:text-gray-600">
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Grid of item cards */}
+              <div className="overflow-y-auto flex-1 p-4">
+                {filtered.length === 0 ? (
+                  <p className="py-8 text-sm text-center text-gray-400">No items found.</p>
+                ) : (
+                  <div className="grid grid-cols-3 gap-3">
+                    {filtered.map((item) => {
+                      const isEditing = editingItemId === item.id;
+                      return (
+                        <div key={item.id} className="group relative">
+                          {isEditing ? (
+                            /* Edit mode card */
+                            <div className="border border-blue-400 rounded-lg p-2 bg-blue-50/30 flex flex-col gap-2">
+                              <input
+                                autoFocus
+                                type="text"
+                                value={editingItemName}
+                                onChange={e => setEditingItemName(e.target.value)}
+                                onKeyDown={async e => {
+                                  if (e.key === "Enter") {
+                                    e.preventDefault();
+                                    if (!editingItemName.trim()) return;
+                                    setItemActionLoading(true);
+                                    try {
+                                      await axiosInstance.put(`/api/v1/item-blueprints/${item.id}`, { itemName: editingItemName.trim() });
+                                      toast.success("Item updated");
+                                      setEditingItemId(null);
+                                      await loadAll();
+                                    } catch { toast.error("Failed to update"); }
+                                    finally { setItemActionLoading(false); }
+                                  }
+                                  if (e.key === "Escape") setEditingItemId(null);
+                                }}
+                                className="w-full text-sm px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-gray-400 bg-white"
+                              />
+                              <div className="flex gap-1.5 justify-end">
+                                <button type="button"
+                                  onClick={async () => {
+                                    if (!editingItemName.trim()) return;
+                                    setItemActionLoading(true);
+                                    try {
+                                      await axiosInstance.put(`/api/v1/item-blueprints/${item.id}`, { itemName: editingItemName.trim() });
+                                      toast.success("Item updated");
+                                      setEditingItemId(null);
+                                      await loadAll();
+                                    } catch { toast.error("Failed to update"); }
+                                    finally { setItemActionLoading(false); }
+                                  }}
+                                  disabled={itemActionLoading}
+                                  className="px-2 py-0.5 text-xs bg-gray-800 text-white rounded hover:bg-gray-700 transition disabled:opacity-50"
+                                >Save</button>
+                                <button type="button" onClick={() => setEditingItemId(null)}
+                                  className="px-2 py-0.5 text-xs border border-gray-300 text-gray-600 rounded hover:bg-gray-100 transition"
+                                >Cancel</button>
+                              </div>
+                            </div>
+                          ) : (
+                            /* Read-only card chip */
+                            <div className="border border-gray-200 rounded-lg px-3 py-2.5 text-sm text-gray-700 bg-white hover:border-gray-300 hover:shadow-sm transition min-h-[44px] flex items-center justify-between gap-1 cursor-default">
+                              <span className="truncate">{item.itemName || `Item #${item.id}`}</span>
+                              <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                                <button type="button" title="Edit"
+                                  onClick={() => { setEditingItemId(item.id); setEditingItemName(item.itemName || ""); }}
+                                  className="p-1 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded transition"
+                                >
+                                  <Pencil className="w-3 h-3" />
+                                </button>
+                                <button type="button" title="Delete"
+                                  onClick={() => setDeleteItemTarget({ id: item.id, name: item.itemName })}
+                                  className="p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition"
+                                >
+                                  <Trash2 className="w-3 h-3" />
+                                </button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
-                ))
-              )}
+                )}
+              </div>
+
+              {/* Footer */}
+              <div className="px-5 py-3 border-t border-gray-200 flex justify-end">
+                <button type="button"
+                  onClick={() => { setViewItemsDialog(false); setEditingItemId(null); setViewItemSearch(""); }}
+                  className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-100 transition font-medium text-sm"
+                >
+                  Close
+                </button>
+              </div>
             </div>
-            <div className="bg-gray-50 px-6 py-3 border-t border-gray-200 flex justify-end">
-              <button
-                type="button"
-                onClick={() => setViewItemsDialog(false)}
-                className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-100 transition font-medium text-sm"
+          </div>
+        );
+      })()}
+
+      {/* Delete item confirmation */}
+      {deleteItemTarget && (
+        <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-[60]">
+          <div className="bg-white rounded-lg shadow-xl max-w-sm w-full mx-4 overflow-hidden">
+            <div className="px-6 py-5">
+              <h3 className="text-base font-semibold text-gray-900 mb-1">Delete Item</h3>
+              <p className="text-sm text-gray-500">
+                Are you sure you want to delete <strong>{deleteItemTarget.name}</strong>? This cannot be undone.
+              </p>
+            </div>
+            <div className="px-6 pb-5 flex justify-end gap-3">
+              <button type="button" onClick={() => setDeleteItemTarget(null)}
+                className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-100 transition text-sm font-medium"
               >
-                Close
+                Cancel
+              </button>
+              <button type="button" disabled={itemActionLoading}
+                onClick={async () => {
+                  setItemActionLoading(true);
+                  try {
+                    await axiosInstance.delete(`/api/v1/item-blueprints/${deleteItemTarget.id}`);
+                    toast.success("Item deleted");
+                    setDeleteItemTarget(null);
+                    await loadAll();
+                  } catch (err) {
+                    toast.error(err?.response?.data?.message || "Failed to delete item");
+                  } finally { setItemActionLoading(false); }
+                }}
+                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition text-sm font-medium disabled:opacity-50"
+              >
+                {itemActionLoading ? "Deleting…" : "Delete"}
               </button>
             </div>
           </div>

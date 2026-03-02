@@ -36,7 +36,10 @@ const createEmptyItem = () => ({
   // user inputs
   qtyPc: "",
   finish: "",
-  // auto from client inventory (read-only)
+  // raw rates from client inventory (used for calculations)
+  rawPcPerBox: "",      // pcsPerBox  — the rate, never changes
+  rawBoxPerCartoon: "", // boxPerCarton — the rate, never changes
+  // calculated display values (derived from qtyPc + raw rates)
   pcPerBox: "",
   boxPerCartoon: "",
   pcPerCartoon: "",
@@ -46,6 +49,29 @@ const createEmptyItem = () => ({
   itemSearch: "",
   itemDropdownOpen: false,
 });
+
+// ─── Derive box / carton / kg from user's qtyPc input ────────────────────────
+// boxes   = ceil(qtyPc / pcPerBox_rate)
+// cartons = ceil(boxes / boxPerCartoon_rate)
+// qtyKg   = (dozenWeight / 12) × qtyPc
+const computeDerived = (qtyPc, rawPcPerBox, rawBoxPerCartoon, dozenWeight) => {
+  const qty     = parseFloat(qtyPc)            || 0;
+  const pcRate  = parseFloat(rawPcPerBox)       || 0;
+  const boxRate = parseFloat(rawBoxPerCartoon)  || 0;
+  const dozWt   = parseFloat(dozenWeight)       || 0;
+
+  if (!qty || !pcRate) return { pcPerBox: "", boxPerCartoon: "", qtyKg: "" };
+
+  const boxes   = Math.ceil(qty / pcRate);
+  const cartons = boxRate ? Math.ceil(boxes / boxRate) : "";
+  const kg      = dozWt ? ((dozWt / 12) * qty).toFixed(3) : "";
+
+  return {
+    pcPerBox:      String(boxes),
+    boxPerCartoon: cartons !== "" ? String(cartons) : "",
+    qtyKg:         kg,
+  };
+};
 
 // ─── Searchable dropdown ───────────────────────────────────────────────────
 const SearchableDropdown = ({
@@ -167,7 +193,7 @@ const AddOrder = () => {
   }, [updateItem]);
 
   // Step 2: size selected → auto-fill from client inventory
-  const handleSelectSize = useCallback(async (index, size) => {
+  const handleSelectSize = useCallback(async (index, size, currentQtyPc = "") => {
     updateItem(index, {
       selectedSize: size,
       clientInventoryLoading: true,
@@ -184,12 +210,20 @@ const AddOrder = () => {
         selectedParty.id, size.id, undefined, 0, 1
       );
       const m = res.data?.data?.[0] ?? null;
+      const rawPcPerBox      = m?.pcsPerBox    != null ? String(m.pcsPerBox)    : "";
+      const rawBoxPerCartoon = m?.boxPerCarton != null ? String(m.boxPerCarton) : "";
       updateItem(index, {
         clientInventoryLoading: false,
-        pcPerBox:      m?.pcsPerBox    != null ? String(m.pcsPerBox)    : "",
-        boxPerCartoon: m?.boxPerCarton != null ? String(m.boxPerCarton) : "",
-        pcPerCartoon:  m?.pcsPerCarton != null ? String(m.pcsPerCarton) : "",
-        qtyKg:         m?.cartonWeight != null ? String(m.cartonWeight) : "",
+        rawPcPerBox,
+        rawBoxPerCartoon,
+        pcPerCartoon: m?.pcsPerCarton != null ? String(m.pcsPerCarton) : "",
+        // Re-derive using qtyPc that was entered BEFORE size change
+        ...computeDerived(
+          currentQtyPc,
+          rawPcPerBox,
+          rawBoxPerCartoon,
+          size.dozenWeight
+        ),
       });
     } catch {
       updateItem(index, { clientInventoryLoading: false });
@@ -343,7 +377,7 @@ const AddOrder = () => {
                       disabled={!item.selectedItem || item.sizesLoading}
                       onChange={(e) => {
                         const sz = item.sizes.find((s) => String(s.id) === e.target.value);
-                        if (sz) handleSelectSize(index, sz);
+                        if (sz) handleSelectSize(index, sz, item.qtyPc);
                       }}
                       className="w-full border border-gray-300 rounded-md px-3 py-2.5 text-md focus:outline-none focus:ring-1 focus:ring-gray-400 bg-white disabled:bg-gray-50 disabled:text-gray-400 disabled:cursor-not-allowed"
                     >
@@ -365,7 +399,18 @@ const AddOrder = () => {
                       type="number"
                       min="0"
                       value={item.qtyPc}
-                      onChange={(e) => updateItem(index, { qtyPc: e.target.value })}
+                      onChange={(e) => {
+                        const qtyPc = e.target.value;
+                        updateItem(index, {
+                          qtyPc,
+                          ...computeDerived(
+                            qtyPc,
+                            item.rawPcPerBox,
+                            item.rawBoxPerCartoon,
+                            item.selectedSize?.dozenWeight
+                          ),
+                        });
+                      }}
                       placeholder="Enter Pc."
                       className="w-full border border-gray-300 rounded-md px-3 py-2.5 text-md focus:outline-none focus:ring-1 focus:ring-gray-400"
                     />
