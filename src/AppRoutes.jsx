@@ -115,7 +115,11 @@ const AppRoutes = () => {
       />
       <Route
         path="/inventory"
-        element={ <Inventory />}
+        element={
+          <ProtectedRoute>
+            <Inventory />
+          </ProtectedRoute>
+        }
       />
       <Route
         path="/client-management/select"

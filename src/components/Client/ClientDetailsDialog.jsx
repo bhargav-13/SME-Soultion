@@ -17,6 +17,7 @@ const ClientDetailsDialog = ({
   onSave,
   onDeleteAll,
   onClose,
+  readOnlyCols = [],
 }) => {
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
@@ -41,6 +42,7 @@ const ClientDetailsDialog = ({
           <EditableClientTable
             columns={columns}
             rows={rows}
+            readOnlyCols={readOnlyCols}
             selectedCell={isEditMode ? selectedCell : null}
             editingCell={isEditMode ? editingCell : null}
             onCellClick={isEditMode ? onCellClick : () => {}}

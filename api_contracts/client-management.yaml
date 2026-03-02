@@ -1,0 +1,426 @@
+openapi: 3.0.3
+
+info:
+  title: Client Inventory Management API
+  version: 1.0.0
+  description: Client-wise inventory management (Client from Master Parties, Items from Inventory)
+
+servers:
+  - url: http://localhost:8080
+    description: Local development server
+  - url: http://3.7.63.123:8080
+    description: Development Server
+  - url: http://13.205.54.102:8080
+    description: Production Server
+
+tags:
+  - name: ClientInventory
+    description: Client scoped inventory price override APIs
+
+security:
+  - oauth2: [ ]
+
+paths:
+
+  # -------------------- CLIENT INVENTORY LIST --------------------
+  /api/v1/clients/{clientId}/inventory:
+    get:
+      tags: [ ClientInventory ]
+      summary: Get all inventory overrides for a client
+      operationId: getInventoryByClient
+      parameters:
+        - $ref: '#/components/parameters/clientId'
+        - $ref: '#/components/parameters/searchParam'
+        - $ref: '#/components/parameters/pageParam'
+        - $ref: '#/components/parameters/sizeParam'
+        - $ref: '#/components/parameters/SortByFields'
+        - $ref: '#/components/parameters/directionParam'
+      responses:
+        '200':
+          description: Paginated inventory list for client
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedResultClientInventory'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+
+    post:
+      tags: [ ClientInventory ]
+      summary: Create client inventory override
+      operationId: createClientInventory
+      parameters:
+        - $ref: '#/components/parameters/clientId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NewClientInventory'
+      responses:
+        '201':
+          description: Inventory override created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClientInventory'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+
+  # -------------------- CLIENT INVENTORY BY ID --------------------
+  /api/v1/clients/{clientId}/inventory/{inventoryId}:
+    get:
+      tags: [ ClientInventory ]
+      summary: Get client inventory override by id
+      operationId: getClientInventoryById
+      parameters:
+        - $ref: '#/components/parameters/clientId'
+        - $ref: '#/components/parameters/inventoryId'
+      responses:
+        '200':
+          description: Inventory override details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClientInventory'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+
+    put:
+      tags: [ ClientInventory ]
+      summary: Update client inventory override
+      operationId: updateClientInventory
+      parameters:
+        - $ref: '#/components/parameters/clientId'
+        - $ref: '#/components/parameters/inventoryId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NewClientInventory'
+      responses:
+        '200':
+          description: Inventory override updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClientInventory'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+
+    delete:
+      tags: [ ClientInventory ]
+      summary: Delete client inventory override
+      operationId: deleteClientInventory
+      parameters:
+        - $ref: '#/components/parameters/clientId'
+        - $ref: '#/components/parameters/inventoryId'
+      responses:
+        '204':
+          description: Inventory override deleted
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+
+components:
+
+  securitySchemes:
+    oauth2:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    clientId:
+      name: clientId
+      in: path
+      required: true
+      schema:
+        type: integer
+        format: int64
+
+    inventoryId:
+      name: inventoryId
+      in: path
+      required: true
+      schema:
+        type: integer
+        format: int64
+
+    pageParam:
+      name: page
+      in: query
+      description: Page number starting from 0
+      schema:
+        type: integer
+        default: 0
+
+    sizeParam:
+      name: size
+      in: query
+      description: Number of items per page
+      schema:
+        type: integer
+        default: 10
+
+    directionParam:
+      name: direction
+      in: query
+      description: Sort direction
+      schema:
+        type: string
+        enum: [ ASC, DESC ]
+
+    searchParam:
+      name: search
+      in: query
+      description: Search text to filter results
+      schema:
+        type: string
+
+    SortByFields:
+      name: sortByFields
+      in: query
+      description: Field to sort by
+      schema:
+        type: string
+        enum:
+          - lastUpdatedAt
+          - createdAt
+
+  schemas:
+
+    # -------- COMMON REFERENCE --------
+    IdName:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        name:
+          type: string
+
+    # -------- REQUEST --------
+    NewClientInventory:
+      required:
+        - sizeId
+      type: object
+      properties:
+        sizeId:
+          type: integer
+          format: int64
+          description: ItemBlueprintData (size) reference from inventory
+
+        pcsPerBox:
+          type: integer
+        boxPerCarton:
+          type: integer
+        pcsPerCarton:
+          type: integer
+        cartonWeight:
+          type: number
+          format: double
+
+        sssatinlacq:
+          type: number
+          format: double
+        antiq:
+          type: number
+          format: double
+        sidegold:
+          type: number
+          format: double
+        zblack:
+          type: number
+          format: double
+        grblack:
+          type: number
+          format: double
+        mattss:
+          type: number
+          format: double
+        mattantiq:
+          type: number
+          format: double
+        pvdrose:
+          type: number
+          format: double
+        pvdgold:
+          type: number
+          format: double
+        pvdblack:
+          type: number
+          format: double
+        rosegold:
+          type: number
+          format: double
+        clearlacq:
+          type: number
+          format: double
+
+    # -------- RESPONSE --------
+    ClientInventory:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+
+        client:
+          $ref: '#/components/schemas/IdName'
+
+        size:
+          $ref: '#/components/schemas/ClientInventorySize'
+
+        pcsPerBox:
+          type: integer
+        boxPerCarton:
+          type: integer
+        pcsPerCarton:
+          type: integer
+        cartonWeight:
+          type: number
+          format: double
+
+        sssatinlacq:
+          type: number
+          format: double
+        antiq:
+          type: number
+          format: double
+        sidegold:
+          type: number
+          format: double
+        zblack:
+          type: number
+          format: double
+        grblack:
+          type: number
+          format: double
+        mattss:
+          type: number
+          format: double
+        mattantiq:
+          type: number
+          format: double
+        pvdrose:
+          type: number
+          format: double
+        pvdgold:
+          type: number
+          format: double
+        pvdblack:
+          type: number
+          format: double
+        rosegold:
+          type: number
+          format: double
+        clearlacq:
+          type: number
+          format: double
+
+        isOverridden:
+          type: boolean
+          description: True if this row has a client-specific price override, false if showing base inventory prices
+
+        createdAt:
+          type: string
+          format: date-time
+        lastUpdatedAt:
+          type: string
+          format: date-time
+
+    ClientInventorySize:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        sizeInInch:
+          type: string
+        sizeInMm:
+          type: string
+        dozenWeight:
+          type: number
+          format: double
+        item:
+          $ref: '#/components/schemas/IdName'
+
+    PaginatedResultClientInventory:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/ClientInventory'
+        empty:
+          type: boolean
+        last:
+          type: boolean
+        first:
+          type: boolean
+        totalPages:
+          type: integer
+        totalElements:
+          type: integer
+        size:
+          type: integer
+
+    ErrorResponse:
+      type: object
+      properties:
+        message:
+          type: string
+        code:
+          type: string
+        detail:
+          type: object
+
+  responses:
+    UnauthorizedError:
+      description: Unauthorized
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+    ForbiddenError:
+      description: Forbidden
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+    NotFoundError:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+    InternalServerError:
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'

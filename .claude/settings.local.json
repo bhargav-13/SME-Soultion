@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cd /d/ishita-industry/SME-Soultion && npm run generate:api-clients 2>&1)",
+      "Bash(tail:*)"
+    ]
+  }
+}

@@ -1,5 +1,11 @@
 import React from "react";
 
+/**
+ * EditableClientTable
+ *
+ * readOnlyCols – Set (or array converted to Set) of column indices that are
+ *                NOT editable. Clicking them never triggers edit mode.
+ */
 const EditableClientTable = ({
   columns,
   rows,
@@ -9,19 +15,24 @@ const EditableClientTable = ({
   onCellChange,
   onCellBlur,
   onLastCellTab,
+  readOnlyCols = [],          // array of column indices that are read-only
   tableMinWidth = "min-w-[1600px]",
   scrollHeightClass = "max-h-[560px]",
 }) => {
+  const readOnlySet = new Set(readOnlyCols);
+
   return (
     <div className="border border-gray-200 rounded-lg overflow-hidden">
       <div className={`${scrollHeightClass} overflow-auto scrollbar-thin`}>
         <table className={`${tableMinWidth} w-full`}>
           <thead>
             <tr className="bg-gray-100 border-b border-gray-200">
-              {columns.map((col) => (
+              {columns.map((col, colIndex) => (
                 <th
                   key={col}
-                  className="sticky top-0 z-10 whitespace-nowrap px-6 py-4 text-center text-sm font-semibold text-gray-900 border-r border-gray-200 last:border-r-0 bg-gray-100"
+                  className={`sticky top-0 z-10 whitespace-nowrap px-6 py-4 text-center text-sm font-semibold border-r border-gray-200 last:border-r-0 bg-gray-100 ${
+                    readOnlySet.has(colIndex) ? "text-gray-400" : "text-gray-900"
+                  }`}
                 >
                   {col}
                 </th>
@@ -33,14 +44,18 @@ const EditableClientTable = ({
               <tr key={`row-${rowIndex}`} className="border-b border-gray-200 hover:bg-gray-50">
                 {row.map((value, colIndex) => {
                   const cellId = `${rowIndex}-${colIndex}`;
-                  const isEditing = editingCell === cellId;
-                  const isSelected = selectedCell === cellId;
+                  const isReadOnly = readOnlySet.has(colIndex);
+                  const isEditing = !isReadOnly && editingCell === cellId;
+                  const isSelected = !isReadOnly && selectedCell === cellId;
 
                   return (
                     <td
                       key={`${rowIndex}-${columns[colIndex]}`}
-                      className={`h-10 min-w-[84px] px-3 py-3 text-center text-sm text-gray-500 border-r border-gray-200 last:border-r-0 ${isSelected ? "ring-2 ring-gray-400 ring-inset" : ""}`}
-                      onClick={() => onCellClick(rowIndex, colIndex)}
+                      className={`h-10 min-w-[84px] px-3 py-3 text-center text-sm border-r border-gray-200 last:border-r-0
+                        ${isReadOnly ? "bg-gray-50 text-gray-400 select-none" : "text-gray-500 cursor-pointer"}
+                        ${isSelected ? "ring-2 ring-gray-400 ring-inset" : ""}
+                      `}
+                      onClick={() => !isReadOnly && onCellClick(rowIndex, colIndex)}
                     >
                       {isEditing ? (
                         <input
@@ -53,7 +68,6 @@ const EditableClientTable = ({
                               e.currentTarget.blur();
                               return;
                             }
-
                             if (
                               e.key === "Tab" &&
                               !e.shiftKey &&
@@ -68,7 +82,9 @@ const EditableClientTable = ({
                           className="w-full rounded text-start text-sm focus:outline-none focus:ring-none focus:ring-gray-300"
                         />
                       ) : (
-                        <span className={value ? "text-gray-500" : "text-gray-300"}>{value || " "}</span>
+                        <span className={value ? (isReadOnly ? "text-gray-400" : "text-gray-500") : "text-gray-300"}>
+                          {value || " "}
+                        </span>
                       )}
                     </td>
                   );

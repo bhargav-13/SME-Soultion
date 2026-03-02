@@ -10,6 +10,16 @@ import { Configuration } from '../api-clients/master';
 import { InvoiceApi, Configuration as InvoiceMgmtConfiguration } from '../api-clients/invoice-management';
 import { Configuration as UserMgmtConfiguration } from '../api-clients/user-management';
 import {
+    Configuration as ItemMgmtConfiguration,
+    ItemApi as ItemBlueprintApi,
+    SizeApi,
+    InventoryApi,
+} from '../api-clients/item-management';
+import {
+    Configuration as ClientMgmtConfiguration,
+    ClientInventoryApi,
+} from '../api-clients/client-management';
+import {
     CategoryApi,
     ItemApi,
     PartyApi,
@@ -142,6 +152,26 @@ const createInvoiceMgmtConfig = () => {
     });
 };
 
+const createItemMgmtConfig = () => {
+    return new ItemMgmtConfiguration({
+        basePath: config.API_BASE_URL,
+        accessToken: getAccessToken(),
+        baseOptions: {
+            adapter: axiosInstance.defaults.adapter,
+        },
+    });
+};
+
+const createClientMgmtConfig = () => {
+    return new ClientMgmtConfiguration({
+        basePath: config.API_BASE_URL,
+        accessToken: getAccessToken(),
+        baseOptions: {
+            adapter: axiosInstance.defaults.adapter,
+        },
+    });
+};
+
 // Initialize API clients
 let partyApi = new PartyApi(createApiConfig(), config.API_BASE_URL, axiosInstance);
 let categoryApi = new CategoryApi(createApiConfig(), config.API_BASE_URL, axiosInstance);
@@ -151,6 +181,10 @@ let authApi = new AuthenticationApi(createUserMgmtConfig(), config.API_BASE_URL,
 let userManagementApi = new UserManagementApi(createUserMgmtConfig(), config.API_BASE_URL, axiosInstance);
 let invoiceApi = new InvoiceApi(createInvoiceMgmtConfig(), config.API_BASE_URL, axiosInstance);
 let exportApi = new InvoiceApi(createInvoiceMgmtConfig(), config.API_BASE_URL, axiosInstance);
+let itemBlueprintApi = new ItemBlueprintApi(createItemMgmtConfig(), config.API_BASE_URL, axiosInstance);
+let sizeApi = new SizeApi(createItemMgmtConfig(), config.API_BASE_URL, axiosInstance);
+let inventoryApi = new InventoryApi(createItemMgmtConfig(), config.API_BASE_URL, axiosInstance);
+let clientInventoryApi = new ClientInventoryApi(createClientMgmtConfig(), config.API_BASE_URL, axiosInstance);
 /**
  * Update all API clients with new token
  * Call this after login or token refresh
@@ -167,6 +201,10 @@ export const updateApiClients = () => {
     userManagementApi = new UserManagementApi(userConfig, config.API_BASE_URL, axiosInstance);
     invoiceApi = new InvoiceApi(createInvoiceMgmtConfig(), config.API_BASE_URL, axiosInstance);
     exportApi = new InvoiceApi(createInvoiceMgmtConfig(), config.API_BASE_URL, axiosInstance);
+    itemBlueprintApi = new ItemBlueprintApi(createItemMgmtConfig(), config.API_BASE_URL, axiosInstance);
+    sizeApi = new SizeApi(createItemMgmtConfig(), config.API_BASE_URL, axiosInstance);
+    inventoryApi = new InventoryApi(createItemMgmtConfig(), config.API_BASE_URL, axiosInstance);
+    clientInventoryApi = new ClientInventoryApi(createClientMgmtConfig(), config.API_BASE_URL, axiosInstance);
 };
 
 // Export API clients
@@ -180,6 +218,10 @@ export {
     axiosInstance,
     invoiceApi,
     exportApi,
+    itemBlueprintApi,
+    sizeApi,
+    inventoryApi,
+    clientInventoryApi,
 };
 
 // Export a default object with all APIs
@@ -193,4 +235,8 @@ export default {
     updateClients: updateApiClients,
     invoice: invoiceApi,
     export: exportApi,
+    itemBlueprint: itemBlueprintApi,
+    size: sizeApi,
+    inventory: inventoryApi,
+    clientInventory: clientInventoryApi,
 };

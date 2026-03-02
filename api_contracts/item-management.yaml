@@ -1,0 +1,799 @@
+openapi: 3.0.3
+
+info:
+  title: Inventory API
+  version: 1.0.0
+  description: OpenAPI for Inventory (Item read-only with sizes, Size read-only, Inventory CRUD)
+
+servers:
+  - url: http://localhost:8080
+    description: Local development server
+  - url: http://3.7.63.123:8080
+    description: Development Server
+  - url: http://13.205.54.102:8080
+    description: Production Server
+
+tags:
+  - name: Item
+    description: Read-only item endpoints (includes sizes)
+  - name: Size
+    description: Read-only size endpoints
+  - name: Inventory
+    description: Inventory CRUD endpoints (flat row format)
+
+security:
+  - oauth2: [ ]
+
+paths:
+
+  # -------------------- ITEM (GET ONLY, WITH SIZES) --------------------
+  /api/v1/item-blueprints:
+    get:
+      operationId: getAllItems
+      tags:
+        - Item
+      summary: Get all items with size info (read-only)
+      parameters:
+        - $ref: '#/components/parameters/searchParam'
+      responses:
+        '200':
+          description: Item list with sizes
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Item'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+    post:
+      operationId: createItem
+      tags:
+        - Item
+      summary: Create item
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NewItem'
+      responses:
+        '201':
+          description: Item created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Item'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/v1/item-blueprints/{id}:
+    get:
+      operationId: getItemById
+      tags:
+        - Item
+      summary: Get item by id with sizes (read-only)
+      parameters:
+        - $ref: '#/components/parameters/idParam'
+      responses:
+        '200':
+          description: Item details with sizes
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Item'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+    put:
+      operationId: updateItem
+      tags:
+        - Item
+      summary: Update item by id
+      parameters:
+        - $ref: '#/components/parameters/idParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NewItem'
+      responses:
+        '200':
+          description: Item updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Item'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+    delete:
+      operationId: deleteItem
+      tags:
+        - Item
+      summary: Delete item by id
+      parameters:
+        - $ref: '#/components/parameters/idParam'
+      responses:
+        '204':
+          description: Item deleted
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  # -------------------- SIZE (GET ONLY) --------------------
+  /api/v1/item-blueprints/{itemId}/sizes:
+    get:
+      operationId: getSizesByItemId
+      tags:
+        - Size
+      summary: Get sizes for item (read-only)
+      parameters:
+        - $ref: '#/components/parameters/itemIdParam'
+        - $ref: '#/components/parameters/searchParam'
+      responses:
+        '200':
+          description: Size list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Size'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+    post:
+      operationId: createSize
+      tags:
+        - Size
+      summary: Create size for item
+      parameters:
+        - $ref: '#/components/parameters/itemIdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NewSize'
+      responses:
+        '201':
+          description: Size created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Size'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/v1/item-blueprints/{itemId}/sizes/{sizeId}:
+    get:
+      operationId: getSizeById
+      tags:
+        - Size
+      summary: Get size by id (read-only)
+      parameters:
+        - $ref: '#/components/parameters/itemIdParam'
+        - $ref: '#/components/parameters/sizeIdParam'
+      responses:
+        '200':
+          description: Size details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Size'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+    put:
+      operationId: updateSize
+      tags:
+        - Size
+      summary: Update size by id
+      parameters:
+        - $ref: '#/components/parameters/itemIdParam'
+        - $ref: '#/components/parameters/sizeIdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NewSize'
+      responses:
+        '200':
+          description: Size updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Size'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+    delete:
+      operationId: deleteSize
+      tags:
+        - Size
+      summary: Delete size by id
+      parameters:
+        - $ref: '#/components/parameters/itemIdParam'
+        - $ref: '#/components/parameters/sizeIdParam'
+      responses:
+        '204':
+          description: Size deleted
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  # -------------------- INVENTORY (CRUD + GET) --------------------
+  /api/v1/item-blueprints/{itemId}/inventory:
+    get:
+      operationId: getAllInventory
+      tags:
+        - Inventory
+      summary: Get all inventory rows (table format)
+      parameters:
+        - $ref: '#/components/parameters/itemIdParam'
+        - name: itemName
+          in: query
+          description: Filter by item name
+          schema:
+            type: string
+        - name: sizeInInch
+          in: query
+          description: Filter by size in inch text
+          schema:
+            type: string
+        - name: sizeInMm
+          in: query
+          description: Filter by size in mm text
+          schema:
+            type: string
+        - $ref: '#/components/parameters/searchParam'
+        - $ref: '#/components/parameters/pageParam'
+        - $ref: '#/components/parameters/sizeParam'
+        - $ref: '#/components/parameters/SortByFields'
+        - $ref: '#/components/parameters/directionParam'
+      responses:
+        '200':
+          description: Paginated inventory list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedResultInventory'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+    post:
+      operationId: createInventory
+      tags:
+        - Inventory
+      summary: Create inventory row (by itemName + size fields)
+      parameters:
+        - $ref: '#/components/parameters/itemIdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NewInventory'
+      responses:
+        '201':
+          description: Inventory created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Inventory'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/v1/item-blueprints/{itemId}/inventory/{id}:
+    get:
+      operationId: getInventoryById
+      tags:
+        - Inventory
+      summary: Get inventory by id
+      parameters:
+        - $ref: '#/components/parameters/itemIdParam'
+        - $ref: '#/components/parameters/idParam'
+      responses:
+        '200':
+          description: Inventory details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Inventory'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+    put:
+      operationId: updateInventory
+      tags:
+        - Inventory
+      summary: Update inventory by id (by itemName + size fields)
+      parameters:
+        - $ref: '#/components/parameters/itemIdParam'
+        - $ref: '#/components/parameters/idParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NewInventory'
+      responses:
+        '200':
+          description: Inventory updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Inventory'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+    delete:
+      operationId: deleteInventory
+      tags:
+        - Inventory
+      summary: Delete inventory by id
+      parameters:
+        - $ref: '#/components/parameters/itemIdParam'
+        - $ref: '#/components/parameters/idParam'
+      responses:
+        '204':
+          description: Inventory deleted
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+components:
+
+  securitySchemes:
+    oauth2:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    idParam:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: integer
+        format: int64
+
+    itemIdParam:
+      name: itemId
+      in: path
+      required: true
+      schema:
+        type: integer
+        format: int64
+
+    sizeIdParam:
+      name: sizeId
+      in: path
+      required: true
+      schema:
+        type: integer
+        format: int64
+
+    pageParam:
+      name: page
+      in: query
+      description: Page number starting from 0
+      schema:
+        type: integer
+        default: 0
+
+    sizeParam:
+      name: size
+      in: query
+      description: Number of items per page
+      schema:
+        type: integer
+        default: 10
+
+    directionParam:
+      name: direction
+      in: query
+      description: Sort direction
+      schema:
+        type: string
+        enum: [ ASC, DESC ]
+
+    searchParam:
+      name: search
+      in: query
+      description: Search text
+      schema:
+        type: string
+
+    SortByFields:
+      name: sortByFields
+      in: query
+      description: Field to sort by
+      schema:
+        type: string
+        enum:
+          - lastUpdatedAt
+          - createdAt
+
+  schemas:
+
+    NewItem:
+      required: [ itemName ]
+      type: object
+      properties:
+        itemName:
+          type: string
+
+    # -------- Item (read-only) includes sizes list --------
+    Item:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        itemName:
+          type: string
+        sizes:
+          type: array
+          items:
+            $ref: '#/components/schemas/Size'
+
+    NewSize:
+      required: [ sizeInInch, sizeInMm ]
+      type: object
+      properties:
+        sizeInInch:
+          type: string
+          example: Butt - 3 X 3/8 X 5/8
+        sizeInMm:
+          type: string
+          example: 75*9*16
+        dozenWeight:
+          type: number
+          format: double
+          example: 0.650
+
+    # -------- Size (read-only) --------
+    Size:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        sizeInInch:
+          type: string
+        sizeInMm:
+          type: string
+        dozenWeight:
+          type: number
+          format: double
+
+    # -------- Inventory request uses names (no ids) --------
+    NewInventory:
+      required: [ sizeInInch, sizeInMm ]
+      type: object
+      properties:
+        sizeInInch:
+          type: string
+          example: Butt - 3 X 3/8 X 5/8
+        sizeInMm:
+          type: string
+          example: 75*9*16
+        dozenWeight:
+          type: number
+          format: double
+          example: 0.650
+
+        pcsPerBox:
+          type: integer
+          example: 25
+        boxPerCarton:
+          type: integer
+          example: 16
+        pcsPerCarton:
+          type: integer
+          example: 400
+        cartonWeight:
+          type: number
+          format: double
+          example: 21.667
+
+        sssatinlacq:
+          type: number
+          format: double
+          example: 210
+
+        antiq:
+          type: number
+          format: double
+          example: 220
+
+        sidegold:
+          type: number
+          format: double
+          example: 230
+
+        zblack:
+          type: number
+          format: double
+          example: 330
+
+        grblack:
+          type: number
+          format: double
+          example: 300
+
+        mattss:
+          type: number
+          format: double
+          example: 250
+
+        mattantiq:
+          type: number
+          format: double
+          example: 260
+
+        pvdrose:
+          type: number
+          format: double
+          example: 500
+
+        pvdgold:
+          type: number
+          format: double
+          example: 500
+
+        pvdblack:
+          type: number
+          format: double
+          example: 500
+
+        rosegold:
+          type: number
+          format: double
+          example: 500
+
+        clearlacq:
+          type: number
+          format: double
+          example: 500
+
+    # -------- Inventory response (flat row + id) --------
+    Inventory:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+
+        itemName:
+          type: string
+        sizeInInch:
+          type: string
+        sizeInMm:
+          type: string
+        dozenWeight:
+          type: number
+          format: double
+
+        pcsPerBox:
+          type: integer
+        boxPerCarton:
+          type: integer
+        pcsPerCarton:
+          type: integer
+        cartonWeight:
+          type: number
+          format: double
+
+        sssatinlacq:
+          type: number
+          format: double
+          example: 210
+
+        antiq:
+          type: number
+          format: double
+          example: 220
+
+        sidegold:
+          type: number
+          format: double
+          example: 230
+
+        zblack:
+          type: number
+          format: double
+          example: 330
+
+        grblack:
+          type: number
+          format: double
+          example: 300
+
+        mattss:
+          type: number
+          format: double
+          example: 250
+
+        mattantiq:
+          type: number
+          format: double
+          example: 260
+
+        pvdrose:
+          type: number
+          format: double
+          example: 500
+
+        pvdgold:
+          type: number
+          format: double
+          example: 500
+
+        pvdblack:
+          type: number
+          format: double
+          example: 500
+
+        rosegold:
+          type: number
+          format: double
+          example: 500
+
+        clearlacq:
+          type: number
+          format: double
+          example: 500
+
+        createdAt:
+          type: string
+          format: date
+        updatedAt:
+          type: string
+          format: date
+
+    PaginatedResultInventory:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Inventory'
+        empty:
+          type: boolean
+        last:
+          type: boolean
+        first:
+          type: boolean
+        totalPages:
+          type: integer
+        totalElements:
+          type: integer
+        size:
+          type: integer
+
+    ErrorResponse:
+      type: object
+      properties:
+        message:
+          type: string
+        code:
+          type: string
+        detail:
+          type: object
+
+  responses:
+    UnauthorizedError:
+      description: Unauthorized
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+    ForbiddenError:
+      description: Forbidden
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+    NotFoundError:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+    InternalServerError:
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
