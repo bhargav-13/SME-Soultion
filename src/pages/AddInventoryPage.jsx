@@ -562,7 +562,7 @@ const AddInventoryPage = () => {
               {/* ════ Section 3: Stock Entry ════════════════════════════ */}
               <div
                 ref={stockSectionRef}
-                className={`rounded-lg transition-all duration-700 ${
+                className={`space-y-6 rounded-lg transition-all duration-700 ${
                   stockHighlight
                     ? "ring-2 ring-amber-400 bg-amber-50 px-4 pb-4 -mx-4"
                     : ""
@@ -570,7 +570,7 @@ const AddInventoryPage = () => {
               >
               <SectionDivider title="Stock Entry" />
 
-              <div className="space-y-6 mt-1">
+              <div className="space-y-6">
                 <div className="grid grid-cols-2 gap-6">
                   <div>
                     <label className={labelCls}>Item in Kg</label>
