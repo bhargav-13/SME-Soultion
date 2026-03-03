@@ -13,8 +13,6 @@ const EditItemDialog = ({
     sizeMM: "",
     categoryId: "",
     categoryName: "",
-    subCategoryId: "",
-    subCategoryName: "",
     itemKg: "",
     weightPerPL: "",
     weightUnit: "",
@@ -24,8 +22,6 @@ const EditItemDialog = ({
   });
   const [isWeightUnitOpen, setIsWeightUnitOpen] = useState(false);
   const [isCategoryOpen, setIsCategoryOpen] = useState(false);
-  const [isSubCategoryOpen, setIsSubCategoryOpen] = useState(false);
-  const [subCategories, setSubCategories] = useState([]);
 
   useEffect(() => {
     if (initialData) {
@@ -34,8 +30,6 @@ const EditItemDialog = ({
         sizeMM: initialData.sizeMM || "",
         categoryId: initialData.categoryId || "",
         categoryName: initialData.category || "",
-        subCategoryId: initialData.subCategoryId || "",
-        subCategoryName: initialData.subCategory || "",
         itemKg: initialData.itemKg || "",
         weightPerPL: initialData.weightPerPL || "",
         weightUnit: initialData.weightUnit || "",
@@ -43,38 +37,19 @@ const EditItemDialog = ({
         dozenWeight: initialData.dozenWeight || "",
         lowStockWarning: initialData.lowStockWarning || "",
       });
-
-      // Set subcategories for the initial category
-      const matchedCategory = categories.find(
-        (cat) => cat.id === initialData.categoryId || cat.name === initialData.category
-      );
-      setSubCategories(matchedCategory?.subCategories || []);
     }
-  }, [initialData, isOpen, categories]);
+  }, [initialData, isOpen]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData((prev) => {
-      const newFormData = {
-        ...prev,
-        [name]: value,
-      };
+      const newFormData = { ...prev, [name]: value };
 
-      // Auto-calculate Total Pc when Item Kg, Weight/Pc, or Weight Unit changes
       if (name === "itemKg" || name === "weightPerPL" || name === "weightUnit") {
-        const itemKg =
-          name === "itemKg"
-            ? parseFloat(value) || 0
-            : parseFloat(prev.itemKg) || 0;
-        const weightPerPc =
-          name === "weightPerPL"
-            ? parseFloat(value) || 0
-            : parseFloat(prev.weightPerPL) || 0;
-        const weightUnit =
-          name === "weightUnit" ? value : newFormData.weightUnit || prev.weightUnit;
-
+        const itemKg = name === "itemKg" ? parseFloat(value) || 0 : parseFloat(prev.itemKg) || 0;
+        const weightPerPc = name === "weightPerPL" ? parseFloat(value) || 0 : parseFloat(prev.weightPerPL) || 0;
+        const weightUnit = name === "weightUnit" ? value : newFormData.weightUnit || prev.weightUnit;
         const weightPerPcInKg = weightUnit === "Gram" ? weightPerPc / 1000 : weightPerPc;
-
         if (itemKg > 0 && weightPerPcInKg > 0) {
           newFormData.totalPL = (itemKg / weightPerPcInKg).toFixed(2);
         } else {
@@ -82,17 +57,10 @@ const EditItemDialog = ({
         }
       }
 
-      // Auto-calculate Dozen Weight when Weight/Pc or Weight Unit changes
       if (name === "weightPerPL" || name === "weightUnit") {
-        const weightPerPc =
-          name === "weightPerPL"
-            ? parseFloat(value) || 0
-            : parseFloat(prev.weightPerPL) || 0;
-        const weightUnit =
-          name === "weightUnit" ? value : newFormData.weightUnit || prev.weightUnit;
-
+        const weightPerPc = name === "weightPerPL" ? parseFloat(value) || 0 : parseFloat(prev.weightPerPL) || 0;
+        const weightUnit = name === "weightUnit" ? value : newFormData.weightUnit || prev.weightUnit;
         const weightPerPcInKg = weightUnit === "Gram" ? weightPerPc / 1000 : weightPerPc;
-
         if (weightPerPcInKg > 0) {
           newFormData.dozenWeight = (weightPerPcInKg * 12).toFixed(2);
         } else {
@@ -109,20 +77,8 @@ const EditItemDialog = ({
       ...prev,
       categoryId: category.id,
       categoryName: category.name,
-      subCategoryId: "",
-      subCategoryName: "",
     }));
-    setSubCategories(category.subCategories || []);
     setIsCategoryOpen(false);
-  };
-
-  const handleSubCategorySelect = (subCategory) => {
-    setFormData((prev) => ({
-      ...prev,
-      subCategoryId: subCategory.id,
-      subCategoryName: subCategory.name,
-    }));
-    setIsSubCategoryOpen(false);
   };
 
   const handleSave = () => {
@@ -141,10 +97,7 @@ const EditItemDialog = ({
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-xl font-medium text-gray-900">Edit Item</h2>
-          <button
-            onClick={onClose}
-            className="text-gray-500 hover:text-gray-500"
-          >
+          <button onClick={onClose} className="text-gray-500 hover:text-gray-500">
             <X className="w-6 h-6" />
           </button>
         </div>
@@ -179,82 +132,42 @@ const EditItemDialog = ({
             </div>
           </div>
 
-          {/* Row 2 - Category & SubCategory Dropdowns */}
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-black mb-1">
-                Category<span className="text-black">*</span>
-              </label>
-              <div className="relative">
-                <button
-                  type="button"
-                  onClick={() => setIsCategoryOpen(!isCategoryOpen)}
-                  className="w-full flex items-center justify-between px-3 py-2 border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-gray-500 transition text-sm"
-                >
-                  <span className={formData.categoryName === "" ? "text-gray-500 text-sm" : "text-gray-900"}>
-                    {formData.categoryName === "" ? "Select Category" : formData.categoryName}
-                  </span>
-                  <svg className={`w-4 h-4 text-gray-500 transition-transform ${isCategoryOpen ? "rotate-180" : ""}`} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-                  </svg>
-                </button>
-                {isCategoryOpen && (
-                  <div className="absolute z-20 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden max-h-48 overflow-y-auto">
-                    {categories.length === 0 ? (
-                      <div className="px-3 py-2 text-sm text-gray-500">No categories available</div>
-                    ) : (
-                      categories.map((category) => (
-                        <button
-                          key={category.id}
-                          type="button"
-                          onClick={() => handleCategorySelect(category)}
-                          className="w-full text-left px-3 py-2 text-sm hover:bg-gray-100 transition"
-                        >
-                          {category.name}
-                        </button>
-                      ))
-                    )}
-                  </div>
-                )}
-              </div>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-black mb-1">
-                Sub Category
-              </label>
-              <div className="relative">
-                <button
-                  type="button"
-                  onClick={() => setIsSubCategoryOpen(!isSubCategoryOpen)}
-                  disabled={!formData.categoryId}
-                  className="w-full flex items-center justify-between px-3 py-2 border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-gray-500 transition text-sm disabled:bg-gray-50 disabled:cursor-not-allowed"
-                >
-                  <span className={formData.subCategoryName === "" ? "text-gray-500 text-sm" : "text-gray-900"}>
-                    {formData.subCategoryName === "" ? "Select Sub Category" : formData.subCategoryName}
-                  </span>
-                  <svg className={`w-4 h-4 text-gray-500 transition-transform ${isSubCategoryOpen ? "rotate-180" : ""}`} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-                  </svg>
-                </button>
-                {isSubCategoryOpen && (
-                  <div className="absolute z-20 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden max-h-48 overflow-y-auto">
-                    {subCategories.length === 0 ? (
-                      <div className="px-3 py-2 text-sm text-gray-500">No sub categories available</div>
-                    ) : (
-                      subCategories.map((subCategory) => (
-                        <button
-                          key={subCategory.id}
-                          type="button"
-                          onClick={() => handleSubCategorySelect(subCategory)}
-                          className="w-full text-left px-3 py-2 text-sm hover:bg-gray-100 transition"
-                        >
-                          {subCategory.name}
-                        </button>
-                      ))
-                    )}
-                  </div>
-                )}
-              </div>
+          {/* Row 2 - Category */}
+          <div>
+            <label className="block text-sm font-medium text-black mb-1">
+              Category<span className="text-black">*</span>
+            </label>
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setIsCategoryOpen(!isCategoryOpen)}
+                className="w-full flex items-center justify-between px-3 py-2 border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-gray-500 transition text-sm"
+              >
+                <span className={formData.categoryName === "" ? "text-gray-500 text-sm" : "text-gray-900"}>
+                  {formData.categoryName === "" ? "Select Category" : formData.categoryName}
+                </span>
+                <svg className={`w-4 h-4 text-gray-500 transition-transform ${isCategoryOpen ? "rotate-180" : ""}`} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+              {isCategoryOpen && (
+                <div className="absolute z-20 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden max-h-48 overflow-y-auto">
+                  {categories.length === 0 ? (
+                    <div className="px-3 py-2 text-sm text-gray-500">No categories available</div>
+                  ) : (
+                    categories.map((category) => (
+                      <button
+                        key={category.id}
+                        type="button"
+                        onClick={() => handleCategorySelect(category)}
+                        className="w-full text-left px-3 py-2 text-sm hover:bg-gray-100 transition"
+                      >
+                        {category.name}
+                      </button>
+                    ))
+                  )}
+                </div>
+              )}
             </div>
           </div>
 

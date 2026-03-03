@@ -28,9 +28,7 @@ const ItemsTable = ({
         <th className="px-6 py-3 text-center text-sm font-semibold text-gray-900">
           Category
         </th>
-        <th className="px-6 py-3 text-center text-sm font-semibold text-gray-900">
-          Sub Category
-        </th>
+
         <th className="px-6 py-3 text-center text-sm font-semibold text-gray-900">
           Total Kg
         </th>
@@ -61,9 +59,7 @@ const ItemsTable = ({
             <td className="px-6 py-4 text-sm text-gray-900 text-center">
               {item.category}
             </td>
-            <td className="px-6 py-4 text-sm text-gray-900 text-center">
-              {item.subCategory}
-            </td>
+
             <td className="px-6 py-4 text-sm text-gray-900 text-center">
               {item.totalKg}
             </td>
@@ -118,7 +114,7 @@ const ItemsTable = ({
       ) : (
         <tr>
           <td
-            colSpan={showActions ? 8 : 7}
+            colSpan={showActions ? 7 : 6}
             className="px-6 py-8 text-center text-gray-500"
           >
             No items found

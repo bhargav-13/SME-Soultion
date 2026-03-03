@@ -23,7 +23,6 @@ import {
     CategoryApi,
     ItemApi,
     PartyApi,
-    SubCategoryApi,
 } from '../api-clients/master';
 import {
     AuthenticationApi,
@@ -175,7 +174,7 @@ const createClientMgmtConfig = () => {
 // Initialize API clients
 let partyApi = new PartyApi(createApiConfig(), config.API_BASE_URL, axiosInstance);
 let categoryApi = new CategoryApi(createApiConfig(), config.API_BASE_URL, axiosInstance);
-let subCategoryApi = new SubCategoryApi(createApiConfig(), config.API_BASE_URL, axiosInstance);
+
 let itemApi = new ItemApi(createApiConfig(), config.API_BASE_URL, axiosInstance);
 let authApi = new AuthenticationApi(createUserMgmtConfig(), config.API_BASE_URL, axiosInstance);
 let userManagementApi = new UserManagementApi(createUserMgmtConfig(), config.API_BASE_URL, axiosInstance);
@@ -195,7 +194,7 @@ export const updateApiClients = () => {
 
     partyApi = new PartyApi(masterConfig, config.API_BASE_URL, axiosInstance);
     categoryApi = new CategoryApi(masterConfig, config.API_BASE_URL, axiosInstance);
-    subCategoryApi = new SubCategoryApi(masterConfig, config.API_BASE_URL, axiosInstance);
+
     itemApi = new ItemApi(masterConfig, config.API_BASE_URL, axiosInstance);
     authApi = new AuthenticationApi(userConfig, config.API_BASE_URL, axiosInstance);
     userManagementApi = new UserManagementApi(userConfig, config.API_BASE_URL, axiosInstance);
@@ -211,7 +210,6 @@ export const updateApiClients = () => {
 export {
     partyApi,
     categoryApi,
-    subCategoryApi,
     itemApi,
     authApi,
     userManagementApi,
@@ -228,7 +226,6 @@ export {
 export default {
     party: partyApi,
     category: categoryApi,
-    subCategory: subCategoryApi,
     item: itemApi,
     auth: authApi,
     userManagement: userManagementApi,

@@ -12,7 +12,6 @@ const ViewItemDialog = ({
     sizeInch: "",
     sizeMM: "",
     category: "",
-    subCategory: "",
     itemKg: "",
     weightPerPL: "",
     totalPL: "",
@@ -26,7 +25,6 @@ const ViewItemDialog = ({
         sizeInch: itemData.sizeInch || "",
         sizeMM: itemData.sizeMM || "",
         category: itemData.category || "",
-        subCategory: itemData.subCategory || "",
         itemKg: itemData.itemKg || "",
         weightPerPL: itemData.weightPerPL || "",
         totalPL: itemData.totalPL || "",
@@ -94,30 +92,17 @@ const ViewItemDialog = ({
             </div>
           </div>
 
-          {/* Row 2 */}
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-black mb-1">
-                Category
-              </label>
-              <input
-                type="text"
-                value={formData.category}
-                readOnly
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-sm text-gray-500"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-black mb-1">
-                Sub Category
-              </label>
-              <input
-                type="text"
-                value={formData.subCategory}
-                readOnly
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-sm text-gray-500"
-              />
-            </div>
+          {/* Row 2 - Category */}
+          <div>
+            <label className="block text-sm font-medium text-black mb-1">
+              Category
+            </label>
+            <input
+              type="text"
+              value={formData.category}
+              readOnly
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-sm text-gray-500"
+            />
           </div>
 
           {/* Row 3 */}

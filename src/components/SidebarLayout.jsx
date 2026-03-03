@@ -20,7 +20,7 @@ import logo from "../assets/logo.png";
 const SidebarLayout = ({ children }) => {
   const [isOpen, setIsOpen] = useState(false);
   const location = useLocation();
-  const isMastersActive = location.pathname.startsWith("/masters");
+  const isMastersActive = location.pathname.startsWith("/masters") || location.pathname.startsWith("/inventory");
   const [mastersOpen, setMastersOpen] = useState(false);
   const [popoverPos, setPopoverPos] = useState({ top: 0, left: 0 });
   const mastersRef = useRef(null);
@@ -65,9 +65,9 @@ const SidebarLayout = ({ children }) => {
       label: "Category Master",
     },
     {
-      to: "/masters/item",
-      icon: <ListTodo className="w-4 h-4" />,
-      label: "Inventory",
+      to: "/inventory",
+      icon: <Package className="w-4 h-4" />,
+      label: "Stock Master",
     },
   ];
 
@@ -94,11 +94,6 @@ const SidebarLayout = ({ children }) => {
       to: "/order",
       label: "Order",
       icon: <ListTodo className="w-5 h-5" />,
-    },
-    {
-      to: "/inventory",
-      label: "Items",
-      icon: <Package className="w-5 h-5" />,
     },
     {
       to: "/client-management/select",

@@ -18,8 +18,6 @@ const AddItem = () => {
     sizeMM: "",
     categoryId: "",
     categoryName: "",
-    subCategoryId: "",
-    subCategoryName: "",
     itemKg: "",
     weightPerPL: "",
     weightUnit: "",
@@ -29,7 +27,6 @@ const AddItem = () => {
   });
   const [items, setItems] = useState([]);
   const [categories, setCategories] = useState([]);
-  const [subCategories, setSubCategories] = useState([]);
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("");
@@ -47,7 +44,6 @@ const AddItem = () => {
     data: null,
   });
   const [isWeightUnitOpen, setIsWeightUnitOpen] = useState(false);
-  const [isSubCategoryOpen, setIsSubCategoryOpen] = useState(false);
   const [isCategoryOpen, setIsCategoryOpen] = useState(false);
 
   useEffect(() => {
@@ -101,11 +97,7 @@ const AddItem = () => {
         categoriesData.map((cat) => ({
           id: cat.id,
           name: cat.name,
-          subCategories: (cat.subCategories || []).map((sub) => ({
-            id: sub.id,
-            name: sub.name,
-          })),
-        })),
+        }))
       );
     } catch (error) {
       console.error("Error fetching categories:", error);
@@ -117,20 +109,8 @@ const AddItem = () => {
       ...prev,
       categoryId: category.id,
       categoryName: category.name,
-      subCategoryId: "",
-      subCategoryName: "",
     }));
-    setSubCategories(category.subCategories || []);
     setIsCategoryOpen(false);
-  };
-
-  const handleSubCategorySelect = (subCategory) => {
-    setFormData((prev) => ({
-      ...prev,
-      subCategoryId: subCategory.id,
-      subCategoryName: subCategory.name,
-    }));
-    setIsSubCategoryOpen(false);
   };
 
   const handleChange = (e) => {
@@ -208,7 +188,6 @@ const AddItem = () => {
         sizeInch: formData.sizeInch,
         sizeMm: formData.sizeMM,
         categoryId: formData.categoryId,
-        subCategoryId: formData.subCategoryId || undefined,
         itemKg: parseFloat(formData.itemKg) || 0,
         weightPerPc: parseFloat(formData.weightPerPL) || 0,
         totalPc: parseFloat(formData.totalPL) || 0,
@@ -225,8 +204,6 @@ const AddItem = () => {
         sizeMM: "",
         categoryId: "",
         categoryName: "",
-        subCategoryId: "",
-        subCategoryName: "",
         itemKg: "",
         weightPerPL: "",
         weightUnit: "",
@@ -234,7 +211,6 @@ const AddItem = () => {
         dozenWeight: "",
         lowStockWarning: "",
       });
-      setSubCategories([]);
 
       await fetchItems();
     } catch (error) {
@@ -251,8 +227,6 @@ const AddItem = () => {
       sizeMM: "",
       categoryId: "",
       categoryName: "",
-      subCategoryId: "",
-      subCategoryName: "",
       itemKg: "",
       weightPerPL: "",
       weightUnit: "",
@@ -260,7 +234,6 @@ const AddItem = () => {
       dozenWeight: "",
       lowStockWarning: "",
     });
-    setSubCategories([]);
   };
 
   const handleEdit = (item) => {
@@ -318,7 +291,6 @@ const AddItem = () => {
         sizeInch: formData.sizeInch,
         sizeMm: formData.sizeMM,
         categoryId: formData.categoryId || editDialog.data.categoryId,
-        subCategoryId: formData.subCategoryId || editDialog.data.subCategoryId,
         itemKg: parseFloat(formData.itemKg) || 0,
         weightPerPc: parseFloat(formData.weightPerPL) || 0,
         totalPc: parseFloat(formData.totalPL) || 0,
@@ -407,9 +379,9 @@ const AddItem = () => {
               </div>
             </div>
 
-            {/* Row 2 - Category & SubCategory from API */}
+            {/* Row 2 - Category from API */}
             <div className="grid grid-cols-2 gap-6">
-              <div>
+              <div className="col-span-2">
                 <label className="block font-medium text-black mb-2">
                   Category<span className="text-black">*</span>
                 </label>
@@ -462,67 +434,6 @@ const AddItem = () => {
                             className="w-full text-left px-4 py-2 text-sm hover:bg-gray-100 transition"
                           >
                             {category.name}
-                          </button>
-                        ))
-                      )}
-                    </div>
-                  )}
-                </div>
-              </div>
-              <div>
-                <label className="block font-medium text-black mb-2">
-                  Sub Category
-                </label>
-                <div className="relative">
-                  <button
-                    type="button"
-                    onClick={() => setIsSubCategoryOpen(!isSubCategoryOpen)}
-                    disabled={!formData.categoryId}
-                    className="w-full flex items-center justify-between px-4 py-2 border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-gray-500 transition disabled:bg-gray-50 disabled:cursor-not-allowed"
-                  >
-                    <span
-                      className={
-                        formData.subCategoryName === ""
-                          ? "text-gray-500 text-sm"
-                          : "text-gray-900"
-                      }
-                    >
-                      {formData.subCategoryName === ""
-                        ? "Select Sub Category"
-                        : formData.subCategoryName}
-                    </span>
-                    <svg
-                      className={`w-4 h-4 text-gray-500 transition-transform ${
-                        isSubCategoryOpen ? "rotate-180" : ""
-                      }`}
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        d="M19 9l-7 7-7-7"
-                      />
-                    </svg>
-                  </button>
-
-                  {isSubCategoryOpen && (
-                    <div className="absolute z-20 mt-2 w-full bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden max-h-48 overflow-y-auto">
-                      {subCategories.length === 0 ? (
-                        <div className="px-4 py-2 text-sm text-gray-500">
-                          No sub categories available
-                        </div>
-                      ) : (
-                        subCategories.map((subCategory) => (
-                          <button
-                            key={subCategory.id}
-                            type="button"
-                            onClick={() => handleSubCategorySelect(subCategory)}
-                            className="w-full text-left px-4 py-2 text-sm hover:bg-gray-100 transition"
-                          >
-                            {subCategory.name}
                           </button>
                         ))
                       )}

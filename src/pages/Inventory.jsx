@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import ReactDOM from "react-dom";
+import { useNavigate } from "react-router-dom";
 import { Plus, Pencil, Trash2, X, Eye, Search, Check } from "lucide-react";
 import SidebarLayout from "../components/SidebarLayout";
 import SearchFilter from "../components/SearchFilter";
@@ -7,7 +8,8 @@ import StatsCard from "../components/StatsCard";
 import PageHeader from "../components/PageHeader";
 import PrimaryActionButton from "../components/PrimaryActionButton";
 import ConfirmationDialog from "../components/ConfirmationDialog";
-import { itemBlueprintApi, sizeApi, inventoryApi, axiosInstance } from "../services/apiService";
+import { itemBlueprintApi, sizeApi, inventoryApi, axiosInstance, categoryApi, itemApi } from "../services/apiService";
+import AddStockDialog from "../components/Inventory/AddStockDialog";
 import toast from "react-hot-toast";
 
 const columns = [
@@ -162,7 +164,11 @@ const SuggestInput = ({
   );
 };
 
+
+
 const Inventory = () => {
+  const navigate = useNavigate();
+
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -176,6 +182,8 @@ const Inventory = () => {
   const [addItemDialog, setAddItemDialog] = useState(false);
   const [viewItemsDialog, setViewItemsDialog] = useState(false);
   const [newItemName, setNewItemName] = useState("");
+  const [newItemCategoryId, setNewItemCategoryId] = useState("");
+  const [categories, setCategories] = useState([]);
   const [addingItem, setAddingItem] = useState(false);
 
   // View Items dialog state
@@ -190,8 +198,17 @@ const Inventory = () => {
   const [deleteDialog, setDeleteDialog] = useState({ open: false, rowIndex: null });
   const [deleting, setDeleting] = useState(false);
 
+  // Add Inventory dialog state
+  const [addInventoryDialog, setAddInventoryDialog] = useState(false);
+  const [invBlueprintSizes, setInvBlueprintSizes]   = useState([]);
+  const [addingInventory, setAddingInventory]         = useState(false);
+
+  // Add Stock popup state
+  const [stockDialogRow, setStockDialogRow] = useState(null);
+
   useEffect(() => {
     loadAll();
+    loadCategories();
   }, []);
 
   // Check if there are any dirty (editing) rows that can be saved
@@ -235,17 +252,31 @@ const Inventory = () => {
     }
   };
 
+  const loadCategories = async () => {
+    try {
+      const res = await categoryApi.getAllCategories();
+      setCategories(Array.isArray(res.data) ? res.data : []);
+    } catch (err) {
+      console.error("Error fetching categories:", err);
+    }
+  };
+
   const handleAddItem = async () => {
     if (!newItemName.trim()) {
       toast.error("Item name is required");
       return;
     }
+    if (!newItemCategoryId) {
+      toast.error("Please select a category");
+      return;
+    }
     try {
       setAddingItem(true);
-      await itemBlueprintApi.createItem({ itemName: newItemName.trim() });
+      await itemBlueprintApi.createItem({ itemName: newItemName.trim(), categoryId: Number(newItemCategoryId) });
       toast.success("Item added successfully!");
       setAddItemDialog(false);
       setNewItemName("");
+      setNewItemCategoryId("");
       await loadAll();
     } catch (error) {
       console.error("Error adding item:", error);
@@ -502,6 +533,119 @@ const Inventory = () => {
     setSelectedCell(null);
   };
 
+  // ── Add Inventory Dialog handlers ─────────────────────────────────
+  const openAddInventoryDialog = () => {
+    setInvForm(defaultInvForm);
+    setInvBlueprintSizes([]);
+    setAddInventoryDialog(true);
+  };
+
+  const handleInvBlueprintSelect = async (blueprintId) => {
+    setInvForm(prev => ({ ...prev, selectedBlueprintId: blueprintId, sizeInInch: "", sizeInMm: "", dozenWeight: "" }));
+    if (!blueprintId) { setInvBlueprintSizes([]); return; }
+    try {
+      const found = items.find(i => String(i.id) === String(blueprintId));
+      let sizes = found?.sizes || [];
+      if (sizes.length === 0) {
+        const res = await sizeApi.getSizesByItemId(Number(blueprintId));
+        sizes = Array.isArray(res.data) ? res.data : [];
+      }
+      setInvBlueprintSizes(sizes);
+    } catch (err) { console.error("Error loading sizes:", err); }
+  };
+
+  const handleInvSizeSelect = (size) => {
+    setInvForm(prev => ({
+      ...prev,
+      sizeInInch: size.sizeInInch || "",
+      sizeInMm: size.sizeInMm || "",
+      dozenWeight: size.dozenWeight != null ? String(size.dozenWeight) : "",
+    }));
+  };
+
+  const handleSaveInventory = async () => {
+    const isNewBlueprint = invForm.blueprintMode === "new";
+    if (isNewBlueprint && !invForm.newBlueprintName.trim()) {
+      toast.error("Item name is required"); return;
+    }
+    if (isNewBlueprint && !invForm.newBlueprintCategoryId) {
+      toast.error("Please select a category"); return;
+    }
+    if (!isNewBlueprint && !invForm.selectedBlueprintId) {
+      toast.error("Please select a blueprint"); return;
+    }
+    if (!invForm.sizeInInch.trim() || !invForm.sizeInMm.trim()) {
+      toast.error("Size In Inch and Size In MM are required"); return;
+    }
+    try {
+      setAddingInventory(true);
+      // 1. Get or create blueprint
+      let blueprintId;
+      if (isNewBlueprint) {
+        const res = await itemBlueprintApi.createItem({
+          itemName: invForm.newBlueprintName.trim(),
+          categoryId: Number(invForm.newBlueprintCategoryId),
+        });
+        blueprintId = res.data?.id;
+      } else {
+        blueprintId = Number(invForm.selectedBlueprintId);
+      }
+      if (!blueprintId) throw new Error("Blueprint ID missing");
+
+      // 2. Create size if not already exists
+      const existingSizes = invBlueprintSizes;
+      const inchVal = invForm.sizeInInch.trim();
+      const mmVal = invForm.sizeInMm.trim();
+      const dozenVal = invForm.dozenWeight ? parseFloat(invForm.dozenWeight) : null;
+      const matchingSize = existingSizes.find(s =>
+        (s.sizeInInch || "").trim() === inchVal &&
+        (s.sizeInMm || "").trim() === mmVal
+      );
+      if (!matchingSize) {
+        const sizePayload = { sizeInInch: inchVal, sizeInMm: mmVal };
+        if (dozenVal !== null) sizePayload.dozenWeight = dozenVal;
+        await sizeApi.createSize(blueprintId, sizePayload);
+      }
+
+      // 3. Build inventory payload
+      const payload = {};
+      payload.sizeInInch = inchVal;
+      payload.sizeInMm = mmVal;
+      if (dozenVal !== null) payload.dozenWeight = dozenVal;
+      const invNumericFields = [
+        "pcsPerBox", "boxPerCarton", "pcsPerCarton", "cartonWeight",
+        "sssatinlacq", "antiq", "sidegold", "zblack", "grblack",
+        "mattss", "mattantiq", "pvdrose", "pvdgold", "pvdblack",
+        "rosegold", "clearlacq",
+      ];
+      invNumericFields.forEach(field => {
+        if (invForm[field] !== "" && invForm[field] !== undefined) {
+          payload[field] = ["pcsPerBox", "boxPerCarton", "pcsPerCarton"].includes(field)
+            ? parseInt(invForm[field], 10)
+            : parseFloat(invForm[field]);
+        }
+      });
+
+      // 4. Create inventory
+      await inventoryApi.createInventory(blueprintId, payload);
+      toast.success("Inventory added successfully!");
+      setAddInventoryDialog(false);
+      setInvForm(defaultInvForm);
+      setInvBlueprintSizes([]);
+      await loadAll();
+    } catch (error) {
+      console.error("Error saving inventory:", error);
+      toast.error(error.response?.data?.message || "Failed to add inventory");
+    } finally {
+      setAddingInventory(false);
+    }
+  };
+
+  // Stock "+" button — open stock popup dialog for this row
+  const handleAddStockRow = (row) => {
+    setStockDialogRow(row);
+  };
+
   const filteredRows = useMemo(() => {
     return tableData
       .map((row, originalIndex) => ({ ...row, _originalIndex: originalIndex }))
@@ -670,8 +814,8 @@ const Inventory = () => {
       <div className="max-w-7xl mx-auto">
         <div className="">
           <PageHeader
-            title="Item Management"
-            description="Add the items, sizes & packing system"
+            title="Stock Master"
+            description="Manage items, sizes, stock & packing details"
             action={
               <div className="flex items-center gap-2">
                 <PrimaryActionButton
@@ -688,6 +832,14 @@ const Inventory = () => {
                 >
                   Add Item
                 </PrimaryActionButton>
+                <button
+                  type="button"
+                  onClick={() => navigate("/add-inventory")}
+                  className="flex items-center gap-2 bg-gray-900 border border-gray-900 text-white px-4 py-2 rounded-lg hover:bg-gray-700 hover:border-gray-700 transition font-medium"
+                >
+                  <Plus className="w-5 h-5" />
+                  Add Inventory
+                </button>
               </div>
             }
           />
@@ -723,6 +875,9 @@ const Inventory = () => {
                           {col.label}
                         </th>
                       ))}
+                      <th className="sticky top-0 z-10 whitespace-nowrap px-3 py-4 text-center text-sm font-semibold text-gray-900 bg-gray-100 w-[60px] border-r border-gray-200">
+                        Stock
+                      </th>
                       <th className="sticky top-0 z-10 whitespace-nowrap px-3 py-4 text-center text-sm font-semibold text-gray-900 bg-gray-100 w-[80px]">
                         Actions
                       </th>
@@ -745,6 +900,19 @@ const Inventory = () => {
                           {columns.map((col, colIndex) =>
                             renderCell(row, originalIndex, col, colIndex)
                           )}
+                          {/* Stock column — quick-add another row for this blueprint */}
+                          <td className="h-10 px-2 py-1 text-center w-[60px] border-r border-gray-200">
+                            {!row._isNew && !row._editing && row._itemId && (
+                              <button
+                                type="button"
+                                onClick={() => handleAddStockRow(row)}
+                                title="Add stock row for this blueprint"
+                                className="p-1 text-emerald-600 hover:bg-emerald-50 rounded transition"
+                              >
+                                <Plus className="w-4 h-4" />
+                              </button>
+                            )}
+                          </td>
                           {/* Actions column at the end */}
                           <td className="h-10 px-2 py-1 text-center w-[80px]">
                             <div className="flex items-center justify-center gap-1">
@@ -835,6 +1003,187 @@ const Inventory = () => {
         </div>
       </div>
 
+      {/* ── Add Inventory Dialog ── */}
+      {addInventoryDialog && (() => {
+        const isNew = invForm.blueprintMode === "new";
+        const stockCols = [
+          { key: "pcsPerBox", label: "Pcs/Box" },
+          { key: "boxPerCarton", label: "Box/Carton" },
+          { key: "pcsPerCarton", label: "Pcs/Carton" },
+          { key: "cartonWeight", label: "Carton Wt." },
+          { key: "sssatinlacq", label: "S.S & Satin Lacq" },
+          { key: "antiq", label: "ANTQ" },
+          { key: "sidegold", label: "Side Gold" },
+          { key: "zblack", label: "Z-Black" },
+          { key: "grblack", label: "Gr. Black" },
+          { key: "mattss", label: "Matt S.S" },
+          { key: "mattantiq", label: "Matt ANTQ" },
+          { key: "pvdrose", label: "PVD Rose" },
+          { key: "pvdgold", label: "PVD Gold" },
+          { key: "pvdblack", label: "PVD Black" },
+          { key: "rosegold", label: "Rose Gold" },
+          { key: "clearlacq", label: "Clear Lacq." },
+        ];
+        return (
+          <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50">
+            <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl mx-4 flex flex-col max-h-[90vh]">
+              {/* Header */}
+              <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between shrink-0">
+                <div>
+                  <h2 className="text-lg font-semibold text-gray-900">Add Inventory</h2>
+                  <p className="text-xs text-gray-400 mt-0.5">Create blueprint + size + stock entry in one go</p>
+                </div>
+                <button type="button" onClick={() => setAddInventoryDialog(false)} className="text-gray-400 hover:text-gray-600 transition">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="overflow-y-auto flex-1 px-6 py-5 space-y-6">
+
+                {/* ── Section 1: Blueprint ── */}
+                <div>
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">1 · Blueprint</h3>
+                    <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-0.5 text-xs">
+                      <button type="button"
+                        onClick={() => setInvForm(prev => ({ ...prev, blueprintMode: "existing", selectedBlueprintId: "" }))}
+                        className={`px-3 py-1 rounded-md transition font-medium ${!isNew ? "bg-white shadow text-gray-900" : "text-gray-500"}`}
+                      >Select Existing</button>
+                      <button type="button"
+                        onClick={() => setInvForm(prev => ({ ...prev, blueprintMode: "new", selectedBlueprintId: "" }))}
+                        className={`px-3 py-1 rounded-md transition font-medium ${isNew ? "bg-white shadow text-gray-900" : "text-gray-500"}`}
+                      >Create New</button>
+                    </div>
+                  </div>
+                  {!isNew ? (
+                    <select
+                      value={invForm.selectedBlueprintId}
+                      onChange={e => handleInvBlueprintSelect(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-400 bg-white"
+                    >
+                      <option value="">Select item blueprint…</option>
+                      {items.map(item => (
+                        <option key={item.id} value={item.id}>
+                          {item.itemName}{item.category?.name ? ` — ${item.category.name}` : ""}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-1">Item Name <span className="text-red-500">*</span></label>
+                        <input
+                          type="text" autoFocus
+                          value={invForm.newBlueprintName}
+                          onChange={e => setInvForm(prev => ({ ...prev, newBlueprintName: e.target.value }))}
+                          placeholder="e.g. Butt Hinge"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-400"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-1">Category <span className="text-red-500">*</span></label>
+                        <select
+                          value={invForm.newBlueprintCategoryId}
+                          onChange={e => setInvForm(prev => ({ ...prev, newBlueprintCategoryId: e.target.value }))}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-400 bg-white"
+                        >
+                          <option value="">Select category…</option>
+                          {categories.map(cat => (
+                            <option key={cat.id} value={cat.id}>{cat.name}</option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* ── Section 2: Size ── */}
+                <div>
+                  <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wide mb-3">2 · Size</h3>
+                  {invBlueprintSizes.length > 0 && (
+                    <div className="mb-3">
+                      <label className="block text-xs font-medium text-gray-500 mb-1.5">Quick-fill from existing sizes</label>
+                      <div className="flex flex-wrap gap-1.5">
+                        {invBlueprintSizes.map((s, i) => (
+                          <button key={i} type="button" onClick={() => handleInvSizeSelect(s)}
+                            className={`px-2.5 py-1 text-xs rounded-full border transition ${
+                              invForm.sizeInInch === s.sizeInInch && invForm.sizeInMm === s.sizeInMm
+                                ? "border-gray-800 bg-gray-900 text-white" : "border-gray-300 text-gray-700 hover:border-gray-500"
+                            }`}
+                          >
+                            {s.sizeInInch} / {s.sizeInMm}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  <div className="grid grid-cols-3 gap-3">
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">Size In Inch <span className="text-red-500">*</span></label>
+                      <input type="text"
+                        value={invForm.sizeInInch}
+                        onChange={e => setInvForm(prev => ({ ...prev, sizeInInch: e.target.value }))}
+                        placeholder="e.g. 3x3/8"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-400"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">Size In MM <span className="text-red-500">*</span></label>
+                      <input type="text"
+                        value={invForm.sizeInMm}
+                        onChange={e => setInvForm(prev => ({ ...prev, sizeInMm: e.target.value }))}
+                        placeholder="e.g. 75x9"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-400"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">Dozen Weight</label>
+                      <input type="number" step="any"
+                        value={invForm.dozenWeight}
+                        onChange={e => setInvForm(prev => ({ ...prev, dozenWeight: e.target.value }))}
+                        placeholder="e.g. 1.2"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-400"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* ── Section 3: Stock Details ── */}
+                <div>
+                  <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wide mb-3">3 · Stock Details</h3>
+                  <div className="grid grid-cols-4 gap-3">
+                    {stockCols.map(col => (
+                      <div key={col.key}>
+                        <label className="block text-xs font-medium text-gray-500 mb-1">{col.label}</label>
+                        <input type="number" step="any"
+                          value={invForm[col.key]}
+                          onChange={e => setInvForm(prev => ({ ...prev, [col.key]: e.target.value }))}
+                          placeholder="—"
+                          className="w-full px-2 py-1.5 border border-gray-200 rounded-md text-sm text-center focus:outline-none focus:ring-2 focus:ring-gray-400"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Footer */}
+              <div className="px-6 py-4 border-t border-gray-200 flex justify-end gap-3 shrink-0">
+                <button type="button"
+                  onClick={() => setAddInventoryDialog(false)}
+                  className="px-5 py-2 border border-gray-300 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50 transition"
+                >Cancel</button>
+                <button type="button"
+                  disabled={addingInventory}
+                  onClick={handleSaveInventory}
+                  className="px-6 py-2 bg-gray-900 text-white rounded-lg text-sm font-medium hover:bg-gray-800 transition disabled:opacity-50"
+                >{addingInventory ? "Saving…" : "Save Inventory"}</button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
       {/* Add Item dialog */}
       {addItemDialog && (
         <div className="fixed inset-0 bg-black/20 flex items-center justify-center z-50">
@@ -857,12 +1206,30 @@ const Inventory = () => {
                   autoFocus
                 />
               </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Category <span className="text-red-500">*</span>
+                </label>
+                <select
+                  value={newItemCategoryId}
+                  onChange={(e) => setNewItemCategoryId(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-400 bg-white"
+                >
+                  <option value="">Select category…</option>
+                  {categories.map((cat) => (
+                    <option key={cat.id} value={cat.id}>
+                      {cat.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
             <div className="bg-gray-50 px-6 py-4 border-t border-gray-200 flex gap-4 justify-end">
               <button
                 onClick={() => {
                   setAddItemDialog(false);
                   setNewItemName("");
+                  setNewItemCategoryId("");
                 }}
                 className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-100 transition font-medium text-sm"
               >
@@ -979,7 +1346,12 @@ const Inventory = () => {
                           ) : (
                             /* Read-only card chip */
                             <div className="border border-gray-200 rounded-lg px-3 py-2.5 text-sm text-gray-700 bg-white hover:border-gray-300 hover:shadow-sm transition min-h-[44px] flex items-center justify-between gap-1 cursor-default">
-                              <span className="truncate">{item.itemName || `Item #${item.id}`}</span>
+                              <div className="flex flex-col min-w-0">
+                                <span className="truncate font-medium">{item.itemName || `Item #${item.id}`}</span>
+                                {item.category?.name && (
+                                  <span className="text-xs text-gray-400 truncate">{item.category.name}</span>
+                                )}
+                              </div>
                               <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
                                 <button type="button" title="Edit"
                                   onClick={() => { setEditingItemId(item.id); setEditingItemName(item.itemName || ""); }}
@@ -1063,6 +1435,13 @@ const Inventory = () => {
         onConfirm={handleDeleteRow}
         onCancel={() => setDeleteDialog({ open: false, rowIndex: null })}
         isDangerous
+      />
+
+      <AddStockDialog
+        open={!!stockDialogRow}
+        onClose={() => setStockDialogRow(null)}
+        row={stockDialogRow}
+        onSaved={() => loadAll()}
       />
     </SidebarLayout>
   );

@@ -18,8 +18,6 @@ tags:
     description: Party Endpoints
   - name: Category
     description: Category Endpoints
-  - name: SubCategory
-    description: Sub Category Endpoints
   - name: Item
     description: Item Endpoints
 
@@ -138,144 +136,6 @@ paths:
       responses:
         '204':
           description: Category deleted
-        '404':
-          $ref: '#/components/responses/NotFoundError'
-
-  # -------------------- SUB-CATEGORY --------------------
-  /api/v1/categories/{categoryId}/sub-categories:
-    get:
-      operationId: getAllSubCategories
-      tags:
-        - SubCategory
-      summary: Get all sub categories
-      parameters:
-        - name: categoryId
-          in: path
-          required: true
-          schema:
-            type: integer
-            format: int64
-        - $ref: '#/components/parameters/searchParam'
-      responses:
-        '200':
-          description: SubCategory list
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/SubCategory'
-
-    post:
-      operationId: createSubCategory
-      tags:
-        - SubCategory
-      summary: Create sub category
-      parameters:
-        - name: categoryId
-          in: path
-          required: true
-          schema:
-            type: integer
-            format: int64
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/NewSubCategory'
-      responses:
-        '201':
-          description: SubCategory created
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/SubCategory'
-
-  /api/v1/categories/{categoryId}/sub-categories/{id}:
-    get:
-      operationId: getSubCategoryById
-      tags:
-        - SubCategory
-      summary: Get sub category by id
-      parameters:
-        - name: categoryId
-          in: path
-          required: true
-          schema:
-            type: integer
-            format: int64
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: integer
-            format: int64
-      responses:
-        '200':
-          description: SubCategory details
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/SubCategory'
-        '404':
-          $ref: '#/components/responses/NotFoundError'
-
-    put:
-      operationId: updateSubCategory
-      tags:
-        - SubCategory
-      summary: Update sub category
-      parameters:
-        - name: categoryId
-          in: path
-          required: true
-          schema:
-            type: integer
-            format: int64
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: integer
-            format: int64
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/NewSubCategory'
-      responses:
-        '200':
-          description: SubCategory updated
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/SubCategory'
-        '404':
-          $ref: '#/components/responses/NotFoundError'
-
-    delete:
-      operationId: deleteSubCategory
-      tags:
-        - SubCategory
-      summary: Delete sub category
-      parameters:
-        - name: categoryId
-          in: path
-          required: true
-          schema:
-            type: integer
-            format: int64
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: integer
-            format: int64
-      responses:
-        '204':
-          description: SubCategory deleted
         '404':
           $ref: '#/components/responses/NotFoundError'
 
@@ -570,46 +430,7 @@ components:
       properties:
         name:
           type: string
-        subCategories:
-          type: array
-          items:
-            $ref: '#/components/schemas/NewSubCategory'
     Category:
-      type: object
-      properties:
-        id:
-          type: integer
-          format: int64
-        name:
-          type: string
-        subCategories:
-          type: array
-          items:
-            $ref: '#/components/schemas/SubCategory'
-    NewSubCategory:
-      required:
-        - name
-      type: object
-      properties:
-        name:
-          type: string
-    SubCategory:
-      type: object
-      properties:
-        id:
-          type: integer
-          format: int64
-        name:
-          type: string
-    ItemCategory:
-      type: object
-      properties:
-        id:
-          type: integer
-          format: int64
-        name:
-          type: string
-    ItemSubCategory:
       type: object
       properties:
         id:
@@ -620,26 +441,15 @@ components:
 
     NewItem:
       required:
-        - sizeInch
-        - sizeMm
-        - categoryId
-        - subCategoryId
+        - sizeId
         - itemKg
         - weightPerPc
         - totalPc
-        - dozenWeight
         - lowStockWarning
         - stockStatus
       type: object
       properties:
-        sizeInch:
-          type: string
-        sizeMm:
-          type: string
-        categoryId:
-          type: integer
-          format: int64
-        subCategoryId:
+        sizeId:
           type: integer
           format: int64
         itemKg:
@@ -649,9 +459,6 @@ components:
           type: number
           format: double
         totalPc:
-          type: number
-          format: double
-        dozenWeight:
           type: number
           format: double
         lowStockWarning:
@@ -665,14 +472,16 @@ components:
         id:
           type: integer
           format: int64
-        sizeInch:
+        sizeId:
+          type: integer
+          format: int64
+        sizeInInch:
           type: string
-        sizeMm:
+        sizeInMm:
           type: string
-        itemCategory:
-          $ref: '#/components/schemas/ItemCategory'
-        itemSubCategory:
-          $ref: '#/components/schemas/ItemSubCategory'
+        dozenWeight:
+          type: number
+          format: double
         itemKg:
           type: number
           format: double
@@ -680,9 +489,6 @@ components:
           type: number
           format: double
         totalPc:
-          type: number
-          format: double
-        dozenWeight:
           type: number
           format: double
         lowStockWarning:

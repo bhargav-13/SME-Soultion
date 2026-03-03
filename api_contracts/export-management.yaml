@@ -60,6 +60,44 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v1/job-works/{id}/type/{jobWorkFormType}/png:
+    get:
+      tags:
+        - Export
+      operationId: getJobWorkPng
+      summary: Get Job Work png
+      description: Returns Job Work png
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - name: jobWorkFormType
+          in: path
+          required: true
+          description: The variant of the job work form
+          schema:
+            $ref: '#/components/schemas/JobWorkFormType'
+      responses:
+        '200':
+          description: PNG generated successfully
+          content:
+            image/png:
+              schema:
+                type: string
+                format: binary
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+
 components:
   securitySchemes:
     oauth2:
@@ -82,6 +120,11 @@ components:
         - EXPORT
         - COMMERCIAL
         - PACKAGING_LIST
+    JobWorkFormType:
+      type: string
+      enum:
+        - AAVAK
+        - JAVAK
 
   responses:
     UnauthorizedError:

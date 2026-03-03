@@ -163,6 +163,7 @@ components:
     sizeId:
       name: sizeId
       in: query
+      required: false
       schema:
         type: integer
         format: int64

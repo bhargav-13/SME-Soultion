@@ -504,10 +504,22 @@ components:
   schemas:
 
     NewItem:
-      required: [ itemName ]
+      required: [ itemName, categoryId ]
       type: object
       properties:
         itemName:
+          type: string
+        categoryId:
+          type: integer
+          format: int64
+
+    ItemCategory:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        name:
           type: string
 
     # -------- Item (read-only) includes sizes list --------
@@ -519,6 +531,8 @@ components:
           format: int64
         itemName:
           type: string
+        category:
+          $ref: '#/components/schemas/ItemCategory'
         sizes:
           type: array
           items:

@@ -51,10 +51,6 @@ const ItemMaster = () => {
         categoriesData.map((cat) => ({
           id: cat.id,
           name: cat.name,
-          subCategories: (cat.subCategories || []).map((sub) => ({
-            id: sub.id,
-            name: sub.name,
-          })),
         }))
       );
     } catch (error) {
@@ -77,8 +73,6 @@ const ItemMaster = () => {
         sizeMM: item.sizeMm || "",
         category: item.itemCategory?.name || "",
         categoryId: item.itemCategory?.id,
-        subCategory: item.itemSubCategory?.name || "",
-        subCategoryId: item.itemSubCategory?.id,
         totalKg: item.itemKg,
         itemKg: item.itemKg,
         weightPerPL: item.weightPerPc,
@@ -107,8 +101,7 @@ const ItemMaster = () => {
   const filteredItems = items.filter((item) => {
     const matchesSearch =
       item.sizeInch.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      item.category.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      item.subCategory.toLowerCase().includes(searchTerm.toLowerCase());
+      item.category.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesCategory =
       !categoryFilter ||
       item.category.toLowerCase().includes(categoryFilter.toLowerCase());
@@ -132,7 +125,6 @@ const ItemMaster = () => {
         sizeInch: formData.sizeInch,
         sizeMm: formData.sizeMM,
         categoryId: formData.categoryId || editDialog.data.categoryId,
-        subCategoryId: formData.subCategoryId || editDialog.data.subCategoryId,
         itemKg: parseFloat(formData.itemKg) || 0,
         weightPerPc: parseFloat(formData.weightPerPL) || 0,
         totalPc: parseFloat(formData.totalPL) || 0,

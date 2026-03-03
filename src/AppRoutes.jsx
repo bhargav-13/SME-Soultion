@@ -6,9 +6,8 @@ import Admin from "./pages/Admin";
 import AddParty from "./pages/Masters/Party/AddParty";
 import PartyMaster from "./pages/Masters/Party/PartyMaster";
 import CategoryMaster from "./pages/Masters/Category/CategoryMaster";
-import ItemMaster from "./pages/Masters/Item/ItemMaster";
-import AddItem from "./pages/Masters/Item/AddItem";
 import Inventory from "./pages/Inventory";
+import AddInventoryPage from "./pages/AddInventoryPage";
 import InvoicesList from "./pages/Invoices/InvoicesList";
 import CreateInvoice from "./pages/Invoices/CreateInvoice";
 import OrderList from "./pages/Orders/OrderList";
@@ -75,22 +74,6 @@ const AppRoutes = () => {
         }
       />
       <Route
-        path="/masters/item"
-        element={
-          <ProtectedRoute>
-            <ItemMaster />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/masters/item/add"
-        element={
-          <ProtectedRoute>
-            <AddItem />
-          </ProtectedRoute>
-        }
-      />
-      <Route
         path="/order"
         element={
           <ProtectedRoute>
@@ -119,6 +102,14 @@ const AppRoutes = () => {
         element={
           <ProtectedRoute>
             <Inventory />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/add-inventory"
+        element={
+          <ProtectedRoute>
+            <AddInventoryPage />
           </ProtectedRoute>
         }
       />
