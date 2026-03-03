@@ -17,6 +17,7 @@ const columns = [
   { key: "sizeInInch", label: "Size in Inch", type: "suggest" },
   { key: "sizeInMm", label: "In MM", type: "suggest" },
   { key: "dozenWeight", label: "Dozen Wt.", type: "suggest" },
+  { key: "stockStatus", label: "Stock Status", type: "status" },
   { key: "pcsPerBox", label: "Pc./Box", type: "number" },
   { key: "boxPerCarton", label: "Box/Carton", type: "number" },
   { key: "pcsPerCarton", label: "Pcs/Carton", type: "number" },
@@ -223,6 +224,20 @@ const Inventory = () => {
       const itemsData = Array.isArray(response.data) ? response.data : [];
       setItems(itemsData);
 
+      // Fetch all stock entries once to compute stock status per row
+      let allStockEntries = [];
+      try {
+        const stockRes = await itemApi.getAllItems(undefined, undefined, 0, 1000);
+        const stockPage = stockRes.data;
+        allStockEntries = Array.isArray(stockPage?.data)
+          ? stockPage.data
+          : Array.isArray(stockPage)
+          ? stockPage
+          : [];
+      } catch {
+        /* ignore — stock status will show as empty */
+      }
+
       // Fetch inventory for each item
       const allRows = [];
       for (const item of itemsData) {
@@ -234,7 +249,34 @@ const Inventory = () => {
           const invList = Array.isArray(invData) ? invData : [];
           const sizes = item.sizes || [];
           for (const inv of invList) {
-            allRows.push(apiRowToTableRow(inv, item.id, sizes));
+            const row = apiRowToTableRow(inv, item.id, sizes);
+
+            // Match stock entry via size to compute stock status
+            const inch = (inv.sizeInInch || "").trim();
+            const mm = (inv.sizeInMm || "").trim();
+            const matchedSize = sizes.find(
+              (s) =>
+                (s.sizeInInch || "").trim() === inch &&
+                (s.sizeInMm || "").trim() === mm
+            );
+            if (matchedSize?.id) {
+              const stockEntry = allStockEntries.find(
+                (st) => Number(st.sizeId) === Number(matchedSize.id)
+              );
+              if (stockEntry) {
+                const totalPc = parseFloat(stockEntry.totalPc) || 0;
+                const lowWarn = parseFloat(stockEntry.lowStockWarning) || 0;
+                if (totalPc <= 0) {
+                  row.stockStatus = "OUT_OF_STOCK";
+                } else if (lowWarn > 0 && totalPc <= lowWarn) {
+                  row.stockStatus = "LOW";
+                } else {
+                  row.stockStatus = "IN_STOCK";
+                }
+              }
+            }
+
+            allRows.push(row);
           }
         } catch (err) {
           console.error(`Error fetching inventory for item ${item.id}:`, err);
@@ -766,6 +808,39 @@ const Inventory = () => {
       );
     }
 
+    // Stock status badge cell (read-only)
+    if (col.type === "status") {
+      const status = row[col.key] || "";
+      let badge = null;
+      if (status === "IN_STOCK") {
+        badge = (
+          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
+            In Stock
+          </span>
+        );
+      } else if (status === "LOW") {
+        badge = (
+          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200">
+            Low Stock
+          </span>
+        );
+      } else if (status === "OUT_OF_STOCK") {
+        badge = (
+          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-50 text-red-700 border border-red-200">
+            Out of Stock
+          </span>
+        );
+      }
+      return (
+        <td
+          key={col.key}
+          className="h-10 min-w-[110px] px-3 py-1 text-center text-sm border-r border-gray-200"
+        >
+          {badge || <span className="text-gray-300">-</span>}
+        </td>
+      );
+    }
+
     // Number input cells
     return (
       <td
@@ -876,7 +951,7 @@ const Inventory = () => {
                         </th>
                       ))}
                       <th className="sticky top-0 z-10 whitespace-nowrap px-3 py-4 text-center text-sm font-semibold text-gray-900 bg-gray-100 w-[60px] border-r border-gray-200">
-                        Stock
+                        View
                       </th>
                       <th className="sticky top-0 z-10 whitespace-nowrap px-3 py-4 text-center text-sm font-semibold text-gray-900 bg-gray-100 w-[80px]">
                         Actions
@@ -900,16 +975,16 @@ const Inventory = () => {
                           {columns.map((col, colIndex) =>
                             renderCell(row, originalIndex, col, colIndex)
                           )}
-                          {/* Stock column — quick-add another row for this blueprint */}
+                          {/* Stock column — view/update stock for this row */}
                           <td className="h-10 px-2 py-1 text-center w-[60px] border-r border-gray-200">
                             {!row._isNew && !row._editing && row._itemId && (
                               <button
                                 type="button"
                                 onClick={() => handleAddStockRow(row)}
-                                title="Add stock row for this blueprint"
-                                className="p-1 text-emerald-600 hover:bg-emerald-50 rounded transition"
+                                title="View stock details"
+                                className="p-1 text-gray-600 hover:bg-gray-100 rounded transition"
                               >
-                                <Plus className="w-4 h-4" />
+                                <Eye className="w-4 h-4" />
                               </button>
                             )}
                           </td>
