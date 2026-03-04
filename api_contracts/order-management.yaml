@@ -1106,8 +1106,10 @@ components:
           $ref: '#/components/schemas/JobWorkStatus'
         jobWorkType:
           $ref: '#/components/schemas/JobWorkType'
-        jobWorkReturn:
-          $ref: '#/components/schemas/JobWorkReturn'
+        jobWorkReturns:
+          type: array
+          items:
+            $ref: '#/components/schemas/JobWorkReturn'
         createdAt:
           type: string
           format: date-time
