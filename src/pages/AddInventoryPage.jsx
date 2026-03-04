@@ -362,7 +362,7 @@ const AddInventoryPage = () => {
 
   return (
     <SidebarLayout>
-      <div className="max-w-7xl mx-auto">
+      <div className="mx-auto">
         {/* ── Page Header ── */}
         <div className="mb-8">
           <PageHeader

@@ -27,10 +27,6 @@ import {
     OrderDispatchApi,
 } from '../api-clients/order-management';
 import {
-    Configuration as PackingInvoiceMgmtConfiguration,
-    PackingInvoiceApi,
-} from '../api-clients/packing-invoice-management';
-import {
     Configuration as ExportMgmtConfiguration,
     ExportApi,
 } from '../api-clients/export-management';
@@ -196,16 +192,6 @@ const createOrderMgmtConfig = () => {
     });
 };
 
-const createPackingInvoiceMgmtConfig = () => {
-    return new PackingInvoiceMgmtConfiguration({
-        basePath: config.API_BASE_URL,
-        accessToken: getAccessToken(),
-        baseOptions: {
-            adapter: axiosInstance.defaults.adapter,
-        },
-    });
-};
-
 const createExportMgmtConfig = () => {
     return new ExportMgmtConfiguration({
         basePath: config.API_BASE_URL,
@@ -214,6 +200,19 @@ const createExportMgmtConfig = () => {
             adapter: axiosInstance.defaults.adapter,
         },
     });
+};
+
+const createPackingInvoiceApi = () => {
+    return {
+        getAllPackingInvoices: (partyId, startDate, endDate, page = 0, size = 20) =>
+            axiosInstance.get('/api/v1/packing-invoices', {
+                params: { partyId, startDate, endDate, page, size },
+            }),
+        createPackingInvoice: (payload) =>
+            axiosInstance.post('/api/v1/packing-invoices', payload),
+        updatePackingInvoice: (id, payload) =>
+            axiosInstance.put(`/api/v1/packing-invoices/${id}`, payload),
+    };
 };
 
 // Initialize API clients
@@ -233,7 +232,7 @@ let jobWorkApi = new JobWorkApi(createOrderMgmtConfig(), config.API_BASE_URL, ax
 let jobWorkReturnApi = new JobWorkReturnApi(createOrderMgmtConfig(), config.API_BASE_URL, axiosInstance);
 let orderApi = new OrderApi(createOrderMgmtConfig(), config.API_BASE_URL, axiosInstance);
 let orderDispatchApi = new OrderDispatchApi(createOrderMgmtConfig(), config.API_BASE_URL, axiosInstance);
-let packingInvoiceApi = new PackingInvoiceApi(createPackingInvoiceMgmtConfig(), config.API_BASE_URL, axiosInstance);
+let packingInvoiceApi = createPackingInvoiceApi();
 let packingInvoiceExportApi = new ExportApi(createExportMgmtConfig(), config.API_BASE_URL, axiosInstance);
 /**
  * Update all API clients with new token
@@ -259,7 +258,7 @@ export const updateApiClients = () => {
     jobWorkReturnApi = new JobWorkReturnApi(createOrderMgmtConfig(), config.API_BASE_URL, axiosInstance);
     orderApi = new OrderApi(createOrderMgmtConfig(), config.API_BASE_URL, axiosInstance);
     orderDispatchApi = new OrderDispatchApi(createOrderMgmtConfig(), config.API_BASE_URL, axiosInstance);
-    packingInvoiceApi = new PackingInvoiceApi(createPackingInvoiceMgmtConfig(), config.API_BASE_URL, axiosInstance);
+    packingInvoiceApi = createPackingInvoiceApi();
     packingInvoiceExportApi = new ExportApi(createExportMgmtConfig(), config.API_BASE_URL, axiosInstance);
 };
 

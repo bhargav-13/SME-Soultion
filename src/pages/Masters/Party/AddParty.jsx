@@ -194,7 +194,7 @@ const AddParty = () => {
 
   return (
     <SidebarLayout>
-      <div className="max-w-6xl mx-auto">
+      <div className="mx-auto">
         {/* Header */}
 
         <div className="mb-6">

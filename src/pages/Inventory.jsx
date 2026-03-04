@@ -886,7 +886,7 @@ const Inventory = () => {
 
   return (
     <SidebarLayout>
-      <div className="max-w-7xl mx-auto">
+      <div className="mx-auto">
         <div className="">
           <PageHeader
             title="Stock Master"

@@ -362,7 +362,7 @@ const ClientSelect = () => {
 
   return (
     <SidebarLayout>
-      <div className="max-w-7xl mx-auto">
+      <div className="mx-auto">
         <div className="mb-6">
           <PageHeader
             title="Client Management"

@@ -277,7 +277,7 @@ const MoveToJobWork = () => {
 
   return (
     <SidebarLayout>
-      <div className="max-w-6xl mx-auto">
+      <div className="mx-auto">
         <div className="mb-6">
           <PageHeader
             title={mode === "edit" ? "Edit Job Work" : "Move to Job Work"}

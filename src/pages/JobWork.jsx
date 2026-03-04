@@ -6,6 +6,7 @@ import {
   CircleCheck,
   ChevronDown,
   RefreshCw,
+  ChevronLeft,
 } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 import SidebarLayout from "../components/SidebarLayout";
@@ -539,25 +540,16 @@ const JobWork = () => {
   return (
     <SidebarLayout>
       <div className="max-w-7xl mx-auto">
-        {/* Page Header */}
-        <div className="mb-6">
-          <PageHeader
-            title={orderRow ? "Job Works for Order Item" : "All Job Works"}
-            description={orderRow
-              ? `Viewing job work records for order item #${orderRow.id}`
-              : "Viewing all job work records across all orders"}
-            action={
-              <button
-                type="button"
-                onClick={loadJobWorks}
-                disabled={loading}
-                className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-black transition disabled:opacity-50"
-              >
-                <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
-                Refresh
-              </button>
-            }
-          />
+        <div className="mb-3">
+          <button
+            type="button"
+            onClick={() => navigate("/order")}
+            className="inline-flex items-center gap-2 text-sm text-gray-700 hover:text-black transition"
+            aria-label="Back to Order List"
+          >
+            <ChevronLeft className="w-4 h-4" />
+            <span>Back to Order List</span>
+          </button>
         </div>
 
         {/* Context banner (when coming from a specific order row) */}

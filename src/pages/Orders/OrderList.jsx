@@ -53,7 +53,7 @@ const OrderList = () => {
 
   return (
     <SidebarLayout>
-      <div className="max-w-7xl mx-auto">
+      <div className="mx-auto">
 
          <div className="relative mb-4">
             <input

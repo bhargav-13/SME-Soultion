@@ -554,7 +554,7 @@ const PackingInvoice = () => {
 
   return (
     <SidebarLayout>
-      <div className="max-w-7xl mx-auto">
+      <div className="mx-auto">
         <PageHeader
           title="Packing Invoice"
           description="Add packing Invoice and other details"

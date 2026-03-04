@@ -144,7 +144,7 @@ const InvoicesList = () => {
 
   return (
     <SidebarLayout>
-      <div className="max-w-7xl mx-auto">
+      <div className="mx-auto">
         <div className="mb-8">
           <PageHeader
             title="Invoices"
