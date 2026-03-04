@@ -256,7 +256,7 @@ const SidebarLayout = ({ children }) => {
         {/* Mobile overlay */}
         {isOpen && (
           <div
-            className="fixed inset-0 bg-black bg-opacity-50 md:hidden z-10"
+            className="fixed inset-0  md:hidden z-10"
             onClick={() => setIsOpen(false)}
           />
         )}
