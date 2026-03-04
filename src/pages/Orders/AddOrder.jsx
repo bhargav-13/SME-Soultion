@@ -35,6 +35,7 @@ const createEmptyItem = () => ({
   sizesLoading: false,
   // user inputs
   qtyPc: "",
+  stickerQty: "",
   finish: "",
   // raw rates from client inventory (used for calculations)
   rawPcPerBox: "",      // pcsPerBox  — the rate, never changes
@@ -252,7 +253,7 @@ const AddOrder = () => {
           pcPerBox:      it.pcPerBox       !== "" ? parseInt(it.pcPerBox, 10)      : null,
           boxPerCartoon: it.boxPerCartoon  !== "" ? parseInt(it.boxPerCartoon, 10) : null,
           pcPerCartoon:  it.pcPerCartoon   !== "" ? parseInt(it.pcPerCartoon, 10)  : null,
-          stickerQty:    null,
+          stickerQty:    it.stickerQty     !== "" ? parseInt(it.stickerQty, 10)    : null,
           pendingPc:     null,
           jobActionDone: null,
           platingType:   null,
@@ -412,6 +413,19 @@ const AddOrder = () => {
                         });
                       }}
                       placeholder="Enter Pc."
+                      className="w-full border border-gray-300 rounded-md px-3 py-2.5 text-md focus:outline-none focus:ring-1 focus:ring-gray-400"
+                    />
+                  </div>
+
+                  {/* Sticker Qty */}
+                  <div>
+                    <Label>Sticker Qty</Label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={item.stickerQty}
+                      onChange={(e) => updateItem(index, { stickerQty: e.target.value })}
+                      placeholder="Enter sticker quantity"
                       className="w-full border border-gray-300 rounded-md px-3 py-2.5 text-md focus:outline-none focus:ring-1 focus:ring-gray-400"
                     />
                   </div>
