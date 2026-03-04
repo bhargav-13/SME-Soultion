@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Plus, SquarePen, Eye, Trash2, ChevronDown, X, ChevronLeft, ChevronRight } from "lucide-react";
+import { Plus, SquarePen, Eye, Trash2, ChevronDown, X, ChevronLeft, ChevronRight, BriefcaseBusiness } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import SidebarLayout from "../../components/SidebarLayout";
 import SearchFilter from "../../components/SearchFilter";
@@ -7,6 +7,7 @@ import StatsCard from "../../components/StatsCard";
 import PageHeader from "../../components/PageHeader";
 import PrimaryActionButton from "../../components/PrimaryActionButton";
 import ConfirmationDialog from "../../components/ConfirmationDialog";
+import JobWorkPopup from "../../components/JobWork/JobWorkPopup";
 import toast from "react-hot-toast";
 import { axiosInstance } from "../../services/apiService";
 
@@ -40,6 +41,7 @@ const flattenOrders = (apiData) => {
         id:       item.id,
         orderId:  order.id,
         partyId:  partyResp.party?.id,
+        sizeId:   item.itemSize?.id,
         // display fields
         partyName:    partyResp.party?.name || "—",
         date:         order.orderDate || "—",
@@ -93,6 +95,7 @@ const OrderManagement = () => {
   const [editOrder, setEditOrder]     = useState(null);
   const [expandedGroups, setExpandedGroups] = useState({});
   const [deleteTarget, setDeleteTarget] = useState(null);
+  const [jobWorkPopupRow, setJobWorkPopupRow] = useState(null);
 
   // ── Debounce search ───────────────────────────────────────────────────────
   const searchDebounceRef = useRef(null);
@@ -204,27 +207,51 @@ const OrderManagement = () => {
   const toggleJobUpdateStatus = (row) => {
     if (!row) return;
     const override = getRowOverride(row);
-    const nextStatus = !(override?.platingStatus ?? row.platingStatus ?? false);
+    const currentStatus = override?.platingStatus ?? row.platingStatus ?? false;
 
-    setOrders((prev) =>
-      prev.map((order) =>
-        order.id === row.id ? { ...order, platingStatus: nextStatus } : order
-      )
-    );
+    // Once job work is done (ON), it cannot be disabled
+    if (currentStatus) return;
 
-    setOrderJobOverrides((prev) => {
-      const next = { ...prev };
-      if (row.id) {
-        const key = `item-${row.id}`;
-        next[key] = { ...(next[key] || {}), platingStatus: nextStatus };
-      }
-      if (row.orderId) {
-        const key = `order-${row.orderId}`;
-        next[key] = { ...(next[key] || {}), platingStatus: nextStatus };
-      }
-      writeOrderJobOverrides(next);
-      return next;
-    });
+    // Toggling ON → open the job work popup
+    setJobWorkPopupRow(row);
+  };
+
+  const handleJobWorkSaved = (savedFormData, apiResponse) => {
+    if (jobWorkPopupRow) {
+      const row = jobWorkPopupRow;
+      // Optimistically update the row with data from the popup + API response
+      const jobWorkNo = String(new Date().getDate()).padStart(2, "0");
+      const jobWorkType = savedFormData?.jobWorkType || "JOB_WORK";
+      const stickerQty = savedFormData?.stickerQty || row.stickerQty;
+
+      setOrders((prev) =>
+        prev.map((order) =>
+          order.id === row.id
+            ? {
+                ...order,
+                platingStatus: true,
+                jobWork: jobWorkType === "INHOUSE" ? "IN_HOUSE" : jobWorkType,
+                jobWorkNo: jobWorkNo,
+                stickerQty: stickerQty || order.stickerQty,
+              }
+            : order
+        )
+      );
+      setOrderJobOverrides((prev) => {
+        const next = { ...prev };
+        const payload = {
+          platingStatus: true,
+          jobWork: jobWorkType === "INHOUSE" ? "IN_HOUSE" : jobWorkType,
+          jobWorkNo: String(jobWorkNo),
+        };
+        if (row.id) next[`item-${row.id}`] = { ...(next[`item-${row.id}`] || {}), ...payload };
+        if (row.orderId) next[`order-${row.orderId}`] = { ...(next[`order-${row.orderId}`] || {}), ...payload };
+        writeOrderJobOverrides(next);
+        return next;
+      });
+    }
+    // Refresh data from server to get full backend state
+    triggerFetch(debouncedSearch.current, page);
   };
 
   const handlePlatingMove = (row, jobWorkValue = row?.jobWork) => {
@@ -329,9 +356,19 @@ const OrderManagement = () => {
             title="Order Management"
             description="Simplifying Order Processing from Start to Delivery"
             action={
-              <PrimaryActionButton onClick={() => navigate("/order/select")} icon={Plus}>
-                Add Order
-              </PrimaryActionButton>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => navigate("/job-work")}
+                  className="inline-flex items-center gap-2 px-4 py-2 border border-gray-300 text-gray-700 text-sm rounded-lg hover:bg-gray-50 transition"
+                >
+                  <BriefcaseBusiness className="w-4 h-4" />
+                  All Job Works
+                </button>
+                <PrimaryActionButton onClick={() => navigate("/order/select")} icon={Plus}>
+                  Add Order
+                </PrimaryActionButton>
+              </div>
             }
           />
         </div>
@@ -418,6 +455,7 @@ const OrderManagement = () => {
                       const effectivePlatingStatus = rowOverride?.platingStatus ?? row.platingStatus;
                       const effectiveJobWork = rowOverride?.jobWork ?? row.jobWork;
                       const effectiveJobWorkNo = rowOverride?.jobWorkNo ?? row.jobWorkNo;
+                      const effectiveStickerQty = row.stickerQty ?? "—";
 
                       return (
                         <tr key={row.id} className="border-b border-gray-200 hover:bg-gray-50">
@@ -449,7 +487,7 @@ const OrderManagement = () => {
                           <td className="px-3 py-4 text-sm text-center text-gray-700 border-r border-gray-200 whitespace-nowrap">{row.boxPc}</td>
                           <td className="px-3 py-4 text-sm text-center text-gray-700 border-r border-gray-200 whitespace-nowrap">{row.cartoon}</td>
                           <td className="px-3 py-4 text-sm text-center text-gray-700 border-r border-gray-200 whitespace-nowrap">{row.pcCartoon}</td>
-                          <td className="px-3 py-4 text-sm text-center text-gray-700 border-r border-gray-200 whitespace-nowrap">{row.stickerQty}</td>
+                          <td className="px-3 py-4 text-sm text-center text-gray-700 border-r border-gray-200 whitespace-nowrap">{effectiveStickerQty}</td>
                           <td className="px-3 py-4 text-sm text-center text-gray-700 border-r border-gray-200 whitespace-nowrap">{row.dispatchDate}</td>
                           <td className="px-3 py-4 text-sm text-center text-gray-700 border-r border-gray-200 whitespace-nowrap">{row.dispatchPcs}</td>
                           <td className="px-3 py-4 text-sm text-center text-gray-700 border-r border-gray-200 whitespace-nowrap">{row.pendingPc}</td>
@@ -459,8 +497,9 @@ const OrderManagement = () => {
                               <button
                                 type="button"
                                 onClick={() => toggleJobUpdateStatus(row)}
-                                aria-label={effectivePlatingStatus ? "Disable job update" : "Enable job update"}
-                                className={`w-7 h-4 rounded-full relative inline-flex items-center ${effectivePlatingStatus ? "bg-emerald-600" : "bg-gray-300"}`}
+                                aria-label={effectivePlatingStatus ? "Job work done (locked)" : "Enable job update"}
+                                title={effectivePlatingStatus ? "Job work is done and cannot be undone" : "Click to mark job work as done"}
+                                className={`w-7 h-4 rounded-full relative inline-flex items-center ${effectivePlatingStatus ? "bg-emerald-600 cursor-not-allowed" : "bg-gray-300 cursor-pointer"}`}
                               >
                                 <span className={`w-3 h-3 bg-white rounded-full absolute top-0.5 ${effectivePlatingStatus ? "right-0.5" : "left-0.5"}`} />
                               </button>
@@ -484,7 +523,7 @@ const OrderManagement = () => {
                           </td>
                           <td className="px-3 py-4 text-sm text-center border-r border-gray-200 whitespace-nowrap">{effectiveJobWorkNo}</td>
                           <td className="px-3 py-4 text-sm text-center border-r border-gray-200 whitespace-nowrap">
-                            <button type="button" aria-label="Open job work" onClick={() => navigate("/job-work")}>
+                            <button type="button" aria-label="Open job work" onClick={() => navigate("/job-work", { state: { orderRow: row } })}>
                               <Eye className="w-4 h-4 text-gray-700 cursor-pointer" />
                             </button>
                           </td>
@@ -587,6 +626,13 @@ const OrderManagement = () => {
         isDangerous
         onCancel={() => setDeleteTarget(null)}
         onConfirm={confirmDelete}
+      />
+
+      <JobWorkPopup
+        isOpen={Boolean(jobWorkPopupRow)}
+        orderRow={jobWorkPopupRow}
+        onClose={() => setJobWorkPopupRow(null)}
+        onSaved={handleJobWorkSaved}
       />
     </SidebarLayout>
   );

@@ -1,243 +1,613 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { ChevronLeft } from "lucide-react";
+import {
+  ChevronLeft,
+  Printer,
+  SquarePen,
+  Trash2,
+  CircleCheck,
+  ChevronDown,
+  RefreshCw,
+  Search,
+} from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 import SidebarLayout from "../components/SidebarLayout";
-import SearchFilter from "../components/SearchFilter";
 import ConfirmationDialog from "../components/ConfirmationDialog";
-import JobWorkCard from "../components/JobWork/JobWorkCard";
-import JobWorkReturnDialog from "../components/JobWork/JobWorkReturnDialog";
+import { jobWorkApi, jobWorkReturnApi, axiosInstance } from "../services/apiService";
+import toast from "react-hot-toast";
 
-const JOB_WORK_STORAGE_KEY = "jobWorkCards";
-const ORDER_JOB_OVERRIDES_KEY = "orderJobWorkOverrides";
-
-const INITIAL_JOB_WORKS = [
-  {
-    id: 1,
-    jobId: "Job ID - 001",
-    partyName: "Ishita Industries To Maruti Brass",
-    finish: "S.S + 16",
-    stickerQty: "26",
-    date: "03-11-2025",
-    time: "13:15",
-    itemSize: "6 X 1.1/8 X 5/32 - 3.600",
-    itemElement: "2P",
-    itemKg: "100Kg",
-    returnElement: "2P",
-    returnKg: "99.200Kg",
-    ghati: "0.800",
-    returnKgInput: "99.200",
-    ghatiInput: "0.800",
-    returnElementInput: "2",
-    returnType: "Peti",
-    status: "Completed",
-    completionStatus: "Complete",
-    inHouseStatus: "In-House",
-  },
-];
-
-const readJsonStorage = (key, fallback) => {
+// ── Print helper ─────────────────────────────────────────────────────────────
+// 1. Downloads the PNG to disk (no pop-up needed — uses hidden <a download> click)
+// 2. Opens a minimal print window with the image and triggers the print dialog
+//    the moment the image finishes loading (no pop-up blocker issues because
+//    this is called synchronously inside a user click event).
+const printJobWorkPng = async (jwId, formType, setLoadingKey) => {
+  const key = formType.toLowerCase(); // 'aavak' | 'javak'
+  setLoadingKey(key);
   try {
-    const raw = localStorage.getItem(key);
-    if (!raw) return fallback;
-    const parsed = JSON.parse(raw);
-    return parsed ?? fallback;
-  } catch {
-    return fallback;
+    const res = await axiosInstance.get(
+      `/api/v1/job-works/${jwId}/type/${formType}/png`,
+      {
+        responseType: "blob",
+        headers: { Accept: "image/png,application/json" },
+      }
+    );
+
+    const blob    = new Blob([res.data], { type: "image/png" });
+    const blobUrl = URL.createObjectURL(blob);
+    const label   = formType === "AAVAK" ? "aavak" : "javak";
+    const filename = `job-work-${jwId}-${label}.png`;
+
+    // ── 1. Download the file to disk ────────────────────────────────────────
+    const a = document.createElement("a");
+    a.href     = blobUrl;
+    a.download = filename;
+    a.style.display = "none";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+
+    // ── 2. Open print dialog via a hidden iframe ─────────────────────────────
+    // We write an HTML page into the iframe that shows the image at full size
+    // and calls window.print() once the image is loaded.
+    const iframe = document.createElement("iframe");
+    iframe.style.cssText = "position:fixed;top:-9999px;left:-9999px;width:0;height:0;border:0;";
+    document.body.appendChild(iframe);
+
+    const doc = iframe.contentDocument || iframe.contentWindow.document;
+    doc.open();
+    doc.write(`<!DOCTYPE html>
+<html>
+<head>
+  <title>Print — ${filename}</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { display: flex; justify-content: center; align-items: flex-start; }
+    img { max-width: 100%; height: auto; display: block; }
+    @media print { body { margin: 0; } img { width: 100%; } }
+  </style>
+</head>
+<body>
+  <img src="${blobUrl}"
+    onload="window.focus(); window.print();"
+    onerror="window.parent.postMessage('print-error','*');" />
+</body>
+</html>`);
+    doc.close();
+
+    // Clean up blob URL and iframe after printing (give plenty of time)
+    setTimeout(() => {
+      URL.revokeObjectURL(blobUrl);
+      if (iframe.parentNode) iframe.parentNode.removeChild(iframe);
+    }, 120_000);
+
+    toast.success(`${label.toUpperCase()} image downloaded. Print dialog will open shortly.`);
+  } catch (err) {
+    const msg = err?.response?.data?.message || err?.message || "Failed to generate print";
+    toast.error(msg);
+  } finally {
+    setLoadingKey(null);
   }
 };
 
-const writeJsonStorage = (key, value) => {
-  try {
-    localStorage.setItem(key, JSON.stringify(value));
-  } catch {
-    // Ignore storage write failures
-  }
+// ── Status helpers ──────────────────────────────────────────────────────────
+const STATUS_OPTIONS = ["PENDING", "COMPLETE", "REJECT"];
+const TYPE_OPTIONS   = ["JOB_WORK", "INHOUSE", "OUTSIDE"];
+
+const STATUS_LABEL = { PENDING: "Pending", COMPLETE: "Complete", REJECT: "Reject" };
+const TYPE_LABEL   = { JOB_WORK: "Job Work", INHOUSE: "In-House", OUTSIDE: "Outside" };
+
+const STATUS_COLOR = {
+  COMPLETE: "bg-[#D1FFE2] text-green-800",
+  PENDING:  "bg-[#fde68a] text-yellow-800",
+  REJECT:   "bg-[#fecaca] text-red-800",
 };
 
+const fmt = (v) => (v == null || v === "" ? "—" : v);
+const fmtDate = (s) => {
+  if (!s) return "—";
+  try { return new Date(s).toLocaleDateString("en-IN"); } catch { return s; }
+};
+
+// ── Return Record Dialog ─────────────────────────────────────────────────────
+const ReturnDialog = ({ isOpen, jobWork, onClose, onSaved }) => {
+  const [form, setForm] = useState({ returnKg: "", ghati: "", returnElementCount: "", elementType: "PETI" });
+  const [saving, setSaving] = useState(false);
+  const [isTypeOpen, setIsTypeOpen] = useState(false);
+  const existingReturn = jobWork?.jobWorkReturn;
+
+  useEffect(() => {
+    if (!isOpen) return;
+    setIsTypeOpen(false);
+    if (existingReturn) {
+      setForm({
+        returnKg:           String(existingReturn.returnKg ?? ""),
+        ghati:              String(existingReturn.ghati ?? ""),
+        returnElementCount: String(existingReturn.returnElementCount ?? ""),
+        elementType:        existingReturn.elementType || "PETI",
+      });
+    } else {
+      setForm({ returnKg: "", ghati: "", returnElementCount: "", elementType: "PETI" });
+    }
+  }, [isOpen, existingReturn]);
+
+  if (!isOpen || !jobWork) return null;
+
+  const handleSave = async () => {
+    if (!form.returnKg) { toast.error("Return Kg is required"); return; }
+    setSaving(true);
+    try {
+      const payload = {
+        returnKg:           parseFloat(form.returnKg) || 0,
+        ghati:              form.ghati ? parseFloat(form.ghati) : undefined,
+        returnElementCount: form.returnElementCount ? parseFloat(form.returnElementCount) : undefined,
+        elementType:        form.elementType,
+      };
+      if (existingReturn?.id) {
+        await jobWorkReturnApi.updateJobWorkReturn(jobWork.orderItemId, jobWork.id, existingReturn.id, payload);
+        toast.success("Return record updated!");
+      } else {
+        await jobWorkReturnApi.createJobWorkReturn(jobWork.orderItemId, jobWork.id, payload);
+        toast.success("Return record saved!");
+      }
+      onSaved?.();
+      onClose();
+    } catch (err) {
+      toast.error(err?.response?.data?.message || "Failed to save return");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/30 flex items-center justify-center p-4">
+      <div className="bg-white rounded-xl w-full max-w-xl border border-gray-200 shadow-xl">
+        <div className="px-6 py-5 border-b border-gray-200 flex items-center justify-between">
+          <h2 className="w-full text-center text-xl font-medium text-black">
+            {existingReturn ? "Edit Return Record" : "Return Record"}
+          </h2>
+          <button type="button" onClick={onClose} aria-label="Close dialog" className="text-gray-400 hover:text-gray-600">✕</button>
+        </div>
+        <div className="px-10 py-6 space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-black mb-1">Return Kg <span className="text-red-400">*</span></label>
+            <input type="number" step="0.001" value={form.returnKg}
+              onChange={(e) => setForm(p => ({ ...p, returnKg: e.target.value }))}
+              placeholder="Enter Kg"
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-500 outline-none placeholder:text-sm placeholder:text-gray-400" />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-black mb-1">Ghati</label>
+            <input type="number" step="0.001" value={form.ghati}
+              onChange={(e) => setForm(p => ({ ...p, ghati: e.target.value }))}
+              placeholder="Enter Ghati"
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-500 outline-none placeholder:text-sm placeholder:text-gray-400" />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-black mb-1">Return Element</label>
+            <div className="flex gap-2">
+              <input type="number" step="1" value={form.returnElementCount}
+                onChange={(e) => setForm(p => ({ ...p, returnElementCount: e.target.value }))}
+                placeholder="Count"
+                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-500 outline-none placeholder:text-sm placeholder:text-gray-400" />
+              <div className="relative w-28">
+                <button type="button" onClick={() => setIsTypeOpen(p => !p)}
+                  className="w-full h-full flex items-center justify-between px-3 py-2 border border-gray-300 rounded-lg bg-white text-sm">
+                  <span>{form.elementType === "PETI" ? "Peti" : "Drum"}</span>
+                  <ChevronDown className={`w-4 h-4 text-gray-500 transition-transform ${isTypeOpen ? "rotate-180" : ""}`} />
+                </button>
+                {isTypeOpen && (
+                  <div className="absolute z-20 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden">
+                    {["PETI", "DRUM"].map(opt => (
+                      <button key={opt} type="button"
+                        onClick={() => { setForm(p => ({ ...p, elementType: opt })); setIsTypeOpen(false); }}
+                        className="w-full text-left px-3 py-2 text-sm hover:bg-gray-100">
+                        {opt === "PETI" ? "Peti" : "Drum"}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+          <div className="pt-4 flex items-center justify-center gap-4">
+            <button type="button" onClick={handleSave} disabled={saving}
+              className="w-28 h-10 bg-black text-white rounded-lg hover:bg-gray-700 transition text-sm disabled:opacity-60">
+              {saving ? "Saving…" : "Save"}
+            </button>
+            <button type="button" onClick={onClose}
+              className="w-28 h-10 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition text-sm">
+              Cancel
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ── Status Dropdown ──────────────────────────────────────────────────────────
+const StatusDropdown = ({ value, onChange }) => {
+  const [open, setOpen] = useState(false);
+  const colorClass = STATUS_COLOR[value] || "bg-gray-100 text-gray-700";
+  return (
+    <div className="relative">
+      <button type="button" onClick={() => setOpen(p => !p)}
+        className={`flex items-center gap-2 px-4 py-1.5 rounded-md text-sm font-medium transition ${colorClass}`}>
+        {STATUS_LABEL[value] || value}
+        <ChevronDown className={`w-3.5 h-3.5 transition-transform ${open ? "rotate-180" : ""}`} />
+      </button>
+      {open && (
+        <div className="absolute z-20 mt-1 w-36 bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden">
+          {STATUS_OPTIONS.map(opt => (
+            <button key={opt} type="button"
+              onClick={() => { onChange(opt); setOpen(false); }}
+              className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-50 ${value === opt ? "font-semibold" : ""}`}>
+              {STATUS_LABEL[opt]}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ── Type Dropdown ────────────────────────────────────────────────────────────
+const TypeDropdown = ({ value, onChange }) => {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="relative">
+      <button type="button" onClick={() => setOpen(p => !p)}
+        className="flex items-center gap-2 px-4 py-1.5 border border-gray-300 rounded-md bg-white text-sm font-medium text-black transition hover:border-gray-400">
+        {TYPE_LABEL[value] || value}
+        <ChevronDown className={`w-3.5 h-3.5 text-gray-500 transition-transform ${open ? "rotate-180" : ""}`} />
+      </button>
+      {open && (
+        <div className="absolute z-20 mt-1 w-36 bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden">
+          {TYPE_OPTIONS.map(opt => (
+            <button key={opt} type="button"
+              onClick={() => { onChange(opt); setOpen(false); }}
+              className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-50 ${value === opt ? "font-semibold" : ""}`}>
+              {TYPE_LABEL[opt]}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ── Job Work Card ─────────────────────────────────────────────────────────────
+const JobWorkCardItem = ({ jw, onStatusChange, onTypeChange, onReturnRecord, onEdit, onDelete }) => {
+  const ret = jw.jobWorkReturn;
+  const [printingKey, setPrintingKey] = useState(null); // 'aavak' | 'javak' | null
+  const sizeLabel = [
+    jw.size?.sizeInInch,
+    jw.size?.sizeInMm ? `(${jw.size.sizeInMm})` : null,
+  ].filter(Boolean).join(" ") || "—";
+
+  const elementLabel = jw.elementCount != null
+    ? `${jw.elementCount} ${jw.elementType === "DRUM" ? "Drum" : "Peti"}`
+    : "—";
+
+  const returnElementLabel = ret?.returnElementCount != null
+    ? `${ret.returnElementCount} ${ret.elementType === "DRUM" ? "Drum" : "Peti"}`
+    : "—";
+
+  return (
+    <div className="border border-gray-200 rounded-xl bg-white p-4 shadow-sm">
+      {/* Header row */}
+      <div className="flex items-start justify-between gap-3 mb-3">
+        <div>
+          <div className="flex items-center gap-3 text-black">
+            <span className="font-semibold text-sm">JW-{jw.id}</span>
+            <button type="button" onClick={onEdit} aria-label="Edit job work" className="text-gray-500 hover:text-gray-800 transition">
+              <SquarePen className="w-4 h-4" />
+            </button>
+            <button type="button" onClick={onDelete} aria-label="Delete job work" className="text-red-400 hover:text-red-600 transition">
+              <Trash2 className="w-4 h-4" />
+            </button>
+          </div>
+          <div className="flex flex-wrap items-center gap-2 mt-1 text-sm text-gray-500">
+            <span>{jw.party?.name || "—"}</span>
+            <span className="w-1 h-1 rounded-full bg-gray-400 inline-block" />
+            <span>Finish: <span className="text-black">{fmt(jw.finish)}</span></span>
+            <span className="w-1 h-1 rounded-full bg-gray-400 inline-block" />
+            <span>Sticker Qty: <span className="text-black">{fmt(jw.stickerQty)}</span></span>
+          </div>
+        </div>
+        <div className="text-right text-sm text-gray-500 flex-shrink-0">
+          <p>Date: {fmtDate(jw.jobDate)}</p>
+          <p>Created: {fmtDate(jw.createdAt)}</p>
+        </div>
+      </div>
+
+      {/* Items + Return panels */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
+        {/* Items panel */}
+        <div className="border border-gray-200 rounded-xl bg-gray-50 p-4">
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-black font-semibold">Items</p>
+            <button
+              type="button"
+              disabled={printingKey === "aavak"}
+              onClick={() => printJobWorkPng(jw.id, "AAVAK", setPrintingKey)}
+              className="inline-flex items-center gap-1.5 px-3 py-1 text-sm border border-gray-300 rounded-md text-black hover:bg-gray-100 transition disabled:opacity-60 disabled:cursor-not-allowed"
+            >
+              {printingKey === "aavak" ? (
+                <><span className="animate-spin inline-block w-3 h-3 border-2 border-gray-400 border-t-transparent rounded-full" /> Printing…</>
+              ) : (
+                <>Print <Printer className="w-4 h-4" /></>
+              )}
+            </button>
+          </div>
+          <div className="grid grid-cols-3 text-xs text-gray-400 mb-1">
+            <span>Size</span><span className="text-center">Element</span><span className="text-right">Kg</span>
+          </div>
+          <div className="grid grid-cols-3 text-sm text-gray-700">
+            <span>{sizeLabel}</span>
+            <span className="text-center">{elementLabel}</span>
+            <span className="text-right">{fmt(jw.qtyKg)} Kg</span>
+          </div>
+          <div className="mt-2 text-xs text-gray-500">Qty Pc: <span className="text-black">{fmt(jw.qtyPc)}</span></div>
+        </div>
+
+        {/* Return panel */}
+        <div className="border border-gray-200 rounded-xl bg-gray-50 p-4">
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-black font-semibold">Return</p>
+            <button
+              type="button"
+              disabled={printingKey === "javak"}
+              onClick={() => printJobWorkPng(jw.id, "JAVAK", setPrintingKey)}
+              className="inline-flex items-center gap-1.5 px-3 py-1 text-sm border border-gray-300 rounded-md text-black hover:bg-gray-100 transition disabled:opacity-60 disabled:cursor-not-allowed"
+            >
+              {printingKey === "javak" ? (
+                <><span className="animate-spin inline-block w-3 h-3 border-2 border-gray-400 border-t-transparent rounded-full" /> Printing…</>
+              ) : (
+                <>Print <Printer className="w-4 h-4" /></>
+              )}
+            </button>
+          </div>
+          {ret ? (
+            <>
+              <div className="grid grid-cols-3 text-xs text-gray-400 mb-1">
+                <span>Element</span><span className="text-center">Return Kg</span><span className="text-right">Ghati</span>
+              </div>
+              <div className="grid grid-cols-3 text-sm text-gray-700">
+                <span>{returnElementLabel}</span>
+                <span className="text-center">{fmt(ret.returnKg)} Kg</span>
+                <span className="text-right">{fmt(ret.ghati)}</span>
+              </div>
+            </>
+          ) : (
+            <p className="text-sm text-gray-400 italic">No return recorded yet</p>
+          )}
+        </div>
+      </div>
+
+      {/* Footer actions */}
+      <div className="flex flex-wrap items-center gap-3">
+        <StatusDropdown value={jw.status} onChange={(v) => onStatusChange(jw, v)} />
+        <TypeDropdown   value={jw.jobWorkType} onChange={(v) => onTypeChange(jw, v)} />
+        <button type="button" onClick={onReturnRecord}
+          className="inline-flex items-center gap-2 px-5 py-1.5 rounded-md bg-[#b9d8e9] text-black text-sm font-medium hover:bg-[#a6cde3] transition">
+          {ret ? "Edit Return" : "Return Record"} <CircleCheck className="w-4 h-4" />
+        </button>
+      </div>
+    </div>
+  );
+};
+
+// ── Main Page ─────────────────────────────────────────────────────────────────
 const JobWork = () => {
   const location = useLocation();
-  const navigate = useNavigate();
-  const [searchTerm, setSearchTerm] = useState("");
-  const [typeFilter, setTypeFilter] = useState("");
-  const [jobWorks, setJobWorks] = useState(() =>
-    readJsonStorage(JOB_WORK_STORAGE_KEY, INITIAL_JOB_WORKS),
-  );
-  const [dialogState, setDialogState] = useState({
-    isOpen: false,
-    mode: "edit",
-    job: null,
-  });
-  const [deleteTarget, setDeleteTarget] = useState(null);
+  const navigate  = useNavigate();
 
-  const syncOrderOverrideFromJob = useCallback((job) => {
-    if (!job) return;
-    if (!job.sourceItemId && !job.sourceOrderId) return;
-    const overrides = readJsonStorage(ORDER_JOB_OVERRIDES_KEY, {});
-    const next = { ...overrides };
-    const payload = {
-      jobWork: job.inHouseStatus || "Job Work",
-      jobWorkNo: job.jobId || "—",
-      platingStatus: true,
-    };
-    if (job.sourceItemId) next[`item-${job.sourceItemId}`] = payload;
-    if (job.sourceOrderId) next[`order-${job.sourceOrderId}`] = payload;
-    writeJsonStorage(ORDER_JOB_OVERRIDES_KEY, next);
-  }, []);
+  // The order row passed from OrderManagement (if coming from eye icon)
+  const orderRow = location.state?.orderRow || null;
 
-  useEffect(() => {
-    const savedPayload = location.state?.savedJobWork;
-    if (!savedPayload?.job) return;
+  const [jobWorks,     setJobWorks]     = useState([]);
+  const [loading,      setLoading]      = useState(true);
+  const [searchTerm,   setSearchTerm]   = useState("");
+  const [returnTarget, setReturnTarget] = useState(null); // jw object for return dialog
+  const [deleteTarget, setDeleteTarget] = useState(null); // jw object for confirm delete
+  const [deleting,     setDeleting]     = useState(false);
 
-    syncOrderOverrideFromJob(savedPayload.job);
-    setJobWorks((prev) => {
-      if (savedPayload.mode === "edit") {
-        return prev.map((item) => (item.id === savedPayload.job.id ? savedPayload.job : item));
+  // ── Fetch job works ───────────────────────────────────────────────────────
+  const loadJobWorks = useCallback(async () => {
+    setLoading(true);
+    try {
+      if (orderRow?.id) {
+        // Load job works for a specific order item
+        const res  = await jobWorkApi.getAllJobWorks(Number(orderRow.id), undefined, 0, 200);
+        const data = res.data;
+        const list = Array.isArray(data?.data) ? data.data : Array.isArray(data) ? data : [];
+        // Attach orderItemId to each jw so return dialog can use it
+        setJobWorks(list.map(jw => ({ ...jw, orderItemId: Number(orderRow.id) })));
+      } else {
+        // No specific order — fetch across all order items via the parties/orders endpoint
+        // then fan out per order-item. We use a lightweight approach: fetch all orders and collect job works.
+        const ordersRes = await axiosInstance.get(`/api/v1/parties/orders?page=0&size=500`);
+        const ordersData = ordersRes.data?.data || [];
+        const allJws = [];
+        for (const partyResp of ordersData) {
+          for (const order of (partyResp.orders || [])) {
+            for (const item of (order.orderItems || [])) {
+              try {
+                const jwRes  = await jobWorkApi.getAllJobWorks(Number(item.id), undefined, 0, 200);
+                const jwData = jwRes.data;
+                const jwList = Array.isArray(jwData?.data) ? jwData.data : Array.isArray(jwData) ? jwData : [];
+                jwList.forEach(jw => allJws.push({ ...jw, orderItemId: Number(item.id) }));
+              } catch { /* skip items with no job works */ }
+            }
+          }
+        }
+        setJobWorks(allJws);
       }
-      return [savedPayload.job, ...prev];
-    });
-
-    navigate(location.pathname, { replace: true, state: {} });
-  }, [location.pathname, location.state, navigate, syncOrderOverrideFromJob]);
-
-  useEffect(() => {
-    writeJsonStorage(JOB_WORK_STORAGE_KEY, jobWorks);
-  }, [jobWorks]);
-
-  const filteredJobs = useMemo(() => {
-    const normalizedSearch = searchTerm.trim().toLowerCase();
-    return jobWorks.filter((job) => {
-      const matchesSearch =
-        !normalizedSearch ||
-        job.jobId.toLowerCase().includes(normalizedSearch) ||
-        job.partyName.toLowerCase().includes(normalizedSearch) ||
-        job.itemSize.toLowerCase().includes(normalizedSearch);
-      const matchesType =
-        !typeFilter || job.status.toLowerCase().includes(typeFilter.toLowerCase());
-      return matchesSearch && matchesType;
-    });
-  }, [jobWorks, searchTerm, typeFilter]);
-
-  const handleOpenDialog = (job, mode) => {
-    setDialogState({ isOpen: true, mode, job });
-  };
-
-  const handleCloseDialog = () => {
-    setDialogState({ isOpen: false, mode: "edit", job: null });
-  };
-
-  const handleSaveDialog = (formData) => {
-    if (!dialogState.job) return;
-
-    setJobWorks((prev) =>
-      prev.map((item) => {
-        if (item.id !== dialogState.job.id) return item;
-
-        const returnKgValue = formData.returnKg?.trim() || item.returnKgInput;
-        const ghatiValue = formData.ghati?.trim() || item.ghatiInput;
-        const elementValue = formData.returnElement?.trim() || item.returnElementInput;
-
-        return {
-          ...item,
-          returnKgInput: returnKgValue,
-          ghatiInput: ghatiValue,
-          returnElementInput: elementValue,
-          returnType: formData.returnType,
-          returnKg: `${returnKgValue}Kg`,
-          ghati: ghatiValue,
-          returnElement: `${elementValue}${formData.returnType === "Peti" ? "P" : ""}`,
-        };
-      }),
-    );
-
-    handleCloseDialog();
-  };
-
-  const handleConfirmDelete = () => {
-    if (!deleteTarget) return;
-    if (deleteTarget.sourceItemId || deleteTarget.sourceOrderId) {
-      const overrides = readJsonStorage(ORDER_JOB_OVERRIDES_KEY, {});
-      if (deleteTarget.sourceItemId) delete overrides[`item-${deleteTarget.sourceItemId}`];
-      if (deleteTarget.sourceOrderId) delete overrides[`order-${deleteTarget.sourceOrderId}`];
-      writeJsonStorage(ORDER_JOB_OVERRIDES_KEY, overrides);
+    } catch (err) {
+      toast.error(err?.response?.data?.message || "Failed to load job works");
+    } finally {
+      setLoading(false);
     }
-    setJobWorks((prev) => prev.filter((item) => item.id !== deleteTarget.id));
-    setDeleteTarget(null);
+  }, [orderRow]);
+
+  useEffect(() => { loadJobWorks(); }, [loadJobWorks]);
+
+  // ── Status update ─────────────────────────────────────────────────────────
+  const handleStatusChange = async (jw, newStatus) => {
+    try {
+      await jobWorkApi.updateJobWorkStatus(jw.orderItemId, jw.id, { status: newStatus });
+      toast.success("Status updated!");
+      setJobWorks(prev => prev.map(j => j.id === jw.id ? { ...j, status: newStatus } : j));
+    } catch (err) {
+      toast.error(err?.response?.data?.message || "Failed to update status");
+    }
   };
 
-  const handleStatusChange = (jobId, key, value) => {
-    setJobWorks((prev) =>
-      prev.map((item) => {
-        if (item.id !== jobId) return item;
-        const updatedItem = { ...item, [key]: value };
-        if (key === "inHouseStatus") syncOrderOverrideFromJob(updatedItem);
-        return updatedItem;
-      }),
-    );
+  // ── Type update ───────────────────────────────────────────────────────────
+  const handleTypeChange = async (jw, newType) => {
+    try {
+      await jobWorkApi.updateJobWorkType(jw.orderItemId, jw.id, { jobWorkType: newType });
+      toast.success("Type updated!");
+      setJobWorks(prev => prev.map(j => j.id === jw.id ? { ...j, jobWorkType: newType } : j));
+    } catch (err) {
+      toast.error(err?.response?.data?.message || "Failed to update type");
+    }
   };
+
+  // ── Delete ────────────────────────────────────────────────────────────────
+  const handleDelete = async () => {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    try {
+      await jobWorkApi.deleteJobWork(deleteTarget.orderItemId, deleteTarget.id);
+      toast.success("Job work deleted!");
+      setJobWorks(prev => prev.filter(j => j.id !== deleteTarget.id));
+    } catch (err) {
+      toast.error(err?.response?.data?.message || "Failed to delete");
+    } finally {
+      setDeleting(false);
+      setDeleteTarget(null);
+    }
+  };
+
+  // ── Filter ────────────────────────────────────────────────────────────────
+  const filtered = useMemo(() => {
+    const q = searchTerm.trim().toLowerCase();
+    if (!q) return jobWorks;
+    return jobWorks.filter(jw => {
+      const sizeLabel = [jw.size?.sizeInInch, jw.size?.sizeInMm].filter(Boolean).join(" ").toLowerCase();
+      return (
+        (jw.party?.name || "").toLowerCase().includes(q) ||
+        (jw.finish || "").toLowerCase().includes(q) ||
+        sizeLabel.includes(q) ||
+        String(jw.id).includes(q)
+      );
+    });
+  }, [jobWorks, searchTerm]);
+
+  // ── Header context info ───────────────────────────────────────────────────
+  const contextBanner = orderRow ? (
+    <div className="bg-gray-50 border border-gray-200 rounded-lg px-4 py-3 mb-4 flex flex-wrap items-center gap-4 text-sm">
+      <div><span className="text-gray-400 mr-1">Party:</span><span className="font-medium text-black">{orderRow.partyName}</span></div>
+      <div><span className="text-gray-400 mr-1">Size:</span><span className="font-medium text-black">{orderRow.size}</span></div>
+      <div><span className="text-gray-400 mr-1">Plating:</span><span className="font-medium text-black">{orderRow.plating}</span></div>
+      <div><span className="text-gray-400 mr-1">Qty Pc:</span><span className="font-medium text-black">{orderRow.qtyPc}</span></div>
+      <div><span className="text-gray-400 mr-1">Order Item ID:</span><span className="font-medium text-black">#{orderRow.id}</span></div>
+    </div>
+  ) : null;
 
   return (
     <SidebarLayout>
       <div className="max-w-7xl mx-auto">
-        <div className="mb-3">
-          <button
-            type="button"
-            onClick={() => navigate("/order")}
-            className="inline-flex items-center gap-2 text-sm text-gray-700 hover:text-black transition"
-            aria-label="Back to Order List"
-          >
+        {/* Back button */}
+        <div className="mb-4 flex items-center justify-between">
+          <button type="button" onClick={() => navigate("/order")}
+            className="inline-flex items-center gap-1.5 text-sm text-gray-600 hover:text-black transition">
             <ChevronLeft className="w-4 h-4" />
-            <span>Back to Order List</span>
+            Back to Orders
           </button>
-        </div>
-        <SearchFilter
-          searchQuery={searchTerm}
-          setSearchQuery={setSearchTerm}
-          typeFilter={typeFilter}
-          setTypeFilter={setTypeFilter}
-          filterOptions={["Type", "Completed"]}
-          filterPlaceholder="Type"
-        />
-
-        <div className="space-y-4">
-          {filteredJobs.map((job) => (
-            <JobWorkCard
-              key={job.id}
-              job={job}
-              onEdit={() => navigate("/job-work/move", { state: { mode: "edit", job } })}
-              onReturnRecord={() => handleOpenDialog(job, "edit")}
-              onDelete={() => setDeleteTarget(job)}
-              onCompletionChange={(value) =>
-                handleStatusChange(job.id, "completionStatus", value)
-              }
-              onInHouseChange={(value) =>
-                handleStatusChange(job.id, "inHouseStatus", value)
-              }
-            />
-          ))}
+          <div className="flex items-center gap-3">
+            <button type="button" onClick={loadJobWorks}
+              disabled={loading}
+              className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-black transition disabled:opacity-50">
+              <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
+              Refresh
+            </button>
+          </div>
         </div>
 
-        {filteredJobs.length === 0 && (
-          <p className="mt-4 text-sm text-gray-500">No job work records found.</p>
+        {/* Page title */}
+        <div className="mb-4">
+          <h1 className="text-xl font-semibold text-black">
+            {orderRow ? "Job Works for Order Item" : "All Job Works"}
+          </h1>
+          <p className="text-sm text-gray-500 mt-0.5">
+            {orderRow
+              ? `Viewing job work records for order item #${orderRow.id}`
+              : "Viewing all job work records across all orders"}
+          </p>
+        </div>
+
+        {/* Context banner (when coming from a specific order row) */}
+        {contextBanner}
+
+        {/* Search bar */}
+        <div className="relative mb-4">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+          <input
+            type="text"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            placeholder="Search by party, size, finish…"
+            className="w-full pl-9 pr-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-gray-500 outline-none placeholder:text-gray-400"
+          />
+        </div>
+
+        {/* Content */}
+        {loading ? (
+          <div className="flex items-center justify-center h-48 text-sm text-gray-400">
+            Loading job works…
+          </div>
+        ) : filtered.length === 0 ? (
+          <div className="flex flex-col items-center justify-center h-48 gap-3 text-gray-500">
+            <p className="text-sm">No job work records found.</p>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {filtered.map(jw => (
+              <JobWorkCardItem
+                key={jw.id}
+                jw={jw}
+                onStatusChange={handleStatusChange}
+                onTypeChange={handleTypeChange}
+                onReturnRecord={() => setReturnTarget(jw)}
+                onEdit={() => navigate("/job-work/move", { state: { mode: "edit", jobWorkId: jw.id, orderItemId: jw.orderItemId, prefillOrderRow: orderRow } })}
+                onDelete={() => setDeleteTarget(jw)}
+              />
+            ))}
+          </div>
         )}
       </div>
 
-      <JobWorkReturnDialog
-        isOpen={dialogState.isOpen}
-        mode={dialogState.mode}
-        initialData={dialogState.job}
-        onClose={handleCloseDialog}
-        onSave={handleSaveDialog}
+      {/* Return Record Dialog */}
+      <ReturnDialog
+        isOpen={Boolean(returnTarget)}
+        jobWork={returnTarget}
+        onClose={() => setReturnTarget(null)}
+        onSaved={loadJobWorks}
       />
 
+      {/* Delete Confirmation */}
       <ConfirmationDialog
         isOpen={Boolean(deleteTarget)}
         title="Delete Job Work"
-        message={`Are you sure you want to delete ${deleteTarget?.jobId || "this record"}?`}
-        confirmText="Delete"
+        message={`Are you sure you want to delete job work JW-${deleteTarget?.id}?`}
+        confirmText={deleting ? "Deleting…" : "Delete"}
         cancelText="Cancel"
         isDangerous
         onCancel={() => setDeleteTarget(null)}
-        onConfirm={handleConfirmDelete}
+        onConfirm={handleDelete}
       />
     </SidebarLayout>
   );

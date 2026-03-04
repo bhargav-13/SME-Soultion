@@ -98,6 +98,37 @@ paths:
         '403':
           $ref: '#/components/responses/ForbiddenError'
 
+  /api/v1/packing-invoices/{id}/pdf:
+    get:
+      tags:
+        - Export
+      operationId: getPackingInvoicePdf
+      summary: Get packing invoice PDF by ID
+      description: Returns a packing invoice PDF for a specific invoice ID, with all its items (cartoons) and a size summary table
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: PDF generated successfully
+          content:
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+
 components:
   securitySchemes:
     oauth2:

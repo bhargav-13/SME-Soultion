@@ -20,6 +20,13 @@ import {
     ClientInventoryApi,
 } from '../api-clients/client-management';
 import {
+    Configuration as OrderMgmtConfiguration,
+    JobWorkApi,
+    JobWorkReturnApi,
+    OrderApi,
+    OrderDispatchApi,
+} from '../api-clients/order-management';
+import {
     CategoryApi,
     ItemApi,
     PartyApi,
@@ -171,6 +178,16 @@ const createClientMgmtConfig = () => {
     });
 };
 
+const createOrderMgmtConfig = () => {
+    return new OrderMgmtConfiguration({
+        basePath: config.API_BASE_URL,
+        accessToken: getAccessToken(),
+        baseOptions: {
+            adapter: axiosInstance.defaults.adapter,
+        },
+    });
+};
+
 // Initialize API clients
 let partyApi = new PartyApi(createApiConfig(), config.API_BASE_URL, axiosInstance);
 let categoryApi = new CategoryApi(createApiConfig(), config.API_BASE_URL, axiosInstance);
@@ -184,6 +201,10 @@ let itemBlueprintApi = new ItemBlueprintApi(createItemMgmtConfig(), config.API_B
 let sizeApi = new SizeApi(createItemMgmtConfig(), config.API_BASE_URL, axiosInstance);
 let inventoryApi = new InventoryApi(createItemMgmtConfig(), config.API_BASE_URL, axiosInstance);
 let clientInventoryApi = new ClientInventoryApi(createClientMgmtConfig(), config.API_BASE_URL, axiosInstance);
+let jobWorkApi = new JobWorkApi(createOrderMgmtConfig(), config.API_BASE_URL, axiosInstance);
+let jobWorkReturnApi = new JobWorkReturnApi(createOrderMgmtConfig(), config.API_BASE_URL, axiosInstance);
+let orderApi = new OrderApi(createOrderMgmtConfig(), config.API_BASE_URL, axiosInstance);
+let orderDispatchApi = new OrderDispatchApi(createOrderMgmtConfig(), config.API_BASE_URL, axiosInstance);
 /**
  * Update all API clients with new token
  * Call this after login or token refresh
@@ -204,6 +225,10 @@ export const updateApiClients = () => {
     sizeApi = new SizeApi(createItemMgmtConfig(), config.API_BASE_URL, axiosInstance);
     inventoryApi = new InventoryApi(createItemMgmtConfig(), config.API_BASE_URL, axiosInstance);
     clientInventoryApi = new ClientInventoryApi(createClientMgmtConfig(), config.API_BASE_URL, axiosInstance);
+    jobWorkApi = new JobWorkApi(createOrderMgmtConfig(), config.API_BASE_URL, axiosInstance);
+    jobWorkReturnApi = new JobWorkReturnApi(createOrderMgmtConfig(), config.API_BASE_URL, axiosInstance);
+    orderApi = new OrderApi(createOrderMgmtConfig(), config.API_BASE_URL, axiosInstance);
+    orderDispatchApi = new OrderDispatchApi(createOrderMgmtConfig(), config.API_BASE_URL, axiosInstance);
 };
 
 // Export API clients
@@ -220,6 +245,10 @@ export {
     sizeApi,
     inventoryApi,
     clientInventoryApi,
+    jobWorkApi,
+    jobWorkReturnApi,
+    orderApi,
+    orderDispatchApi,
 };
 
 // Export a default object with all APIs
@@ -236,4 +265,8 @@ export default {
     size: sizeApi,
     inventory: inventoryApi,
     clientInventory: clientInventoryApi,
+    jobWork: jobWorkApi,
+    jobWorkReturn: jobWorkReturnApi,
+    order: orderApi,
+    orderDispatch: orderDispatchApi,
 };

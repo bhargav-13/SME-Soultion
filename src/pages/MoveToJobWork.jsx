@@ -3,11 +3,15 @@ import { ChevronDown, X } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 import SidebarLayout from "../components/SidebarLayout";
 import PageHeader from "../components/PageHeader";
+import toast from "react-hot-toast";
+import { jobWorkApi } from "../services/apiService";
 
 const EMPTY_FORM = {
   partyName: "",
+  partyId: "",
   date: "",
   size: "",
+  sizeId: "",
   qtyPc: "",
   qtyKg: "",
   finish: "",
@@ -53,10 +57,14 @@ const MoveToJobWork = () => {
   const location = useLocation();
   const [formData, setFormData] = useState(EMPTY_FORM);
   const [isElementTypeOpen, setIsElementTypeOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
 
   const mode = location.state?.mode === "edit" ? "edit" : "create";
   const editJob = location.state?.job || null;
   const sourceOrderRow = location.state?.prefillOrderRow || null;
+  // jobWorkId / orderItemId passed from new JobWork.jsx edit flow
+  const editJobWorkId  = location.state?.jobWorkId   || null;
+  const editOrderItemId = location.state?.orderItemId || null;
 
   const inHouseStatus = useMemo(() => {
     if (mode === "edit") return editJob?.inHouseStatus || "In-House";
@@ -94,8 +102,10 @@ const MoveToJobWork = () => {
     if (sourceOrderRow) {
       setFormData({
         partyName: sourceOrderRow.partyName || "",
+        partyId: sourceOrderRow.partyId || "",
         date: normalizeDateForInput(sourceOrderRow.date),
         size: sourceOrderRow.size || "",
+        sizeId: sourceOrderRow.sizeId || "",
         qtyPc:
           sourceOrderRow.qtyPc === "—"
             ? ""
@@ -124,7 +134,7 @@ const MoveToJobWork = () => {
     setFormData((prev) => ({ ...prev, [key]: value }));
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     const now = new Date();
     const timeLabel = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
     const qtyKgRaw = String(formData.qtyKg || "").trim();
@@ -135,6 +145,46 @@ const MoveToJobWork = () => {
         ? `${formData.element}${formData.elementType === "Peti" ? "P" : ""}`
         : "—";
 
+    // Try to save via API if we have the required IDs
+    const orderItemId = sourceOrderRow?.id || editOrderItemId || editJob?.sourceItemId;
+    const partyId = formData.partyId || sourceOrderRow?.partyId;
+    const sizeId = formData.sizeId || sourceOrderRow?.sizeId;
+
+    if (orderItemId && partyId && sizeId) {
+      setSaving(true);
+      try {
+        const jobWorkPayload = {
+          partyId: Number(partyId),
+          sizeId: Number(sizeId),
+          jobDate: formData.date || new Date().toISOString().slice(0, 10),
+          qtyPc: parseFloat(formData.qtyPc) || 0,
+          qtyKg: qtyKgRaw ? parseFloat(qtyKgRaw) : undefined,
+          finish: formData.finish || undefined,
+          elementCount: formData.element ? parseFloat(formData.element) : undefined,
+          elementType: formData.elementType === "Peti" ? "PETI" : "DRUM",
+          stickerQty: formData.stickerQty ? parseFloat(formData.stickerQty) : undefined,
+          status: "PENDING",
+          jobWorkType: inHouseStatus === "Outside" ? "OUTSIDE" : inHouseStatus === "In-House" ? "INHOUSE" : "JOB_WORK",
+        };
+
+        if (mode === "edit" && (editJob?.apiId || editJobWorkId)) {
+          const jwId = editJobWorkId || editJob.apiId;
+          await jobWorkApi.updateJobWork(orderItemId, jwId, jobWorkPayload);
+          toast.success("Job work updated!");
+        } else {
+          await jobWorkApi.createJobWork(orderItemId, jobWorkPayload);
+          toast.success("Job work created!");
+        }
+        navigate("/job-work", { state: sourceOrderRow ? { orderRow: sourceOrderRow } : undefined });
+        return;
+      } catch (err) {
+        toast.error(err?.response?.data?.message || "API save failed, saving locally");
+      } finally {
+        setSaving(false);
+      }
+    }
+
+    // Fallback to local navigation-based save
     if (mode === "edit" && editJob?.id) {
       const updatedJob = {
         ...editJob,
@@ -334,13 +384,15 @@ const MoveToJobWork = () => {
           <div className="flex gap-4 justify-center">
             <button
               type="submit"
-              className="px-12 py-2 bg-black text-white rounded-xl hover:bg-gray-900 transition font-medium"
+              disabled={saving}
+              className="px-12 py-2 bg-black text-white rounded-xl hover:bg-gray-900 transition font-medium disabled:opacity-60 disabled:cursor-not-allowed"
             >
-              Save
+              {saving ? "Saving…" : "Save"}
             </button>
             <button
               type="button"
-              onClick={() => navigate("/job-work")}
+              onClick={() => navigate("/job-work", { state: sourceOrderRow ? { orderRow: sourceOrderRow } : undefined })}
+              disabled={saving}
               className="px-12 py-2 border border-black text-black rounded-xl hover:bg-gray-50 transition font-medium"
             >
               Cancel
