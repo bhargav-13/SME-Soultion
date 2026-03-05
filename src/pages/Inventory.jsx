@@ -11,6 +11,7 @@ import ConfirmationDialog from "../components/ConfirmationDialog";
 import { itemBlueprintApi, sizeApi, inventoryApi, axiosInstance, categoryApi, itemApi } from "../services/apiService";
 import AddStockDialog from "../components/Inventory/AddStockDialog";
 import toast from "react-hot-toast";
+import Loader from "../components/Loader";
 
 const columns = [
   { key: "itemName", label: "Item Name", type: "dropdown" },
@@ -963,7 +964,7 @@ const Inventory = () => {
           </div>
 
           {loading ? (
-            <div className="p-6 text-center text-gray-500">Loading...</div>
+            <Loader text="Loading inventory..." />
           ) : (
             <div className="bg-white rounded-lg overflow-hidden border border-gray-200">
               <div className="max-h-[460px] overflow-auto scrollbar-thin">

@@ -13,6 +13,7 @@ import {
   axiosInstance,
 } from "../services/apiService";
 import toast from "react-hot-toast";
+import Loader from "../components/Loader";
 
 const columns = [
   { key: "date", label: "Date", type: "date" },
@@ -820,11 +821,8 @@ const PackingInvoice = () => {
               <tbody>
                 {loading ? (
                   <tr>
-                    <td
-                      colSpan={columns.length + 1}
-                      className="h-32 text-center text-sm text-gray-400"
-                    >
-                      Loading...
+                    <td colSpan={columns.length + 1}>
+                      <Loader text="Loading invoices..." />
                     </td>
                   </tr>
                 ) : (

@@ -10,6 +10,7 @@ import ConfirmationDialog from "../../components/ConfirmationDialog";
 import JobWorkPopup from "../../components/JobWork/JobWorkPopup";
 import toast from "react-hot-toast";
 import { axiosInstance } from "../../services/apiService";
+import Loader from "../../components/Loader";
 
 const ORDER_JOB_OVERRIDES_KEY = "orderJobWorkOverrides";
 
@@ -163,13 +164,15 @@ const OrderManagement = () => {
         if (search)        params.set("search", search);
         if (sortByFields)  params.set("sortByFields", sortByFields);
         if (direction)     params.set("direction", direction);
-        params.set("page", pageNum);
-        params.set("size", PAGE_SIZE);
+        // When searching, fetch a larger batch so client-side filter has enough data
+        const fetchSize = search ? 200 : PAGE_SIZE;
+        params.set("page", search ? 0 : pageNum);
+        params.set("size", fetchSize);
 
         const res = await axiosInstance.get(`/api/v1/parties/orders?${params.toString()}`);
         const data = res.data;
         setOrders(flattenOrders(data.data || []));
-        setTotalPages(data.totalPages ?? 0);
+        setTotalPages(search ? 1 : (data.totalPages ?? 0));
         setTotalElements(data.totalElements ?? 0);
       } catch (err) {
         toast.error(err?.response?.data?.message || "Failed to load orders");
@@ -196,13 +199,34 @@ const OrderManagement = () => {
     };
   }, []);
 
-  // ── Client-side type filter (API has no platingType filter param) ─────────
+  // ── Client-side search + type filter ──────────────────────────────────────
   const filteredOrders = useMemo(() => {
-    if (!typeFilter) return orders;
-    return orders.filter((order) =>
-      (order.jobWork || "").toLowerCase().includes(typeFilter.toLowerCase())
-    );
-  }, [orders, typeFilter]);
+    let result = orders;
+
+    // Client-side search across key fields (supplements server-side search)
+    const q = searchTerm.trim().toLowerCase();
+    if (q) {
+      result = result.filter((order) =>
+        (order.partyName || "").toLowerCase().includes(q) ||
+        (order.size || "").toLowerCase().includes(q) ||
+        (order.plating || "").toLowerCase().includes(q) ||
+        String(order.qtyPc ?? "").includes(q) ||
+        String(order.qtyKg ?? "").includes(q) ||
+        (order.jobWork || "").toLowerCase().includes(q) ||
+        (order.date || "").includes(q) ||
+        String(order.id ?? "").includes(q)
+      );
+    }
+
+    // Type filter
+    if (typeFilter) {
+      result = result.filter((order) =>
+        (order.jobWork || "").toLowerCase().includes(typeFilter.toLowerCase())
+      );
+    }
+
+    return result;
+  }, [orders, searchTerm, typeFilter]);
 
   // ── Group by orderId ──────────────────────────────────────────────────────
   const groupedFilteredOrders = useMemo(() => {
@@ -482,8 +506,8 @@ const OrderManagement = () => {
               <tbody>
                 {loading ? (
                   <tr>
-                    <td colSpan={18} className="px-3 py-8 text-sm text-center text-gray-400">
-                      Loading orders…
+                    <td colSpan={18}>
+                      <Loader text="Loading orders..." />
                     </td>
                   </tr>
                 ) : groupedFilteredOrders.length === 0 ? (

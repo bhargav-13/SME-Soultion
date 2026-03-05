@@ -11,6 +11,7 @@ import {
   itemApi,
 } from "../services/apiService";
 import toast from "react-hot-toast";
+import Loader from "../components/Loader";
 
 const FINISH_FIELDS = [
   { key: "sssatinlacq", label: "S.S & Satin Lacq" },
@@ -353,9 +354,7 @@ const AddInventoryPage = () => {
   if (loading) {
     return (
       <SidebarLayout>
-        <div className="flex items-center justify-center h-64 text-gray-500 text-sm">
-          Loading…
-        </div>
+        <Loader text="Loading..." className="h-64" />
       </SidebarLayout>
     );
   }

@@ -13,6 +13,7 @@ import PageHeader from "../../../components/PageHeader";
 import PrimaryActionButton from "../../../components/PrimaryActionButton";
 import { categoryApi } from "../../../services/apiService";
 import toast from "react-hot-toast";
+import Loader from "../../../components/Loader";
 
 const CategoryMaster = () => {
   const [categories, setCategories] = useState([]);
@@ -160,8 +161,8 @@ const CategoryMaster = () => {
         {/* Categories Grid */}
         <div className="grid grid-cols-3 gap-4 mt-6">
           {loading ? (
-            <div className="col-span-3 p-6 text-center text-gray-500">
-              Loading...
+            <div className="col-span-3">
+              <Loader text="Loading categories..." />
             </div>
           ) : filteredCategories.length === 0 ? (
             <div className="col-span-3 p-6 text-center text-gray-500">

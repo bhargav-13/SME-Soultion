@@ -12,6 +12,7 @@ import PageHeader from "../../../components/PageHeader";
 import PrimaryActionButton from "../../../components/PrimaryActionButton";
 import { itemApi, categoryApi } from "../../../services/apiService";
 import toast from "react-hot-toast";
+import Loader from "../../../components/Loader";
 
 const ItemMaster = () => {
   const navigate = useNavigate();
@@ -230,7 +231,7 @@ const ItemMaster = () => {
 
         {/* Items Table */}
         {loading ? (
-          <div className="p-6 text-center text-gray-500">Loading...</div>
+          <Loader text="Loading items..." />
         ) : (
           <ItemsTable
             items={filteredItems}

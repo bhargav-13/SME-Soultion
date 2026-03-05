@@ -16,6 +16,7 @@ import ConfirmationDialog from "../components/ConfirmationDialog";
 import StatsCard from "../components/StatsCard";
 import { jobWorkApi, jobWorkReturnApi, axiosInstance } from "../services/apiService";
 import toast from "react-hot-toast";
+import Loader from "../components/Loader";
 
 // ── Print helper ─────────────────────────────────────────────────────────────
 // 1. Downloads the PNG to disk (no pop-up needed — uses hidden <a download> click)
@@ -727,9 +728,7 @@ const JobWork = () => {
 
         {/* Content */}
         {loading ? (
-          <div className="flex items-center justify-center h-48 text-sm text-gray-400">
-            Loading job works…
-          </div>
+          <Loader text="Loading job works..." />
         ) : filtered.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-48 gap-3 text-gray-500">
             <p className="text-sm">No job work records found.</p>
