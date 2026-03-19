@@ -1,5 +1,6 @@
+
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { Calendar, Download, Plus, SquarePen } from "lucide-react";
+import { Calendar, Download, Plus } from "lucide-react";
 import SidebarLayout from "../components/SidebarLayout";
 import PageHeader from "../components/PageHeader";
 import StatsCard from "../components/StatsCard";
@@ -15,7 +16,6 @@ import {
 import toast from "react-hot-toast";
 import Loader from "../components/Loader";
 import PrimaryActionButton from "../components/PrimaryActionButton";
-import { useNavigate } from "react-router-dom";
 
 const columns = [
   { key: "date", label: "Date", type: "date" },
@@ -33,11 +33,7 @@ const columns = [
   { key: "labour", label: "Laboure", type: "auto" },
   { key: "rsKg", label: "Rs/Kg", type: "auto" },
   { key: "boxWeight", label: "Box Weight", type: "number" },
-  {
-    key: "boxWeightAccDozWeight",
-    label: "Box Weight / Ac. Doz Weight",
-    type: "auto",
-  },
+  { key: "boxWeightAccDozWeight", label: "Box Weight / Ac. Doz Weight", type: "auto" },
   { key: "billCalDozWeight", label: "Bill Cal. Doz Weight", type: "auto" },
   { key: "ratePc", label: "Rate/Pc.", type: "auto" },
   { key: "totalRs", label: "Total Rs.", type: "auto" },
@@ -63,7 +59,7 @@ const FINISH_KEY_TO_LABEL = {
 };
 
 const FINISH_LABEL_TO_KEY = Object.fromEntries(
-  Object.entries(FINISH_KEY_TO_LABEL).map(([k, v]) => [v, k]),
+  Object.entries(FINISH_KEY_TO_LABEL).map(([k, v]) => [v, k])
 );
 
 const getColumnWidthClass = (key) => {
@@ -115,11 +111,11 @@ const recalcRow = (row) => {
   };
   const fmt = (v) => (v === 0 ? "" : parseFloat(v.toFixed(4)));
 
-  const box = num(row.box); // F - Box
-  const pc = num(row.pc); // G - Pcs
-  const scrap = num(row.scrap); // I - Scrap
-  const labour = num(row.labour); // J - Labour
-  const boxWeight = num(row.boxWeight); // L - Box Weight
+  const box = num(row.box);                 // F - Box
+  const pc = num(row.pc);                   // G - Pcs
+  const scrap = num(row.scrap);             // I - Scrap
+  const labour = num(row.labour);           // J - Labour
+  const boxWeight = num(row.boxWeight);     // L - Box Weight
   const acDozWeight = num(row.acDozWeight); // C - Actual Doz Weight (from size)
 
   // H: Total Pc = Box * Pcs
@@ -287,7 +283,6 @@ const rowToPayload = (row) => {
 };
 
 const PackingInvoice = () => {
-  const navigate = useNavigate();
   const [rows, setRows] = useState([]);
   const [savedRows, setSavedRows] = useState([]);
   const [searchQuery, setSearchQuery] = useState("");
@@ -314,9 +309,7 @@ const PackingInvoice = () => {
           partyApi.getAllParties(),
           itemBlueprintApi.getAllItems(),
         ]);
-        const partiesList = Array.isArray(partiesRes.data)
-          ? partiesRes.data
-          : [];
+        const partiesList = Array.isArray(partiesRes.data) ? partiesRes.data : [];
         setPartyOptions(partiesList);
 
         const items = Array.isArray(itemsRes.data) ? itemsRes.data : [];
@@ -331,13 +324,9 @@ const PackingInvoice = () => {
               const res = await sizeApi.getSizesByItemId(item.id);
               const sizes = Array.isArray(res.data) ? res.data : [];
               sizesMap[item.id] = sizes;
-              sizes.forEach((s) => {
-                reverseMap[s.id] = { id: item.id, name: item.itemName };
-              });
-            } catch {
-              /* skip */
-            }
-          }),
+              sizes.forEach((s) => { reverseMap[s.id] = { id: item.id, name: item.itemName }; });
+            } catch { /* skip */ }
+          })
         );
         setSizesByItem(sizesMap);
         setSizeToItem(reverseMap);
@@ -352,17 +341,14 @@ const PackingInvoice = () => {
   const fetchClientInventory = useCallback(async (partyId, sizeId, rowId) => {
     if (!partyId || !sizeId) return;
     try {
-      const res = await clientInventoryApi.getInventoryByClient(
-        partyId,
-        sizeId,
-      );
+      const res = await clientInventoryApi.getInventoryByClient(partyId, sizeId);
       const data = res.data?.data || res.data;
       const inventory = Array.isArray(data) ? data[0] : data;
       if (inventory) {
         setRows((prev) =>
           prev.map((row) =>
-            row.id === rowId ? { ...row, _clientInventory: inventory } : row,
-          ),
+            row.id === rowId ? { ...row, _clientInventory: inventory } : row
+          )
         );
       }
     } catch {
@@ -379,7 +365,7 @@ const PackingInvoice = () => {
         undefined,
         undefined,
         0,
-        200,
+        200
       );
       const data = res.data;
       const invoices = Array.isArray(data?.data) ? data.data : [];
@@ -387,9 +373,7 @@ const PackingInvoice = () => {
       setRows(mapped);
       setSavedRows(mapped);
     } catch (err) {
-      toast.error(
-        err?.response?.data?.message || "Failed to load packing invoices",
-      );
+      toast.error(err?.response?.data?.message || "Failed to load packing invoices");
     } finally {
       setLoading(false);
     }
@@ -419,9 +403,7 @@ const PackingInvoice = () => {
     return rows.filter((row) => {
       const matchesSearch =
         !searchQuery ||
-        (row.invoiceId || "")
-          .toLowerCase()
-          .includes(searchQuery.toLowerCase()) ||
+        (row.invoiceId || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
         (row.party || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
         (row.size || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
         (row.finish || "").toLowerCase().includes(searchQuery.toLowerCase());
@@ -532,7 +514,11 @@ const PackingInvoice = () => {
     }
   };
 
-
+  const handleRefresh = () => {
+    loadInvoices();
+    setSelectedCell(null);
+    setEditingCell(null);
+  };
 
   const handleCellClick = (cellId) => {
     if (editingCell === cellId) return;
@@ -569,16 +555,9 @@ const PackingInvoice = () => {
     setRows((prev) =>
       prev.map((row) => {
         if (row.id !== rowId) return row;
-        const updated = {
-          ...row,
-          party: partyName,
-          _partyId: party ? party.id : null,
-          _clientInventory: null,
-          finish: "",
-          labour: "",
-        };
+        const updated = { ...row, party: partyName, _partyId: party ? party.id : null, _clientInventory: null, finish: "", labour: "" };
         return recalcRow(updated);
-      }),
+      })
     );
     // Fetch inventory if size already selected
     if (party?.id) {
@@ -604,7 +583,7 @@ const PackingInvoice = () => {
           labour: "",
           _clientInventory: null,
         });
-      }),
+      })
     );
   };
 
@@ -612,7 +591,7 @@ const PackingInvoice = () => {
   // Also fetch client inventory for the party + size combination
   const handleSizeSelect = (rowId, sizeLabel) => {
     const row = rows.find((r) => r.id === rowId);
-    const itemSizes = row?._itemId ? sizesByItem[row._itemId] || [] : [];
+    const itemSizes = row?._itemId ? (sizesByItem[row._itemId] || []) : [];
     const size = itemSizes.find((s) => {
       const label = `${s.sizeInInch || ""}${s.dozenWeight ? " - " + s.dozenWeight : ""}`;
       return label === sizeLabel;
@@ -629,8 +608,8 @@ const PackingInvoice = () => {
               labour: "",
               _clientInventory: null,
             })
-          : r,
-      ),
+          : r
+      )
     );
     // Fetch client inventory
     if (row?._partyId && size?.id) {
@@ -644,12 +623,9 @@ const PackingInvoice = () => {
       prev.map((row) => {
         if (row.id !== rowId) return row;
         const finishKey = FINISH_LABEL_TO_KEY[finishLabel];
-        const labourValue =
-          finishKey && row._clientInventory
-            ? (row._clientInventory[finishKey] ?? "")
-            : "";
+        const labourValue = finishKey && row._clientInventory ? (row._clientInventory[finishKey] ?? "") : "";
         return recalcRow({ ...row, finish: finishLabel, labour: labourValue });
-      }),
+      })
     );
   };
 
@@ -666,7 +642,7 @@ const PackingInvoice = () => {
         {
           responseType: "blob",
           headers: { Accept: "application/pdf,application/json" },
-        },
+        }
       );
       const blob = new Blob([res.data], { type: "application/pdf" });
       const url = window.URL.createObjectURL(blob);
@@ -674,7 +650,7 @@ const PackingInvoice = () => {
       link.href = url;
       link.setAttribute(
         "download",
-        `packing-invoice-${row.invoiceId || row.id}.pdf`,
+        `packing-invoice-${row.invoiceId || row.id}.pdf`
       );
       document.body.appendChild(link);
       link.click();
@@ -686,11 +662,6 @@ const PackingInvoice = () => {
     } finally {
       setDownloadingId(null);
     }
-  };
-
-  const handleEdit = (row) => {
-    if (!row?.id || row._isNew) return;
-    navigate(`/packing-invoice/edit/${row.id}`, { state: { invoiceRow: row } });
   };
 
   const renderCellValue = (row, col) => {
@@ -770,7 +741,7 @@ const PackingInvoice = () => {
     }
 
     if (col.type === "size-select") {
-      const itemSizes = row._itemId ? sizesByItem[row._itemId] || [] : [];
+      const itemSizes = row._itemId ? (sizesByItem[row._itemId] || []) : [];
       return (
         <select
           autoFocus={autoFocusEnabled}
@@ -780,9 +751,7 @@ const PackingInvoice = () => {
           onBlur={() => handleCellBlur(cellId)}
           className="w-full bg-transparent text-center text-sm focus:outline-none"
         >
-          <option value="">
-            {row._itemId ? "Select Size" : "Select Item first"}
-          </option>
+          <option value="">{row._itemId ? "Select Size" : "Select Item first"}</option>
           {itemSizes.map((s) => {
             const label = `${s.sizeInInch || ""}${s.dozenWeight ? " - " + s.dozenWeight : ""}`;
             return (
@@ -812,11 +781,7 @@ const PackingInvoice = () => {
           onBlur={() => handleCellBlur(cellId)}
           className="w-full bg-transparent text-center text-sm focus:outline-none"
         >
-          <option value="">
-            {row._clientInventory
-              ? "Select Finish"
-              : "Select Party & Size first"}
-          </option>
+          <option value="">{row._clientInventory ? "Select Finish" : "Select Party & Size first"}</option>
           {finishOptions.map((finish) => (
             <option key={finish} value={finish}>
               {finish}
@@ -846,14 +811,14 @@ const PackingInvoice = () => {
         <PageHeader
           title="Packing Invoice"
           description="Add packing Invoice and other details"
-          action={
-            <PrimaryActionButton
-              onClick={() => navigate("/packing-invoice/add")}
-              icon={Plus}
-            >
-              Add Packing
-            </PrimaryActionButton>
-          }
+           action={
+                        <PrimaryActionButton
+                          onClick={() => navigate("/")}
+                          icon={Plus}
+                        >
+                          Add Packing
+                        </PrimaryActionButton>
+                      }
         />
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6 mb-4">
@@ -878,8 +843,8 @@ const PackingInvoice = () => {
                   {columns.map((col) => (
                     <th
                       key={col.key}
-                      className={`sticky top-0 z-10 whitespace-normal px-3 py-3 text-center text-sm font-[550] text-gray-900 border-x border-b border-gray-200 bg-gray-100 ${getColumnWidthClass(
-                        col.key,
+                      className={`sticky top-0 z-10 whitespace-normal px-3 py-3 text-center text-sm font-[550] text-gray-900 border-r border-gray-200 bg-gray-100 ${getColumnWidthClass(
+                        col.key
                       )}`}
                     >
                       <span className="inline-flex flex-col items-center leading-tight">
@@ -889,7 +854,7 @@ const PackingInvoice = () => {
                       </span>
                     </th>
                   ))}
-                  <th className="sticky top-0 z-10 whitespace-nowrap px-3 py-3 text-center text-sm font-[550] text-gray-900 bg-gray-100 min-w-[150px] border-x border-b border-gray-200">
+                  <th className="sticky top-0 z-10 whitespace-nowrap px-3 py-3 text-center text-sm font-[550] text-gray-900 bg-gray-100 min-w-[92px] border-r border-gray-200">
                     Action
                   </th>
                 </tr>
@@ -902,53 +867,90 @@ const PackingInvoice = () => {
                     </td>
                   </tr>
                 ) : (
-                  filteredRows.map((row) => (
-                    <tr
-                      key={row.id}
-                      className="border-b border-gray-200 hover:bg-gray-50"
-                    >
-                      {columns.map((col) => {
+                  filteredRows.map((row, rowIndex) => (
+                    <tr key={row.id} className="border-b border-gray-200 hover:bg-gray-50">
+                      {columns.map((col, colIndex) => {
                         const cellId = `${row.id}-${col.key}`;
+                        const isSelected = selectedCell === cellId;
+                        const isEditing = editingCell === cellId;
+                        const isAlwaysDropdown =
+                          col.type === "party-select" ||
+                          col.type === "item-select" ||
+                          col.type === "size-select" ||
+                          col.type === "finish-select";
                         return (
                           <td
                             key={cellId}
-                            className={`h-10 px-2 py-1 text-center border-x text-sm text-bllack border-gray-200 ${getColumnWidthClass(
-                              col.key,
-                            )}`}
+                            onClick={() => handleCellClick(cellId)}
+                            className={`h-10 px-2 py-1 text-center border-r text-sm text-bllack border-gray-200 cursor-pointer ${
+                              getColumnWidthClass(col.key)
+                            } ${isSelected ? "ring-2 ring-gray-400 ring-inset" : ""}`}
                           >
-                            {renderCellValue(row, col)}
+                            {isEditing || isAlwaysDropdown
+                              ? renderEditableCell(
+                                  row,
+                                  col,
+                                  rowIndex,
+                                  colIndex,
+                                  filteredRows.length,
+                                  cellId,
+                                  isEditing,
+                                )
+                              : renderCellValue(row, col)}
                           </td>
                         );
                       })}
-                      <td className="h-12 px-3 py-1 text-center border-x border-gray-200">
-                        <div className="flex items-center justify-center gap-2">
-                          <button
-                            type="button"
-                            disabled={row._isNew}
-                            onClick={() => handleEdit(row)}
-                            className="inline-flex items-center gap-1 px-2 py-1 text-sm border border-gray-300 rounded bg-gray-100 hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
-                          >
-                            
-                            <SquarePen className="w-3.5 h-3.5" />
-                          </button>
-                          <button
-                            type="button"
-                            disabled={downloadingId === row.id || row._isNew}
-                            onClick={() => handleDownload(row)}
-                            className="inline-flex items-center gap-1 px-2 py-1 text-sm border border-gray-300 rounded bg-gray-100 hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
-                          >
-                            {downloadingId === row.id
-                              ? "Downloading..."
-                              : "Download"}
-                            <Download className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
+                      <td className="h-12 px-3 py-1 text-center">
+                        <button
+                          type="button"
+                          disabled={downloadingId === row.id || row._isNew}
+                          onClick={() => handleDownload(row)}
+                          className="inline-flex items-center gap-2 px-3 py-1 text-sm border border-gray-300 rounded bg-gray-100 hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          {downloadingId === row.id ? "Downloading..." : "Download"}
+                          <Download className="w-4 h-4" />
+                        </button>
                       </td>
                     </tr>
                   ))
                 )}
               </tbody>
             </table>
+          </div>
+        </div>
+
+        <div className="mt-4">
+          <p className="text-xs text-gray-500 text-right mb-2">
+            Press Tab on last cell to add a new row.
+          </p>
+          <div className="flex items-center justify-center gap-4">
+            <button
+              type="button"
+              onClick={handleSaveAll}
+              disabled={!hasChanges || saving}
+              className={`px-10 py-2 rounded-lg transition text-sm font-medium ${
+                hasChanges && !saving
+                  ? "bg-gray-900 text-white hover:bg-gray-800"
+                  : "bg-gray-300 text-gray-500 cursor-not-allowed"
+              }`}
+            >
+              {saving ? "Saving..." : "Save"}
+            </button>
+            <button
+              type="button"
+              onClick={handleAddRow}
+              className="flex items-center gap-2 px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition text-sm"
+            >
+              <Plus className="w-4 h-4" />
+              Add Row
+            </button>
+            <button
+              type="button"
+              onClick={handleRefresh}
+              className="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition text-sm"
+            >
+              Refresh
+            </button>
           </div>
         </div>
       </div>

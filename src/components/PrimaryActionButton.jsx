@@ -12,7 +12,7 @@ const PrimaryActionButton = ({
     <button
       type={type}
       onClick={onClick}
-      className={`flex items-center gap-2 bg-white border border-gray-900 text-gray-800 px-6 py-2 rounded-lg hover:bg-gray-50 transition font-medium ${className}`.trim()}
+      className={`flex items-center gap-2 bg-white border border-gray-900 text-gray-800 px-6 py-2 rounded-lg hover:bg-gray-50 transition font-medium cursor-pointer ${className}`.trim()}
     >
       {Icon ? <Icon className={iconClassName} /> : null}
       {children}
