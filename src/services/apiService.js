@@ -223,7 +223,7 @@ let itemApi = new ItemApi(createApiConfig(), config.API_BASE_URL, axiosInstance)
 let authApi = new AuthenticationApi(createUserMgmtConfig(), config.API_BASE_URL, axiosInstance);
 let userManagementApi = new UserManagementApi(createUserMgmtConfig(), config.API_BASE_URL, axiosInstance);
 let invoiceApi = new InvoiceApi(createInvoiceMgmtConfig(), config.API_BASE_URL, axiosInstance);
-let exportApi = new InvoiceApi(createInvoiceMgmtConfig(), config.API_BASE_URL, axiosInstance);
+let exportApi = new ExportApi(createExportMgmtConfig(), config.API_BASE_URL, axiosInstance);
 let itemBlueprintApi = new ItemBlueprintApi(createItemMgmtConfig(), config.API_BASE_URL, axiosInstance);
 let sizeApi = new SizeApi(createItemMgmtConfig(), config.API_BASE_URL, axiosInstance);
 let inventoryApi = new InventoryApi(createItemMgmtConfig(), config.API_BASE_URL, axiosInstance);
@@ -249,7 +249,7 @@ export const updateApiClients = () => {
     authApi = new AuthenticationApi(userConfig, config.API_BASE_URL, axiosInstance);
     userManagementApi = new UserManagementApi(userConfig, config.API_BASE_URL, axiosInstance);
     invoiceApi = new InvoiceApi(createInvoiceMgmtConfig(), config.API_BASE_URL, axiosInstance);
-    exportApi = new InvoiceApi(createInvoiceMgmtConfig(), config.API_BASE_URL, axiosInstance);
+    exportApi = new ExportApi(createExportMgmtConfig(), config.API_BASE_URL, axiosInstance);
     itemBlueprintApi = new ItemBlueprintApi(createItemMgmtConfig(), config.API_BASE_URL, axiosInstance);
     sizeApi = new SizeApi(createItemMgmtConfig(), config.API_BASE_URL, axiosInstance);
     inventoryApi = new InventoryApi(createItemMgmtConfig(), config.API_BASE_URL, axiosInstance);
