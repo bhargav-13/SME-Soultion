@@ -19,6 +19,10 @@ import JobWork from "./pages/JobWork";
 import MoveToJobWork from "./pages/MoveToJobWork";
 import PackingInvoice from "./pages/PackingInvoice";
 import AddPackingInvoice from "./pages/AddPackingInvoice";
+import PurchaseManagement from "./pages/Bills/PurchaseManagement";
+import AddPurchaseOrder from "./pages/Bills/AddPurchaseOrder";
+import SalesManagement from "./pages/Bills/SalesManagement";
+import AddSalesOrder from "./pages/Bills/AddSalesOrder";
 
 const AppRoutes = () => {
 
@@ -129,6 +133,38 @@ const AppRoutes = () => {
         element={
           <ProtectedRoute>
             <AddPackingInvoice />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/bills/purchase"
+        element={
+          <ProtectedRoute>
+            <PurchaseManagement />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/bills/purchase/add"
+        element={
+          <ProtectedRoute>
+            <AddPurchaseOrder />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/bills/sales"
+        element={
+          <ProtectedRoute>
+            <SalesManagement />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/bills/sales/add"
+        element={
+          <ProtectedRoute>
+            <AddSalesOrder />
           </ProtectedRoute>
         }
       />

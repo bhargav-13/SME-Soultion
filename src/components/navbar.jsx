@@ -45,7 +45,7 @@ const Navbar = ({ showSidebarMenu = false, onOpenSidebar = () => {} }) => {
           <div className="flex items-center gap-4">
             <div
               className="flex items-center gap-2 px-4 py-2 border-e-1 border-black "
-              onClick={() => navigate("/profile")}
+            
             >
               <User className="w-5 h-5 text-gray-500" />
               <span className=" text-md font-normal">

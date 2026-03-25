@@ -30,26 +30,28 @@ const SidebarLayout = ({ children }) => {
   });
   const location = useLocation();
   const isMastersActive = location.pathname.startsWith("/masters") || location.pathname.startsWith("/inventory");
-  const [mastersOpen, setMastersOpen] = useState(false);
+  const isBillsActive = location.pathname.startsWith("/bills");
+  const [submenuOpenKey, setSubmenuOpenKey] = useState(null);
   const [popoverPos, setPopoverPos] = useState({ top: 0, left: 0 });
-  const mastersRef = useRef(null);
+  const submenuRefs = useRef({});
   const closeTimer = useRef(null);
 
-  const openPopover = useCallback(() => {
+  const openPopover = useCallback((menuKey) => {
     clearTimeout(closeTimer.current);
-    if (mastersRef.current) {
-      const rect = mastersRef.current.getBoundingClientRect();
+    const currentRef = submenuRefs.current[menuKey];
+    if (currentRef) {
+      const rect = currentRef.getBoundingClientRect();
       setPopoverPos({
         top: rect.top,
         left: rect.right + 15,
       });
     }
-    setMastersOpen(true);
+    setSubmenuOpenKey(menuKey);
   }, []);
 
   const closePopover = useCallback(() => {
     closeTimer.current = setTimeout(() => {
-      setMastersOpen(false);
+      setSubmenuOpenKey(null);
     }, 150);
   }, []);
 
@@ -88,6 +90,19 @@ const SidebarLayout = ({ children }) => {
     },
   ];
 
+  const billLinks = [
+    {
+      to: "/bills/purchase",
+      icon: <FileText className="w-4 h-4" />,
+      label: "Purchase Bill",
+    },
+    {
+      to: "/bills/sales",
+      icon: <FileText className="w-4 h-4" />,
+      label: "Sels Bill",
+    },
+  ];
+
   // Sidebar links
   const links = [
     {
@@ -96,11 +111,21 @@ const SidebarLayout = ({ children }) => {
       icon: <LayoutDashboard className="w-5 h-5" />,
     },
     {
+      key: "bills",
+      to: "/bills",
+      label: "Bills",
+      icon: <FileText className="w-5 h-5" />,
+      hasArrow: true,
+      activePaths: ["/bills"],
+      submenu: billLinks,
+    },
+    {
       to: "/packing-invoice",
       label: "Packing Invoice",
       icon: <Package className="w-5 h-5" />,
     },
     {
+      key: "masters",
       to: "/masters",
       label: "Masters",
       icon: <Users className="w-5 h-5" />,
@@ -164,15 +189,19 @@ const SidebarLayout = ({ children }) => {
             {links.map((link) => (
               <div key={link.to}>
                 {link.submenu ? (
-                  // Masters with right-side popover
+                  // Menu with right-side popover
                   <div
-                    ref={mastersRef}
-                    onMouseEnter={openPopover}
+                    ref={(el) => {
+                      if (!link.key) return;
+                      submenuRefs.current[link.key] = el;
+                    }}
+                    onMouseEnter={() => openPopover(link.key)}
                     onMouseLeave={closePopover}
                   >
                     <button
                       className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg transition-all duration-200 ${
-                        mastersOpen || isMastersActive
+                        submenuOpenKey === link.key ||
+                        (link.key === "masters" ? isMastersActive : isBillsActive)
                           ? "bg-white text-black font-normal border border-black ml-2"
                           : "text-black hover:bg-gray-50"
                       }`}
@@ -182,7 +211,9 @@ const SidebarLayout = ({ children }) => {
                         <span className="text-sm font-normal">{link.label}</span>
                       </div>
                       <ChevronRight
-                        className={`w-4 h-4 text-black transition-transform duration-200 ${mastersOpen ? "rotate-90" : ""}`}
+                        className={`w-4 h-4 text-black transition-transform duration-200 ${
+                          submenuOpenKey === link.key ? "rotate-90" : ""
+                        }`}
                       />
                     </button>
                   </div>
@@ -216,9 +247,13 @@ const SidebarLayout = ({ children }) => {
         </aside>
 
         {/* Masters submenu popover - rendered outside sidebar to avoid overflow clipping */}
+        {(() => {
+          const currentMenu = links.find((link) => link.key === submenuOpenKey);
+          if (!currentMenu?.submenu) return null;
+          return (
         <div
           className={`fixed z-50 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-1 transition-opacity duration-150  ${
-            mastersOpen
+            submenuOpenKey
               ? "opacity-100 pointer-events-auto"
               : "opacity-0 pointer-events-none"
           }`}
@@ -226,12 +261,12 @@ const SidebarLayout = ({ children }) => {
           onMouseEnter={cancelClose}
           onMouseLeave={closePopover}
         >
-          {masterLinks.map((sublink) => (
+          {currentMenu.submenu.map((sublink) => (
             <Link
               key={sublink.to}
               to={sublink.to}
               onClick={() => {
-                setMastersOpen(false);
+                setSubmenuOpenKey(null);
               }}
               className={`flex items-center px-4 py-2.5 transition-colors text-sm ${
                 location.pathname === sublink.to
@@ -246,6 +281,8 @@ const SidebarLayout = ({ children }) => {
             </Link>
           ))}
         </div>
+          );
+        })()}
 
         {/* Main content */}
         <main className="flex-1 w-full overflow-y-auto scrollbar-hide">
