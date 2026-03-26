@@ -97,13 +97,13 @@ const PurchaseManagement = () => {
                 <tr className="bg-gray-100 border-b border-gray-200">
                   <th
                     colSpan={6}
-                    className="px-3 py-3 text-center text-xs font-semibold text-gray-700 border-r border-gray-200"
+                    className="px-6 py-4 text-center text-sm font-[550] text-black border-r border-gray-200"
                   >
                     Aavak
                   </th>
                   <th
                     colSpan={5}
-                    className="px-3 py-3 text-center text-xs font-semibold text-gray-700"
+                    className="px-6 py-4 text-center text-sm font-[550] text-black"
                   >
                     Javak
                   </th>
@@ -120,11 +120,10 @@ const PurchaseManagement = () => {
                     "Javak Kg / Pc.",
                     "Rs.",
                     "Total Rs.",
-                    "Action",
                   ].map((header) => (
                     <th
                       key={header}
-                      className="px-3 py-3 text-center text-xs font-semibold text-gray-700 border-r border-gray-200 last:border-r-0"
+                      className="px-3 py-4 text-center text-sm font-[550] text-black border-r border-gray-200 last:border-r-0"
                     >
                       {header}
                     </th>
@@ -144,9 +143,7 @@ const PurchaseManagement = () => {
                     <td className="px-3 py-2 text-center text-sm border-r border-gray-200">{row.javakKgPc}</td>
                     <td className="px-3 py-2 text-center text-sm border-r border-gray-200">{row.rs}</td>
                     <td className="px-3 py-2 text-center text-sm border-r border-gray-200">{row.totalRs}</td>
-                    <td className="px-3 py-2 text-center text-sm">
-                      <span className="text-gray-400">-</span>
-                    </td>
+                    
                   </tr>
                 ))}
                 {filtered.length === 0 && (

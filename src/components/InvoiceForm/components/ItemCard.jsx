@@ -13,6 +13,7 @@ const ItemCard = ({
   currencyOptions = [
     { value: "EURO", label: "EUR", iconText: "€" },
     { value: "USD", label: "USD", iconText: "$" },
+    { value: "POUND", label: "POUND", iconText: "£" },
   ],
 }) => {
   const currencyValue = item.currency || "";
@@ -93,7 +94,7 @@ const ItemCard = ({
           <div className="flex gap-2">
           <div className="flex-1">
             <FormInput
-              label="Unit Price (USD/EURO)"
+              label="Unit Price (USD/EURO/POUND)"
               name={`unitPrice_${index}`}
               value={item.unitPrice || ""}
               onChange={(e) => onChange(index, e)}
@@ -101,7 +102,7 @@ const ItemCard = ({
               disabled={disabled}
             />
           </div>
-          <div className="relative w-28">
+          <div className="relative w-36">
             <FormSelect
               label=""
               name={`currency_${index}`}
@@ -110,7 +111,7 @@ const ItemCard = ({
               options={currencyOptions}
               showIcon
               iconText={currencyIcon}
-              placeholder="USD/EUR"
+              placeholder="USD/EUR/POUND"
               disabled={disabled}
             />
           </div>
@@ -198,3 +199,4 @@ const ItemCard = ({
 };
 
 export default ItemCard;
+
