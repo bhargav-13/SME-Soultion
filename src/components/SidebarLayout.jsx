@@ -6,6 +6,7 @@ import {
   Users,
   Package,
   Layers,
+  Package2,
   ChevronRight,
   User,
   ListTodo,
@@ -136,6 +137,11 @@ const SidebarLayout = ({ children }) => {
       to: "/job-work",
       label: "Job Work",
       icon: <BriefcaseBusiness className="w-5 h-5" />,
+    },
+    {
+      to: "/gres",
+      label: "Gres",
+      icon: <Package2 className="w-5 h-5" />,
     },
     {
       to: "/order",

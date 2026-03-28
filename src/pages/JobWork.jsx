@@ -85,7 +85,7 @@ const JobWorkCardItem = ({ jw, onStatusChange, onTypeChange, onReturnRecord, onE
           </div>
         </div>
         <div className="text-right text-sm text-gray-500 flex-shrink-0">
-          <p>Date: <span className="font-bold">{fmtDate(jw.jobDate)}</span></p>
+          <p>Date: <span className="font-bold">{fmtDate(jw.jobDate || jw.date)}</span></p>
           <p>Created: <span className="font-bold">{fmtDate(jw.createdAt)}</span></p>
         </div>
       </div>
@@ -243,6 +243,7 @@ const JobWork = () => {
 
   // The order row passed from OrderManagement (if coming from eye icon)
   const orderRow = location.state?.orderRow || null;
+  const savedJobWork = location.state?.savedJobWork || null;
 
   const [jobWorks,     setJobWorks]     = useState([]);
   const [loading,      setLoading]      = useState(true);
@@ -255,6 +256,31 @@ const JobWork = () => {
   const [deleteReturnTarget, setDeleteReturnTarget] = useState(null); // { jw, ret } for deleting a specific return
   const [deletingReturn, setDeletingReturn] = useState(false);
 
+  const mergeSavedJobWork = useCallback((list) => {
+    if (!savedJobWork?.job) return list;
+
+    const { mode, job } = savedJobWork;
+    const normalizedJob = {
+      ...job,
+      jobDate: job.jobDate || job.date || job.jobDateInput || job.dateInput,
+      date: job.date || job.jobDate || job.jobDateInput || job.dateInput,
+    };
+
+    const targetId = normalizedJob.apiId ?? normalizedJob.id;
+    if (targetId == null) {
+      return mode === "create" ? [normalizedJob, ...list] : list;
+    }
+
+    const found = list.some((item) => String(item.id ?? item.apiId) === String(targetId));
+    if (mode === "edit" || found) {
+      return list.map((item) =>
+        String(item.id ?? item.apiId) === String(targetId) ? { ...item, ...normalizedJob } : item
+      );
+    }
+
+    return [normalizedJob, ...list];
+  }, [savedJobWork]);
+
   // â”€â”€ Fetch job works â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const loadJobWorks = useCallback(async () => {
     setLoading(true);
@@ -265,7 +291,7 @@ const JobWork = () => {
         const data = res.data;
         const list = Array.isArray(data?.data) ? data.data : Array.isArray(data) ? data : [];
         // Attach orderItemId to each jw so return dialog can use it
-        setJobWorks(list.map(jw => ({ ...jw, orderItemId: Number(orderRow.id) })));
+        setJobWorks(mergeSavedJobWork(list.map(jw => ({ ...jw, orderItemId: Number(orderRow.id) }))));
       } else {
         // No specific order â€” fetch across all order items via the parties/orders endpoint
         // then fan out per order-item. We use a lightweight approach: fetch all orders and collect job works.
@@ -284,14 +310,14 @@ const JobWork = () => {
             }
           }
         }
-        setJobWorks(allJws);
+        setJobWorks(mergeSavedJobWork(allJws));
       }
     } catch (err) {
       toast.error(err?.response?.data?.message || "Failed to load job works");
     } finally {
       setLoading(false);
     }
-  }, [orderRow]);
+  }, [orderRow, mergeSavedJobWork]);
 
   useEffect(() => { loadJobWorks(); }, [loadJobWorks]);
 

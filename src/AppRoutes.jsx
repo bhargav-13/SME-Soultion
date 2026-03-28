@@ -17,6 +17,8 @@ import ClientSelect from "./pages/ClientManagement/ClientSelect";
 import ClientManagement from "./pages/ClientManagement/ClientManagement";
 import JobWork from "./pages/JobWork";
 import MoveToJobWork from "./pages/MoveToJobWork";
+import Gres from "./pages/Gres";
+import MoveToGres from "./pages/MoveToGres";
 import PackingInvoice from "./pages/PackingInvoice";
 import AddPackingInvoice from "./pages/AddPackingInvoice";
 import PurchaseManagement from "./pages/Bills/PurchaseManagement";
@@ -189,6 +191,22 @@ const AppRoutes = () => {
         element={
           <ProtectedRoute>
             <MoveToJobWork />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/gres"
+        element={
+          <ProtectedRoute>
+            <Gres />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/gres/move"
+        element={
+          <ProtectedRoute>
+            <MoveToGres />
           </ProtectedRoute>
         }
       />

@@ -329,6 +329,7 @@ const MoveToJobWork = () => {
         ...editJob,
         partyName: formData.partyName,
         date: normalizedDate || editJob.date,
+        jobDate: normalizedDate || editJob.jobDate || editJob.date,
         itemSize: primaryItem.size,
         qtyPcInput: String(primaryItem.qtyPc || ""),
         qtyKgInput: qtyKgRaw,
@@ -359,6 +360,9 @@ const MoveToJobWork = () => {
       finish: primaryItem.finish || "—",
       stickerQty: String(formData.stickerQty || "0"),
       date:
+        normalizedDate ||
+        normalizeDateForCard(new Date().toISOString().slice(0, 10)),
+      jobDate:
         normalizedDate ||
         normalizeDateForCard(new Date().toISOString().slice(0, 10)),
       time: timeLabel,
