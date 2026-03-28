@@ -14,6 +14,7 @@ const createItem = () => ({
   kgPc: "",
   element: "",
   elementType: "",
+  elementWeightGm: "",
   scrap: "",
   labour: "",
 });
@@ -83,6 +84,7 @@ const AddSalesOrder = () => {
           unitType: item.kgPc || undefined,
           element: item.element || undefined,
           elementType: item.elementType || undefined,
+          elementWeightGm: item.elementWeightGm || undefined,
           scrap: item.scrap ? Number(item.scrap) : undefined,
           labour: item.labour ? Number(item.labour) : undefined,
           total: (Number(item.scrap) || 0) + (Number(item.labour) || 0),
@@ -201,7 +203,7 @@ const AddSalesOrder = () => {
 
         <div className="mt-5 bg-white rounded-lg border border-gray-200 p-5">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-medium text-black">Add Items</h3>
+            <h3 className="text-2xl font-medium text-black mb-5">Add Items</h3>
             <button
               type="button"
               onClick={() => setItems((prev) => [...prev, createItem()])}
@@ -231,9 +233,9 @@ const AddSalesOrder = () => {
                   <X className="w-4 h-4" />
                 </button>
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div>
-                  <label className="block text-sm text-gray-600 mb-1">Size</label>
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div className="md:col-span-1">
+                  <label className="block text-md font-medium text-black mb-2">Size</label>
                   <input
                     value={item.size}
                     onChange={(e) => updateItem(index, { size: e.target.value })}
@@ -241,8 +243,8 @@ const AddSalesOrder = () => {
                     className="w-full border border-gray-300 rounded-md px-3 py-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-gray-400"
                   />
                 </div>
-                <div>
-                  <label className="block text-sm text-gray-600 mb-1">Unit</label>
+                <div className="md:col-span-1">
+                  <label className="block text-md font-medium text-black mb-2">Unit</label>
                   <div className="grid grid-cols-2 gap-2">
                     <input
                       value={item.unit}
@@ -259,7 +261,7 @@ const AddSalesOrder = () => {
                         }}
                         className="w-full flex items-center justify-between px-3 py-2.5 border border-gray-300 rounded-md bg-white text-sm"
                       >
-                        <span>{item.kgPc || "Select unit"}</span>
+                        <span className="text-gray-500">{item.kgPc || "Select unit"}</span>
                         <ChevronDown
                           className={`w-4 h-4 text-gray-500 transition-transform ${
                             openUnitTypeIndex === index ? "rotate-180" : ""
@@ -286,9 +288,9 @@ const AddSalesOrder = () => {
                     </div>
                   </div>
                 </div>
-                <div>
-                  <label className="block text-sm text-gray-600 mb-1">Element</label>
-                  <div className="grid grid-cols-2 gap-2">
+                <div className="md:col-span-2">
+                  <label className="block text-md font-medium text-black mb-2">Element</label>
+                  <div className="grid grid-cols-3 gap-2">
                     <input
                       value={item.element}
                       onChange={(e) => updateItem(index, { element: e.target.value })}
@@ -304,7 +306,7 @@ const AddSalesOrder = () => {
                         }}
                         className="w-full flex items-center justify-between px-3 py-2.5 border border-gray-300 rounded-md bg-white text-sm"
                       >
-                        <span>{item.elementType || "Select type"}</span>
+                        <span className="text-gray-500">{item.elementType || "Select type"}</span>
                         <ChevronDown
                           className={`w-4 h-4 text-gray-500 transition-transform ${
                             openTypeIndex === index ? "rotate-180" : ""
@@ -332,12 +334,20 @@ const AddSalesOrder = () => {
                         </div>
                       )}
                     </div>
+                    <input
+                      type="number"
+                      min="0"
+                      value={item.elementWeightGm}
+                      onChange={(e) => updateItem(index, { elementWeightGm: e.target.value })}
+                      placeholder={item.elementType === "PETI" ? "900" : "Enter gm"}
+                      className="w-full border border-gray-300 rounded-md px-3 py-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-gray-400"
+                    />
                   </div>
                 </div>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
-                <div>
-                  <label className="block text-sm text-gray-600 mb-1">Scrap</label>
+                <div className="md:col-span-2">
+                  <label className="block text-md font-medium text-black mb-2">Scrap</label>
                   <input
                     value={item.scrap}
                     onChange={(e) => updateItem(index, { scrap: e.target.value })}
@@ -346,7 +356,7 @@ const AddSalesOrder = () => {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm text-gray-600 mb-1">Labour</label>
+                  <label className="block text-md font-medium text-black mb-2">Labour</label>
                   <input
                     value={item.labour}
                     onChange={(e) => updateItem(index, { labour: e.target.value })}
@@ -355,7 +365,7 @@ const AddSalesOrder = () => {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm text-gray-600 mb-1">Total</label>
+                  <label className="block text-md font-medium text-black mb-2">Total</label>
                   <input
                     readOnly
                     value={getItemTotal(item)}

@@ -7,30 +7,14 @@ import StatsCard from "../../components/StatsCard";
 import PageHeader from "../../components/PageHeader";
 import PrimaryActionButton from "../../components/PrimaryActionButton";
 import ConfirmationDialog from "../../components/ConfirmationDialog";
-import JobWorkPopup from "../../components/JobWork/JobWorkPopup";
 import toast from "react-hot-toast";
 import { axiosInstance } from "../../services/apiService";
 import Loader from "../../components/Loader";
-
-const ORDER_JOB_OVERRIDES_KEY = "orderJobWorkOverrides";
-
-const readOrderJobOverrides = () => {
-  try {
-    const raw = localStorage.getItem(ORDER_JOB_OVERRIDES_KEY);
-    if (!raw) return {};
-    return JSON.parse(raw) || {};
-  } catch {
-    return {};
-  }
-};
-
-const writeOrderJobOverrides = (value) => {
-  try {
-    localStorage.setItem(ORDER_JOB_OVERRIDES_KEY, JSON.stringify(value));
-  } catch {
-    // Ignore storage write failures
-  }
-};
+import {
+  normalizeJobWorkLabel,
+  readOrderJobOverrides,
+  upsertOrderJobOverride,
+} from "../../utils/orderJobWorkSync";
 
 // ─── Flatten API response into table rows ───────────────────────────────────
 const flattenOrders = (apiData) => {
@@ -57,7 +41,7 @@ const flattenOrders = (apiData) => {
         dispatchDate: item.dispatch?.dispatchDate  ?? "—",
         dispatchPcs:  item.dispatch?.dispatchPcs   ?? "—",
         pendingPc:    item.pendingPc    ?? "—",
-        jobWork:      item.platingType  ?? "—",
+        jobWork:      item.platingType  ?? null,
         platingStatus:item.jobActionDone ?? false,
         jobWorkNo:    item.jobWorkNo    ?? "—",
       }))
@@ -139,7 +123,8 @@ const OrderManagement = () => {
   const [editOrder, setEditOrder]     = useState(null);
   const [expandedGroups, setExpandedGroups] = useState({});
   const [deleteTarget, setDeleteTarget] = useState(null);
-  const [jobWorkPopupRow, setJobWorkPopupRow] = useState(null);
+  const [moveToJobWorkRow, setMoveToJobWorkRow] = useState(null);
+  const [selectedMoveType, setSelectedMoveType] = useState("OUTSIDE");
 
   // ── Debounce search ───────────────────────────────────────────────────────
   const searchDebounceRef = useRef(null);
@@ -212,7 +197,7 @@ const OrderManagement = () => {
         (order.plating || "").toLowerCase().includes(q) ||
         String(order.qtyPc ?? "").includes(q) ||
         String(order.qtyKg ?? "").includes(q) ||
-        (order.jobWork || "").toLowerCase().includes(q) ||
+        normalizeJobWorkLabel(order.jobWork).toLowerCase().includes(q) ||
         (order.date || "").includes(q) ||
         String(order.id ?? "").includes(q)
       );
@@ -221,7 +206,7 @@ const OrderManagement = () => {
     // Type filter
     if (typeFilter) {
       result = result.filter((order) =>
-        (order.jobWork || "").toLowerCase().includes(typeFilter.toLowerCase())
+        normalizeJobWorkLabel(order.jobWork).toLowerCase().includes(typeFilter.toLowerCase())
       );
     }
 
@@ -285,65 +270,76 @@ const OrderManagement = () => {
   const toggleJobUpdateStatus = (row) => {
     if (!row) return;
     const override = getRowOverride(row);
-    const currentStatus = override?.platingStatus ?? row.platingStatus ?? false;
-
-    // Once job work is done (ON), it cannot be disabled
-    if (currentStatus) return;
-
-    // Toggling ON → open the job work popup
-    setJobWorkPopupRow(row);
+    const currentJobWork = normalizeJobWorkLabel(override?.jobWork ?? row.jobWork);
+    setMoveToJobWorkRow(row);
+    setSelectedMoveType(currentJobWork === "In-House" ? "INHOUSE" : "OUTSIDE");
   };
 
-  const handleJobWorkSaved = (savedFormData, apiResponse) => {
-    if (jobWorkPopupRow) {
-      const row = jobWorkPopupRow;
-      // Optimistically update the row with data from the popup + API response
-      const jobWorkNo = String(new Date().getDate()).padStart(2, "0");
-      const jobWorkType = savedFormData?.jobWorkType || "JOB_WORK";
-      const stickerQty = savedFormData?.stickerQty || row.stickerQty;
+  const handleMoveToJobWorkSave = () => {
+    if (!moveToJobWorkRow) return;
+    const selectedLabel = selectedMoveType === "INHOUSE" ? "In-House" : "Outside";
+    navigate("/job-work/move", {
+      state: {
+        mode: "create",
+        prefillOrderRow: { ...moveToJobWorkRow, jobWork: selectedLabel },
+      },
+    });
+    setMoveToJobWorkRow(null);
+  };
 
-      setOrders((prev) =>
-        prev.map((order) =>
-          order.id === row.id
-            ? {
-                ...order,
-                platingStatus: true,
-                jobWork: jobWorkType === "INHOUSE" ? "IN_HOUSE" : jobWorkType,
-                jobWorkNo: jobWorkNo,
-                stickerQty: stickerQty || order.stickerQty,
-              }
-            : order
-        )
-      );
-      setOrderJobOverrides((prev) => {
-        const next = { ...prev };
-        const payload = {
-          platingStatus: true,
-          jobWork: jobWorkType === "INHOUSE" ? "IN_HOUSE" : jobWorkType,
-          jobWorkNo: String(jobWorkNo),
-        };
-        if (row.id) next[`item-${row.id}`] = { ...(next[`item-${row.id}`] || {}), ...payload };
-        if (row.orderId) next[`order-${row.orderId}`] = { ...(next[`order-${row.orderId}`] || {}), ...payload };
-        writeOrderJobOverrides(next);
-        return next;
-      });
+  const handleEditOrderSave = () => {
+    if (!editOrder) return;
+    const existingOverride = getRowOverride(editOrder);
+    const currentJobWork = normalizeJobWorkLabel(existingOverride?.jobWork ?? editOrder.jobWork);
+    const overridePatch = {
+      platingStatus: editOrder.platingStatus,
+      jobWorkNo: editOrder.jobWorkNo,
+    };
+
+    if (currentJobWork !== "—") {
+      overridePatch.jobWork = currentJobWork;
     }
-    // Refresh data from server to get full backend state
-    triggerFetch(debouncedSearch.current, page);
+
+    setOrders((prev) =>
+      prev.map((row) => (row.id === editOrder.id ? { ...row, ...editOrder } : row))
+    );
+
+    setOrderJobOverrides(
+      upsertOrderJobOverride({
+        orderItemId: editOrder.id,
+        orderId: editOrder.orderId,
+        ...overridePatch,
+      })
+    );
+
+    setEditOrder(null);
+    toast.success("Order updated");
   };
 
-  const handlePlatingMove = (row, jobWorkValue = row?.jobWork) => {
-    const platingTypeValue = String(jobWorkValue || "").trim().toLowerCase().replace(/[\s-]/g, "");
-    if (["outside", "inhouse", "", "-", "—"].includes(platingTypeValue) || jobWorkValue === "—") {
-      navigate("/job-work/move", {
-        state: { mode: "create", prefillOrderRow: { ...row, jobWork: jobWorkValue } },
-      });
-    }
-  };
+  const renderMoveOption = (value, label) => {
+    const isSelected = selectedMoveType === value;
 
-  const isPlatingMovable = (jobWorkValue) => {
-    const platingTypeValue = String(jobWorkValue || "").trim().toLowerCase().replace(/[\s-]/g, "");
-    return ["outside", "inhouse", "", "-", "—"].includes(platingTypeValue) || jobWorkValue === "—";
+    return (
+      <button
+        type="button"
+        onClick={() => setSelectedMoveType(value)}
+        aria-pressed={isSelected}
+        className={`w-full rounded-md border px-4 py-3 text-sm transition flex items-center gap-3 text-left ${
+          isSelected
+            ? "border-gray-900 bg-gray-50 text-gray-900 ring-1 ring-gray-900"
+            : "border-gray-300 bg-white text-gray-700 hover:border-gray-400 hover:bg-gray-50"
+        }`}
+      >
+        <span
+          className={`flex h-5 w-5 items-center justify-center rounded-full border ${
+            isSelected ? "border-gray-900" : "border-gray-400"
+          }`}
+        >
+          {isSelected ? <span className="h-2.5 w-2.5 rounded-full bg-black" /> : null}
+        </span>
+        <span className="font-medium">{label}</span>
+      </button>
+    );
   };
 
   const convertToDateInput = (dateString) => {
@@ -458,7 +454,7 @@ const OrderManagement = () => {
           setSearchQuery={handleSearchChange}
           typeFilter={typeFilter}
           setTypeFilter={setTypeFilter}
-          filterOptions={["Type", "Job Work"]}
+          filterOptions={["Type", "Outside", "In-House", "Job Work"]}
           filterPlaceholder="Type"
         />
 
@@ -493,9 +489,6 @@ const OrderManagement = () => {
                   <th colSpan={2} className="px-3 py-2 text-center text-sm font-[550] border-r border-gray-200 whitespace-normal">{renderHeaderLabel("Dispatch", "dispatch")}</th>
                   <th rowSpan={2} className="px-3 py-3 text-center text-sm font-[550] border-r border-gray-200 whitespace-normal">{renderHeaderLabel("Pending Pc.", "pending-pc")}</th>
                   <th rowSpan={2} className="px-3 py-3 text-center text-sm font-[550] border-r border-gray-200 whitespace-normal">{renderHeaderLabel("Job Update", "job-update")}</th>
-                  <th rowSpan={2} className="px-3 py-3 text-center text-sm font-[550] border-r border-gray-200 whitespace-normal">{renderHeaderLabel("Plating", "plating-action")}</th>
-                  <th rowSpan={2} className="px-3 py-3 text-center text-sm font-[550] border-r border-gray-200 whitespace-normal">{renderHeaderLabel("Job Work No", "job-work-no")}</th>
-                  <th rowSpan={2} className="px-3 py-3 text-center text-sm font-[550] border-r border-gray-200 whitespace-normal">{renderHeaderLabel("Job Action", "job-action")}</th>
                   <th rowSpan={2} className="px-3 py-3 text-center text-sm font-[550] whitespace-normal">{renderHeaderLabel("Action", "action")}</th>
                 </tr>
                 <tr className="bg-gray-100 border-b border-gray-200">
@@ -506,13 +499,13 @@ const OrderManagement = () => {
               <tbody>
                 {loading ? (
                   <tr>
-                    <td colSpan={18}>
+                    <td colSpan={15}>
                       <Loader text="Loading orders..." />
                     </td>
                   </tr>
                 ) : groupedFilteredOrders.length === 0 ? (
                   <tr>
-                    <td colSpan={18} className="px-3 py-6 text-sm text-center text-gray-500">
+                    <td colSpan={15} className="px-3 py-6 text-sm text-center text-gray-500">
                       No orders found.
                     </td>
                   </tr>
@@ -529,9 +522,10 @@ const OrderManagement = () => {
                       const sizeParts = splitSizeDisplay(row.size);
                       const rowOverride = getRowOverride(row);
                       const effectivePlatingStatus = rowOverride?.platingStatus ?? row.platingStatus;
-                      const effectiveJobWork = rowOverride?.jobWork ?? row.jobWork;
+                      const effectiveJobWork = normalizeJobWorkLabel(rowOverride?.jobWork ?? row.jobWork);
                       const effectiveJobWorkNo = rowOverride?.jobWorkNo ?? row.jobWorkNo;
                       const effectiveStickerQty = row.stickerQty ?? "—";
+                      const effectiveJobWorkKey = String(effectiveJobWork || "").toLowerCase().replace(/[\s-]/g, "");
 
                       return (
                         <tr key={row.id} className="border-b border-gray-200 hover:bg-gray-50">
@@ -573,43 +567,36 @@ const OrderManagement = () => {
                           <td className="px-3 py-4 text-sm text-center text-gray-700 border-r border-gray-200 whitespace-nowrap">{row.dispatchPcs}</td>
                           <td className="px-3 py-4 text-sm text-center text-gray-700 border-r border-gray-200 whitespace-nowrap">{row.pendingPc}</td>
                         
-                          <td className="px-3 py-4 border-r border-gray-200">
-                            <div className="flex items-center justify-center">
+                          <td className="px-3 py-4 border-r border-gray-200 whitespace-nowrap">
+                            <div className="flex flex-col items-center gap-1.5">
+                              <span className="text-xs text-gray-700">{effectiveJobWorkNo}</span>
                               <button
                                 type="button"
                                 onClick={() => toggleJobUpdateStatus(row)}
-                                aria-label={effectivePlatingStatus ? "Job work done (locked)" : "Enable job update"}
-                                title={effectivePlatingStatus ? "Job work is done and cannot be undone" : "Click to mark job work as done"}
-                                className={`w-7 h-4 rounded-full relative inline-flex items-center ${effectivePlatingStatus ? "bg-emerald-600 cursor-not-allowed" : "bg-gray-300 cursor-pointer"}`}
+                                aria-label="Open job update"
+                                title="Open job update"
+                                className={`w-7 h-4 rounded-full relative inline-flex items-center ${effectivePlatingStatus ? "bg-emerald-600" : "bg-gray-300"} cursor-pointer`}
                               >
                                 <span className={`w-3 h-3 bg-white rounded-full absolute top-0.5 ${effectivePlatingStatus ? "right-0.5" : "left-0.5"}`} />
                               </button>
+                              <span
+                                className={`text-xs ${
+                                  effectiveJobWorkKey === "outside"
+                                    ? "text-red-500"
+                                    : effectiveJobWorkKey === "inhouse"
+                                      ? "text-emerald-700"
+                                      : "text-gray-700"
+                                }`}
+                              >
+                                {effectiveJobWork}
+                              </span>
                             </div>
-                          </td>
-                            <td className="px-3 py-4 text-sm text-center text-gray-700 border-r border-gray-200 whitespace-nowrap">
-                            <button
-                              type="button"
-                              onClick={() => handlePlatingMove(row, effectiveJobWork)}
-                              disabled={!isPlatingMovable(effectiveJobWork)}
-                              className={`${
-                                String(effectiveJobWork || "").toLowerCase().replace(/[\s-]/g, "") === "outside"
-                                  ? "text-red-500"
-                                  : String(effectiveJobWork || "").toLowerCase().replace(/[\s-]/g, "") === "inhouse"
-                                    ? "text-emerald-700"
-                                    : "text-gray-700"
-                              } ${isPlatingMovable(effectiveJobWork) ? "cursor-pointer" : "cursor-default"}`}
-                            >
-                              {effectiveJobWork}
-                            </button>
-                          </td>
-                          <td className="px-3 py-4 text-sm text-center border-r border-gray-200 whitespace-nowrap">{effectiveJobWorkNo}</td>
-                          <td className="px-3 py-4 text-sm text-center border-r border-gray-200 whitespace-nowrap">
-                            <button type="button" aria-label="Open job work" onClick={() => navigate("/job-work", { state: { orderRow: row } })}>
-                              <Eye className="w-4 h-4 text-gray-700 cursor-pointer" />
-                            </button>
                           </td>
                           <td className="px-3 py-4">
                             <div className="flex items-center justify-center gap-2">
+                              <button type="button" onClick={() => navigate("/job-work", { state: { orderRow: row } })} aria-label="Open job work">
+                                <BriefcaseBusiness className="w-4 h-4 text-gray-500 cursor-pointer" />
+                              </button>
                               <button type="button" onClick={() => setEditOrder({ ...row })} aria-label="Edit order">
                                 <SquarePen className="w-4 h-4 text-gray-500 cursor-pointer" />
                               </button>
@@ -688,10 +675,17 @@ const OrderManagement = () => {
             <div className="px-5 py-4 border-t border-gray-200 flex items-center justify-center gap-3 flex-shrink-0">
               <button
                 type="button"
-                onClick={() => { setEditOrder(null); toast.success("Changes noted (read-only view)"); }}
+                onClick={handleEditOrderSave}
                 className="px-8 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition text-sm"
               >
-                Close
+                Save
+              </button>
+              <button
+                type="button"
+                onClick={() => setEditOrder(null)}
+                className="px-8 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition text-sm"
+              >
+                Cancel
               </button>
             </div>
           </div>
@@ -709,12 +703,33 @@ const OrderManagement = () => {
         onConfirm={confirmDelete}
       />
 
-      <JobWorkPopup
-        isOpen={Boolean(jobWorkPopupRow)}
-        orderRow={jobWorkPopupRow}
-        onClose={() => setJobWorkPopupRow(null)}
-        onSaved={handleJobWorkSaved}
-      />
+      {moveToJobWorkRow && (
+        <div className="fixed inset-0 z-50 bg-black/30 flex items-center justify-center p-4">
+          <div className="w-full max-w-md rounded-lg border border-gray-200 bg-white p-5">
+            <h3 className="text-base font-medium text-gray-900 text-center">Move to Job Work</h3>
+            <div className="mt-5 space-y-3">
+              {renderMoveOption("OUTSIDE", "Outside Job Work")}
+              {renderMoveOption("INHOUSE", "In-House Job Work")}
+            </div>
+            <div className="mt-6 flex items-center justify-center gap-3">
+              <button
+                type="button"
+                onClick={handleMoveToJobWorkSave}
+                className="px-8 py-2 bg-gray-900 text-white rounded-md hover:bg-gray-800 transition text-sm"
+              >
+                Save
+              </button>
+              <button
+                type="button"
+                onClick={() => setMoveToJobWorkRow(null)}
+                className="px-8 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 transition text-sm"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </SidebarLayout>
   );
 };

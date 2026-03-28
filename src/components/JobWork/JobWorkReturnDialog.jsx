@@ -6,6 +6,7 @@ const EMPTY_FORM = {
   ghati: "",
   returnElement: "",
   returnType: "Peti",
+  elementWeightGm: "900",
 };
 
 const JobWorkReturnDialog = ({
@@ -26,6 +27,7 @@ const JobWorkReturnDialog = ({
       ghati: initialData?.ghatiInput || "",
       returnElement: initialData?.returnElementInput || "",
       returnType: initialData?.returnType || "Peti",
+      elementWeightGm: initialData?.returnType === "Drum" ? "" : "900",
     });
   }, [initialData, isOpen]);
 
@@ -117,6 +119,7 @@ const JobWorkReturnDialog = ({
                           type="button"
                           onClick={() => {
                             handleChange("returnType", option);
+                            handleChange("elementWeightGm", option === "Peti" ? "900" : "");
                             setIsReturnTypeOpen(false);
                           }}
                           className="w-full text-left px-3 py-2 text-sm hover:bg-gray-100 transition"
@@ -127,6 +130,18 @@ const JobWorkReturnDialog = ({
                     </div>
                   )}
                 </div>
+                <input
+                  type="number"
+                  min="0"
+                  step="1"
+                  value={formData.elementWeightGm}
+                  onChange={(e) => handleChange("elementWeightGm", e.target.value)}
+                  placeholder="gm"
+                  disabled={isViewMode || formData.returnType === "Peti"}
+                  className={`w-28 h-10 px-3 border rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-gray-400 disabled:bg-gray-100 disabled:text-gray-500 ${
+                    formData.returnType === "Peti" ? "border-gray-200 bg-gray-50" : "border-gray-300 bg-white"
+                  }`}
+                />
               </div>
             </div>
           </div>

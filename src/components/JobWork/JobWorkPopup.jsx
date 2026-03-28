@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { X, ChevronDown } from "lucide-react";
 import toast from "react-hot-toast";
 import { jobWorkApi, partyApi } from "../../services/apiService";
+import { upsertOrderJobOverride } from "../../utils/orderJobWorkSync";
 
 const FINISH_OPTIONS = [
   "S.S & Sartin Lacq",
@@ -156,6 +157,13 @@ const JobWorkPopup = ({ isOpen, orderRow, onClose, onSaved }) => {
 
       const res = await jobWorkApi.createJobWork(orderItemId, payload);
       toast.success("Job work created successfully!");
+      upsertOrderJobOverride({
+        orderItemId,
+        orderId: orderRow?.orderId,
+        jobWork: formData.jobWorkType === "INHOUSE" ? "In-House" : formData.jobWorkType === "OUTSIDE" ? "Outside" : "Job Work",
+        platingStatus: true,
+        jobWorkNo: orderRow?.jobWorkNo,
+      });
       onSaved?.(formData, res.data);
       onClose();
     } catch (err) {

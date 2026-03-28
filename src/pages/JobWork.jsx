@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+﻿import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Printer,
   SquarePen,
@@ -17,331 +17,25 @@ import StatsCard from "../components/StatsCard";
 import { jobWorkApi, jobWorkReturnApi, axiosInstance } from "../services/apiService";
 import toast from "react-hot-toast";
 import Loader from "../components/Loader";
+import { normalizeJobWorkLabel, removeOrderJobOverride, upsertOrderJobOverride } from "../utils/orderJobWorkSync";
+import { printJobWorkPng as sharedPrintJobWorkPng } from "../utils/jobWorkPrint";
+import JobWorkStatusDropdownShared from "../components/JobWork/JobWorkStatusDropdown";
+import JobWorkTypeDropdownShared from "../components/JobWork/JobWorkTypeDropdown";
+import JobWorkReturnRecordDialogShared from "../components/JobWork/JobWorkReturnRecordDialog";
 
-// ── Print helper ─────────────────────────────────────────────────────────────
-// 1. Downloads the PNG to disk (no pop-up needed — uses hidden <a download> click)
-// 2. Opens a minimal print window with the image and triggers the print dialog
-//    the moment the image finishes loading (no pop-up blocker issues because
-//    this is called synchronously inside a user click event).
-const printJobWorkPng = async (jwId, formType, setLoadingKey) => {
-  const key = formType.toLowerCase(); // 'aavak' | 'javak'
-  setLoadingKey(key);
-  try {
-    const res = await axiosInstance.get(
-      `/api/v1/job-works/${jwId}/type/${formType}/png`,
-      {
-        responseType: "blob",
-        headers: { Accept: "image/png,application/json" },
-      }
-    );
+const printJobWorkPng = sharedPrintJobWorkPng;
 
-    const blob    = new Blob([res.data], { type: "image/png" });
-    const blobUrl = URL.createObjectURL(blob);
-    const label   = formType === "AAVAK" ? "aavak" : "javak";
-    const filename = `job-work-${jwId}-${label}.png`;
-
-    // ── 1. Download the file to disk ────────────────────────────────────────
-    const a = document.createElement("a");
-    a.href     = blobUrl;
-    a.download = filename;
-    a.style.display = "none";
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-
-    // ── 2. Open print dialog via a hidden iframe ─────────────────────────────
-    // We write an HTML page into the iframe that shows the image at full size
-    // and calls window.print() once the image is loaded.
-    const iframe = document.createElement("iframe");
-    iframe.style.cssText = "position:fixed;top:-9999px;left:-9999px;width:0;height:0;border:0;";
-    document.body.appendChild(iframe);
-
-    const doc = iframe.contentDocument || iframe.contentWindow.document;
-    doc.open();
-    doc.write(`<!DOCTYPE html>
-<html>
-<head>
-  <title>Print — ${filename}</title>
-  <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { display: flex; justify-content: center; align-items: flex-start; }
-    img { max-width: 100%; height: auto; display: block; }
-    @media print { body { margin: 0; } img { width: 100%; } }
-  </style>
-</head>
-<body>
-  <img src="${blobUrl}"
-    onload="window.focus(); window.print();"
-    onerror="window.parent.postMessage('print-error','*');" />
-</body>
-</html>`);
-    doc.close();
-
-    // Clean up blob URL and iframe after printing (give plenty of time)
-    setTimeout(() => {
-      URL.revokeObjectURL(blobUrl);
-      if (iframe.parentNode) iframe.parentNode.removeChild(iframe);
-    }, 120_000);
-
-    toast.success(`${label.toUpperCase()} image downloaded. Print dialog will open shortly.`);
-  } catch (err) {
-    const msg = err?.response?.data?.message || err?.message || "Failed to generate print";
-    toast.error(msg);
-  } finally {
-    setLoadingKey(null);
-  }
-};
-
-// ── Status helpers ──────────────────────────────────────────────────────────
-const STATUS_OPTIONS = ["PENDING", "COMPLETE", "REJECT"];
-const TYPE_OPTIONS   = ["JOB_WORK", "INHOUSE", "OUTSIDE"];
-
-const STATUS_LABEL = { PENDING: "Pending", COMPLETE: "Complete", REJECT: "Reject" };
-const TYPE_LABEL   = { JOB_WORK: "Job Work", INHOUSE: "In-House", OUTSIDE: "Outside" };
-
-const STATUS_COLOR = {
-  COMPLETE: "bg-[#D1FFE2] text-green-800",
-  PENDING:  "bg-[#fde68a] text-yellow-800",
-  REJECT:   "bg-[#fecaca] text-red-800",
-};
-
-const fmt = (v) => (v == null || v === "" ? "—" : v);
+const fmt = (v) => (v == null || v === '' ? '—' : v);
 const fmtDate = (s) => {
-  if (!s) return "—";
-  try { return new Date(s).toLocaleDateString("en-IN"); } catch { return s; }
+  if (!s) return '—';
+  try { return new Date(s).toLocaleDateString('en-IN'); } catch { return s; }
 };
 
-// ── Return Record Dialog ─────────────────────────────────────────────────────
-const ReturnDialog = ({ isOpen, jobWork, editingReturn, onClose, onSaved }) => {
-  const [form, setForm] = useState({
-    returnKg: "",
-    ghati: "",
-    returnElementCount: "",
-    elementType: "PETI",
-    elementWeightGm: "900",
-    jobReturnDate: "",
-  });
-  const [saving, setSaving] = useState(false);
-  const [isTypeOpen, setIsTypeOpen] = useState(false);
+const ReturnDialog = (props) => <JobWorkReturnRecordDialogShared {...props} />;
+const StatusDropdown = (props) => <JobWorkStatusDropdownShared {...props} />;
+const TypeDropdown = (props) => <JobWorkTypeDropdownShared {...props} />;
 
-  useEffect(() => {
-    if (!isOpen) return;
-    setIsTypeOpen(false);
-    if (editingReturn) {
-      setForm({
-        returnKg:           String(editingReturn.returnKg ?? ""),
-        ghati:              String(editingReturn.ghati ?? ""),
-        returnElementCount: String(editingReturn.returnElementCount ?? ""),
-        elementType:        editingReturn.elementType || "PETI",
-        elementWeightGm:    (editingReturn.elementType || "PETI") === "PETI" ? "900" : "",
-        jobReturnDate:      editingReturn.jobReturnDate ? editingReturn.jobReturnDate.substring(0, 10) : "",
-      });
-    } else {
-      setForm({
-        returnKg: "",
-        ghati: "",
-        returnElementCount: "",
-        elementType: "PETI",
-        elementWeightGm: "900",
-        jobReturnDate: "",
-      });
-    }
-  }, [isOpen, editingReturn]);
-
-  if (!isOpen || !jobWork) return null;
-
-  const round3 = (n) => Math.round(n * 1000) / 1000;
-  const returns = jobWork.jobWorkReturns || [];
-  const alreadyReturnedKg = round3(returns
-    .filter(r => r.id !== editingReturn?.id)
-    .reduce((sum, r) => sum + (r.returnKg || 0) + (r.ghati || 0), 0));
-  const alreadyReturnedElements = returns
-    .filter(r => r.id !== editingReturn?.id)
-    .reduce((sum, r) => sum + (r.returnElementCount || 0), 0);
-  const sentKg = jobWork.qtyKg || 0;
-  const sentElements = jobWork.elementCount || 0;
-  const availableKg = round3(Math.max(0, sentKg - alreadyReturnedKg));
-  const availableElements = Math.max(0, sentElements - alreadyReturnedElements);
-
-  const handleSave = async () => {
-    const kg = parseFloat(form.returnKg);
-    if (!form.returnKg || isNaN(kg) || kg <= 0) { toast.error("Return Kg is required and must be greater than 0"); return; }
-    const ghatiVal = form.ghati ? parseFloat(form.ghati) : 0;
-    const newContribution = round3(kg + (isNaN(ghatiVal) ? 0 : ghatiVal));
-    if (sentKg > 0 && newContribution > availableKg) { toast.error(`Return Kg + Ghati (${newContribution}) exceeds remaining (${availableKg} Kg)`); return; }
-    const ghatiPayload = form.ghati ? parseFloat(form.ghati) : undefined;
-    if (ghatiPayload !== undefined && (isNaN(ghatiPayload) || ghatiPayload < 0)) { toast.error("Ghati must be a valid non-negative number"); return; }
-    const elemCount = form.returnElementCount ? parseFloat(form.returnElementCount) : undefined;
-    if (elemCount !== undefined && (isNaN(elemCount) || elemCount < 0 || !Number.isInteger(elemCount))) { toast.error("Return Element Count must be a valid non-negative integer"); return; }
-    setSaving(true);
-    try {
-      const payload = {
-        returnKg:           kg,
-        ghati:              ghatiPayload,
-        returnElementCount: elemCount,
-        elementType:        form.elementType,
-        jobReturnDate:      form.jobReturnDate || undefined,
-      };
-      if (editingReturn?.id) {
-        await jobWorkReturnApi.updateJobWorkReturn(jobWork.orderItemId, jobWork.id, editingReturn.id, payload);
-        toast.success("Return record updated!");
-      } else {
-        await jobWorkReturnApi.createJobWorkReturn(jobWork.orderItemId, jobWork.id, payload);
-        toast.success("Return record saved!");
-      }
-      onSaved?.();
-      onClose();
-    } catch (err) {
-      toast.error(err?.response?.data?.message || "Failed to save return");
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  return (
-    <div className="fixed inset-0 z-50 bg-black/30 flex items-center justify-center p-4">
-      <div className="bg-white rounded-xl w-full max-w-xl border border-gray-200 shadow-xl">
-        <div className="px-6 py-5 border-b border-gray-200 flex items-center justify-between">
-          <h2 className="w-full text-center text-xl font-medium text-black">
-            {editingReturn ? "Edit Return Record" : "Return Record"}
-          </h2>
-          <button type="button" onClick={onClose} aria-label="Close dialog" className="text-gray-400 hover:text-gray-600">✕</button>
-        </div>
-        <div className="px-10 py-6 space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-black mb-1">Return Kg <span className="text-red-400">*</span></label>
-            <input type="number" step="0.001" value={form.returnKg}
-              onChange={(e) => setForm(p => ({ ...p, returnKg: e.target.value }))}
-              placeholder="Enter Kg"
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-500 outline-none placeholder:text-sm placeholder:text-gray-400" />
-            {sentKg > 0 && (
-              <p className="mt-1 text-xs text-gray-400">Remaining (incl. Ghati): <span className="font-medium text-gray-600">{availableKg} Kg</span> of {sentKg} Kg</p>
-            )}
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-black mb-1">Ghati</label>
-            <input type="number" step="0.001" value={form.ghati}
-              onChange={(e) => setForm(p => ({ ...p, ghati: e.target.value }))}
-              placeholder="Enter Ghati"
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-500 outline-none placeholder:text-sm placeholder:text-gray-400" />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-black mb-1">Return Element</label>
-            <div className="flex gap-2">
-              <input type="number" step="1" value={form.returnElementCount}
-                onChange={(e) => setForm(p => ({ ...p, returnElementCount: e.target.value }))}
-                placeholder="Count"
-                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-500 outline-none placeholder:text-sm placeholder:text-gray-400" />
-              <div className="relative w-28">
-                <button type="button" onClick={() => setIsTypeOpen(p => !p)}
-                  className="w-full h-full flex items-center justify-between px-3 py-2 border border-gray-300 rounded-lg bg-white text-sm">
-                  <span>{form.elementType === "PETI" ? "Peti" : "Drum"}</span>
-                  <ChevronDown className={`w-4 h-4 text-gray-500 transition-transform ${isTypeOpen ? "rotate-180" : ""}`} />
-                </button>
-                {isTypeOpen && (
-                  <div className="absolute z-20 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden">
-                    {["PETI", "DRUM"].map(opt => (
-                      <button key={opt} type="button"
-                        onClick={() => {
-                          setForm(p => ({
-                            ...p,
-                            elementType: opt,
-                            elementWeightGm: opt === "PETI" ? "900" : "",
-                          }));
-                          setIsTypeOpen(false);
-                        }}
-                        className="w-full text-left px-3 py-2 text-sm hover:bg-gray-100">
-                        {opt === "PETI" ? "Peti" : "Drum"}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-              <input
-                type="number"
-                step="1"
-                min="0"
-                value={form.elementWeightGm}
-                onChange={(e) => setForm(p => ({ ...p, elementWeightGm: e.target.value }))}
-                placeholder={form.elementType === "PETI" ? "900" : "Enter gm"}
-                className="w-28 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-500 outline-none text-sm"
-              />
-            </div>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-black mb-1">Return Date</label>
-            <input type="date" value={form.jobReturnDate}
-              onChange={(e) => setForm(p => ({ ...p, jobReturnDate: e.target.value }))}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-500 outline-none text-sm text-gray-700" />
-          </div>
-          <div className="pt-4 flex items-center justify-center gap-4">
-            <button type="button" onClick={handleSave} disabled={saving}
-              className="w-28 h-10 bg-black text-white rounded-lg hover:bg-gray-700 transition text-sm disabled:opacity-60">
-              {saving ? "Saving…" : "Save"}
-            </button>
-            <button type="button" onClick={onClose}
-              className="w-28 h-10 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition text-sm">
-              Cancel
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-// ── Status Dropdown ──────────────────────────────────────────────────────────
-const StatusDropdown = ({ value, onChange, disabled }) => {
-  const [open, setOpen] = useState(false);
-  const colorClass = STATUS_COLOR[value] || "bg-gray-100 text-gray-700";
-  return (
-    <div className="relative">
-      <button type="button" onClick={() => !disabled && setOpen(p => !p)}
-        className={`flex items-center gap-2 px-4 py-1.5 rounded-md text-sm font-medium transition ${colorClass} ${disabled ? "opacity-70 cursor-not-allowed" : ""}`}>
-        {STATUS_LABEL[value] || value}
-        {!disabled && <ChevronDown className={`w-3.5 h-3.5 transition-transform ${open ? "rotate-180" : ""}`} />}
-      </button>
-      {open && !disabled && (
-        <div className="absolute z-20 mt-1 w-36 bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden">
-          {STATUS_OPTIONS.map(opt => (
-            <button key={opt} type="button"
-              onClick={() => { onChange(opt); setOpen(false); }}
-              className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-50 ${value === opt ? "font-semibold" : ""}`}>
-              {STATUS_LABEL[opt]}
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-};
-
-// ── Type Dropdown ────────────────────────────────────────────────────────────
-const TypeDropdown = ({ value, onChange }) => {
-  const [open, setOpen] = useState(false);
-  return (
-    <div className="relative">
-      <button type="button" onClick={() => setOpen(p => !p)}
-        className="flex items-center gap-2 px-4 py-1.5 border border-gray-300 rounded-md bg-white text-sm font-medium text-black transition hover:border-gray-400">
-        {TYPE_LABEL[value] || value}
-        <ChevronDown className={`w-3.5 h-3.5 text-gray-500 transition-transform ${open ? "rotate-180" : ""}`} />
-      </button>
-      {open && (
-        <div className="absolute z-20 mt-1 w-36 bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden">
-          {TYPE_OPTIONS.map(opt => (
-            <button key={opt} type="button"
-              onClick={() => { onChange(opt); setOpen(false); }}
-              className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-50 ${value === opt ? "font-semibold" : ""}`}>
-              {TYPE_LABEL[opt]}
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-};
-
-// ── Job Work Card ─────────────────────────────────────────────────────────────
+// -- Job Work Card -----------------------------------------------------------
 const JobWorkCardItem = ({ jw, onStatusChange, onTypeChange, onReturnRecord, onEditReturn, onDeleteReturn, onEdit, onDelete }) => {
   const returns = jw.jobWorkReturns || [];
   const [printingKey, setPrintingKey] = useState(null);
@@ -350,21 +44,23 @@ const JobWorkCardItem = ({ jw, onStatusChange, onTypeChange, onReturnRecord, onE
   const sizeLabel = [
     jw.size?.sizeInInch,
     jw.size?.sizeInMm ? `(${jw.size.sizeInMm})` : null,
-  ].filter(Boolean).join(" ") || "—";
+  ].filter(Boolean).join(" ") || "â€”";
 
   const elementLabel = jw.elementCount != null
     ? `${jw.elementCount} ${jw.elementType === "DRUM" ? "Drum" : "Peti"}`
-    : "—";
+    : "â€”";
 
   const round3 = (n) => Math.round(n * 1000) / 1000;
   const totalReturnKg = round3(returns.reduce((sum, r) => sum + (r.returnKg || 0), 0));
   const totalGhati = round3(returns.reduce((sum, r) => sum + (r.ghati || 0), 0));
   const totalReturnWithGhati = round3(totalReturnKg + totalGhati);
-  const totalReturnElements = returns.reduce((sum, r) => sum + (r.returnElementCount || 0), 0);
+  const totalNetKg = round3(Math.max(0, totalReturnKg - totalGhati));
   const sentKg = jw.qtyKg || 0;
   const remainingKg = round3(Math.max(0, sentKg - totalReturnWithGhati));
   const isFullyReturned = sentKg > 0 && totalReturnWithGhati >= sentKg;
   const isCompleted = jw.status === "COMPLETE";
+  const processLabel = /sartin/i.test(String(jw.finish || "")) ? "Sartin" : "Emrey";
+  const sentNetKg = jw.netKg != null ? jw.netKg : jw.qtyKg;
 
   return (
     <div className="border border-gray-200 rounded-xl bg-white p-4 shadow-sm">
@@ -381,7 +77,7 @@ const JobWorkCardItem = ({ jw, onStatusChange, onTypeChange, onReturnRecord, onE
             </button>
           </div>
           <div className="flex flex-wrap items-center gap-2 mt-1 text-sm text-gray-500">
-            <span>{jw.party?.name || "—"}</span>
+            <span>{jw.party?.name || "â€”"}</span>
             <span className="w-1 h-1 rounded-full bg-gray-400 inline-block" />
             <span>Finish: <span className="font-bold text-black">{fmt(jw.finish)}</span></span>
             <span className="w-1 h-1 rounded-full bg-gray-400 inline-block" />
@@ -407,19 +103,21 @@ const JobWorkCardItem = ({ jw, onStatusChange, onTypeChange, onReturnRecord, onE
               className="inline-flex items-center gap-1.5 px-3 py-1 text-sm border border-gray-300 rounded-md text-black hover:bg-gray-100 transition disabled:opacity-60 disabled:cursor-not-allowed"
             >
               {printingKey === "javak" ? (
-                <><span className="animate-spin inline-block w-3 h-3 border-2 border-gray-400 border-t-transparent rounded-full" /> Printing…</>
+                <><span className="animate-spin inline-block w-3 h-3 border-2 border-gray-400 border-t-transparent rounded-full" /> Printingâ€¦</>
               ) : (
                 <>Print <Printer className="w-4 h-4" /></>
               )}
             </button>
           </div>
-          <div className="grid grid-cols-3 text-xs text-gray-400 mb-1">
-            <span>Size</span><span className="text-center">Element</span><span className="text-right">Kg</span>
+          <div className="grid grid-cols-5 text-xs text-gray-400 mb-1">
+            <span>Sizes</span><span className="text-center">Element</span><span className="text-center">Process</span><span className="text-center">Kg.</span><span className="text-right">Net</span>
           </div>
-          <div className="grid grid-cols-3 text-sm text-gray-700">
+          <div className="grid grid-cols-5 text-sm text-gray-700">
             <span className="font-bold">{sizeLabel}</span>
             <span className="text-center font-bold">{elementLabel}</span>
-            <span className="text-right font-bold">{fmt(jw.qtyKg)} Kg</span>
+            <span className="text-center font-bold">{processLabel}</span>
+            <span className="text-center font-bold">{fmt(jw.qtyKg)} Kg</span>
+            <span className="text-right font-bold">{fmt(sentNetKg)} Kg</span>
           </div>
           <div className="mt-2 text-xs text-gray-500">Qty Pc: <span className="font-bold text-black">{fmt(jw.qtyPc)}</span></div>
         </div>
@@ -428,7 +126,7 @@ const JobWorkCardItem = ({ jw, onStatusChange, onTypeChange, onReturnRecord, onE
         <div className="border border-gray-200 rounded-xl bg-gray-50 p-4">
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
-              <p className="text-black font-semibold">Return Details</p>
+              <p className="text-black font-semibold">Return</p>
               {returns.length > 0 && (
                 <span className="text-xs font-medium text-gray-500">({returns.length})</span>
               )}
@@ -451,7 +149,7 @@ const JobWorkCardItem = ({ jw, onStatusChange, onTypeChange, onReturnRecord, onE
                 className="inline-flex items-center gap-1.5 px-3 py-1 text-sm border border-gray-300 rounded-md text-black hover:bg-gray-100 transition disabled:opacity-60 disabled:cursor-not-allowed"
               >
                 {printingKey === "aavak" ? (
-                  <><span className="animate-spin inline-block w-3 h-3 border-2 border-gray-400 border-t-transparent rounded-full" /> Printing…</>
+                  <><span className="animate-spin inline-block w-3 h-3 border-2 border-gray-400 border-t-transparent rounded-full" /> Printingâ€¦</>
                 ) : (
                   <>Print <Printer className="w-4 h-4" /></>
                 )}
@@ -483,16 +181,17 @@ const JobWorkCardItem = ({ jw, onStatusChange, onTypeChange, onReturnRecord, onE
                           </button>
                         </div>
                       </div>
-                      <div className="grid grid-cols-3 text-xs text-gray-400 mb-0.5">
-                        <span>Element</span><span className="text-center">Return Kg</span><span className="text-right">Ghati</span>
+                      <div className="grid grid-cols-4 text-xs text-gray-400 mb-0.5">
+                        <span>Element</span><span className="text-center">Return Kg.</span><span className="text-center">Net Kg</span><span className="text-right">Ghati</span>
                       </div>
-                      <div className="grid grid-cols-3 text-sm text-gray-700">
+                      <div className="grid grid-cols-4 text-sm text-gray-700">
                         <span className="font-bold">
                           {ret.returnElementCount != null
                             ? `${ret.returnElementCount} ${ret.elementType === "DRUM" ? "Drum" : "Peti"}`
-                            : "—"}
+                            : "â€”"}
                         </span>
                         <span className="text-center font-bold">{fmt(ret.returnKg)} Kg</span>
+                        <span className="text-center font-bold">{round3(Math.max(0, (ret.returnKg || 0) - (ret.ghati || 0)))} Kg</span>
                         <span className="text-right font-bold">{fmt(ret.ghati)}</span>
                       </div>
                     </div>
@@ -502,12 +201,13 @@ const JobWorkCardItem = ({ jw, onStatusChange, onTypeChange, onReturnRecord, onE
 
               {/* Summary totals (always visible) */}
               <div className="border-t border-dashed border-gray-300 pt-2">
-                <div className="grid grid-cols-2 text-xs text-gray-400 mb-0.5">
-                  <span>Total Return</span><span className="text-right">Total Ghati</span>
+                <div className="grid grid-cols-3 text-xs text-gray-400 mb-0.5">
+                  <span>Total Return</span><span className="text-center">Total Net</span><span className="text-right">Total Ghati</span>
                 </div>
-                <div className="grid grid-cols-2 text-sm text-gray-700">
-                  <span className="font-bold">{totalReturnKg ? `${totalReturnKg} Kg` : "—"}</span>
-                  <span className="text-right font-bold">{totalGhati || "—"}</span>
+                <div className="grid grid-cols-3 text-sm text-gray-700">
+                  <span className="font-bold">{totalReturnKg ? `${totalReturnKg} Kg` : "â€”"}</span>
+                  <span className="text-center font-bold">{totalNetKg ? `${totalNetKg} Kg` : "â€”"}</span>
+                  <span className="text-right font-bold">{totalGhati || "â€”"}</span>
                 </div>
               </div>
 
@@ -536,7 +236,7 @@ const JobWorkCardItem = ({ jw, onStatusChange, onTypeChange, onReturnRecord, onE
   );
 };
 
-// ── Main Page ─────────────────────────────────────────────────────────────────
+// â”€â”€ Main Page â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const JobWork = () => {
   const location = useLocation();
   const navigate  = useNavigate();
@@ -555,7 +255,7 @@ const JobWork = () => {
   const [deleteReturnTarget, setDeleteReturnTarget] = useState(null); // { jw, ret } for deleting a specific return
   const [deletingReturn, setDeletingReturn] = useState(false);
 
-  // ── Fetch job works ───────────────────────────────────────────────────────
+  // â”€â”€ Fetch job works â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const loadJobWorks = useCallback(async () => {
     setLoading(true);
     try {
@@ -567,7 +267,7 @@ const JobWork = () => {
         // Attach orderItemId to each jw so return dialog can use it
         setJobWorks(list.map(jw => ({ ...jw, orderItemId: Number(orderRow.id) })));
       } else {
-        // No specific order — fetch across all order items via the parties/orders endpoint
+        // No specific order â€” fetch across all order items via the parties/orders endpoint
         // then fan out per order-item. We use a lightweight approach: fetch all orders and collect job works.
         const ordersRes = await axiosInstance.get(`/api/v1/parties/orders?page=0&size=500`);
         const ordersData = ordersRes.data?.data || [];
@@ -595,7 +295,7 @@ const JobWork = () => {
 
   useEffect(() => { loadJobWorks(); }, [loadJobWorks]);
 
-  // ── Status update ─────────────────────────────────────────────────────────
+  // â”€â”€ Status update â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const handleStatusChange = async (jw, newStatus) => {
     try {
       await jobWorkApi.updateJobWorkStatus(jw.orderItemId, jw.id, { status: newStatus });
@@ -606,18 +306,23 @@ const JobWork = () => {
     }
   };
 
-  // ── Type update ───────────────────────────────────────────────────────────
+  // â”€â”€ Type update â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const handleTypeChange = async (jw, newType) => {
     try {
       await jobWorkApi.updateJobWorkType(jw.orderItemId, jw.id, { jobWorkType: newType });
       toast.success("Type updated!");
       setJobWorks(prev => prev.map(j => j.id === jw.id ? { ...j, jobWorkType: newType } : j));
+      upsertOrderJobOverride({
+        orderItemId: jw.orderItemId,
+        jobWork: normalizeJobWorkLabel(newType),
+        platingStatus: true,
+      });
     } catch (err) {
       toast.error(err?.response?.data?.message || "Failed to update type");
     }
   };
 
-  // ── Delete ────────────────────────────────────────────────────────────────
+  // â”€â”€ Delete â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const handleDelete = async () => {
     if (!deleteTarget) return;
     setDeleting(true);
@@ -625,6 +330,7 @@ const JobWork = () => {
       await jobWorkApi.deleteJobWork(deleteTarget.orderItemId, deleteTarget.id);
       toast.success("Job work deleted!");
       setJobWorks(prev => prev.filter(j => j.id !== deleteTarget.id));
+      removeOrderJobOverride({ orderItemId: deleteTarget.orderItemId });
     } catch (err) {
       toast.error(err?.response?.data?.message || "Failed to delete");
     } finally {
@@ -633,10 +339,10 @@ const JobWork = () => {
     }
   };
 
-  // ── Auto-complete after return saved ─────────────────────────────────────
+  // â”€â”€ Auto-complete after return saved â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const handleReturnSaved = async () => {
     await loadJobWorks();
-    // After reload, we need to check the fresh data — but loadJobWorks sets state async.
+    // After reload, we need to check the fresh data â€” but loadJobWorks sets state async.
     // So we do the check using the returnTarget (the jw we just saved a return for).
     // Re-fetch this specific job work to get updated returns.
     if (returnTarget) {
@@ -648,14 +354,14 @@ const JobWork = () => {
         const sentKg = freshJw?.qtyKg || 0;
         if (sentKg > 0 && totalReturned >= sentKg && freshJw?.status !== "COMPLETE") {
           await jobWorkApi.updateJobWorkStatus(returnTarget.orderItemId, returnTarget.id, { status: "COMPLETE" });
-          toast.success("All Kg returned — Job work auto-marked as Complete!");
+          toast.success("All Kg returned â€” Job work auto-marked as Complete!");
           loadJobWorks();
         }
-      } catch { /* ignore — main data already reloaded */ }
+      } catch { /* ignore â€” main data already reloaded */ }
     }
   };
 
-  // ── Delete Return ────────────────────────────────────────────────────────
+  // â”€â”€ Delete Return â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const handleDeleteReturn = async () => {
     if (!deleteReturnTarget) return;
     const { jw: targetJw, ret: targetRet } = deleteReturnTarget;
@@ -672,7 +378,7 @@ const JobWork = () => {
     }
   };
 
-  // ── Filter ────────────────────────────────────────────────────────────────
+  // â”€â”€ Filter â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const filtered = useMemo(() => {
     let filteredList = jobWorks;
     
@@ -714,7 +420,7 @@ const JobWork = () => {
     [filtered]
   );
 
-  // ── Header context info ───────────────────────────────────────────────────
+  // â”€â”€ Header context info â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const contextBanner = orderRow ? (
     <div className="bg-gray-50 border border-gray-200 rounded-lg px-4 py-3 mb-4 flex flex-wrap items-center gap-4 text-sm">
       <div><span className="text-gray-400 mr-1">Party:</span><span className="font-bold text-black">{orderRow.partyName}</span></div>
@@ -800,7 +506,7 @@ const JobWork = () => {
         isOpen={Boolean(deleteTarget)}
         title="Delete Job Work"
         message={`Are you sure you want to delete job work JW-${deleteTarget?.id}?`}
-        confirmText={deleting ? "Deleting…" : "Delete"}
+        confirmText={deleting ? "Deletingâ€¦" : "Delete"}
         cancelText="Cancel"
         isDangerous
         onCancel={() => setDeleteTarget(null)}
@@ -812,7 +518,7 @@ const JobWork = () => {
         isOpen={Boolean(deleteReturnTarget)}
         title="Delete Return Record"
         message={`Are you sure you want to delete this return record (${deleteReturnTarget?.ret?.returnKg ?? 0} Kg)?`}
-        confirmText={deletingReturn ? "Deleting…" : "Delete"}
+        confirmText={deletingReturn ? "Deletingâ€¦" : "Delete"}
         cancelText="Cancel"
         isDangerous
         onCancel={() => setDeleteReturnTarget(null)}
@@ -823,3 +529,7 @@ const JobWork = () => {
 };
 
 export default JobWork;
+
+
+
+
