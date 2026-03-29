@@ -138,6 +138,79 @@ const SearchableDropdown = ({
   );
 };
 
+const ButtonDropdown = ({
+  value,
+  placeholder,
+  options,
+  onSelect,
+  disabled = false,
+  loading = false,
+}) => {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+  const selectedOption = options.find((opt) => String(opt.value) === String(value));
+
+  useEffect(() => {
+    if (disabled) setOpen(false);
+  }, [disabled]);
+
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e) => {
+      if (ref.current && !ref.current.contains(e.target)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [open]);
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={() => !disabled && setOpen((prev) => !prev)}
+        className={`w-full border border-gray-300 rounded-md px-3 py-2.5 text-md bg-white focus:outline-none focus:ring-1 focus:ring-gray-400 flex items-center justify-between ${
+          disabled ? "bg-gray-50 text-gray-500 cursor-not-allowed" : ""
+        }`}
+      >
+        <span className={selectedOption ? "text-black" : "text-gray-500"}>
+          {selectedOption?.label || placeholder}
+        </span>
+        <ChevronDown className={`w-4 h-4 text-gray-500 transition-transform ${open ? "rotate-180" : ""}`} />
+      </button>
+
+      {open && !disabled && (
+        <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-52 overflow-y-auto">
+          {loading ? (
+            <div className="px-3 py-3 text-sm text-gray-400">Loading…</div>
+          ) : options.length === 0 ? (
+            <div className="px-3 py-3 text-sm text-gray-400">No options found.</div>
+          ) : (
+            options.map((opt) => (
+              <button
+                key={opt.value}
+                type="button"
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  setOpen(false);
+                  onSelect(opt);
+                }}
+                className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-50 text-gray-700 ${
+                  String(opt.value) === String(value) ? "font-medium bg-gray-50" : ""
+                }`}
+              >
+                {opt.label}
+              </button>
+            ))
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
 const Label = ({ children }) => (
   <label className="block text-md font-medium text-black mb-2">{children}</label>
 );
@@ -375,24 +448,20 @@ const AddOrder = () => {
                       Size
                       {item.sizesLoading && <span className="text-xs text-gray-400 ml-1 font-normal">Loading…</span>}
                     </Label>
-                    <select
+                    <ButtonDropdown
                       value={item.selectedSize?.id ?? ""}
+                      placeholder={
+                        !item.selectedItem ? "Select item first" : item.sizesLoading ? "Loading…" : "Select size…"
+                      }
+                      options={item.sizes.map((sz) => ({
+                        value: sz.id,
+                        label: `${sz.sizeInInch}${sz.sizeInMm ? ` (${sz.sizeInMm})` : ""}`,
+                        raw: sz,
+                      }))}
                       disabled={!item.selectedItem || item.sizesLoading}
-                      onChange={(e) => {
-                        const sz = item.sizes.find((s) => String(s.id) === e.target.value);
-                        if (sz) handleSelectSize(index, sz, item.qtyPc);
-                      }}
-                      className="w-full border border-gray-300 rounded-md px-3 py-1.5 text-md focus:outline-none focus:ring-1 focus:ring-gray-400 bg-white disabled:bg-gray-50 disabled:text-gray-400 disabled:cursor-not-allowed"
-                    >
-                      <option value="">
-                        {!item.selectedItem ? "Select item first" : item.sizesLoading ? "Loading…" : "Select size…"}
-                      </option>
-                      {item.sizes.map((sz) => (
-                        <option key={sz.id} value={sz.id}>
-                          {sz.sizeInInch}{sz.sizeInMm ? ` (${sz.sizeInMm})` : ""}
-                        </option>
-                      ))}
-                    </select>
+                      loading={item.sizesLoading}
+                      onSelect={(opt) => handleSelectSize(index, opt.raw, item.qtyPc)}
+                    />
                   </div>
 
                   {/* Pcs */}
@@ -437,16 +506,15 @@ const AddOrder = () => {
                   {/* Finish */}
                   <div>
                     <Label>Finish</Label>
-                    <select
+                    <ButtonDropdown
                       value={item.finish}
-                      onChange={(e) => updateItem(index, { finish: e.target.value })}
-                      className="w-full border border-gray-300 rounded-md px-3 py-1.5 text-md focus:outline-none focus:ring-1 focus:ring-gray-400 bg-white"
-                    >
-                      <option value="">Select finish…</option>
-                      {FINISH_OPTIONS.map((f) => (
-                        <option key={f} value={f}>{f}</option>
-                      ))}
-                    </select>
+                      placeholder="Select finish…"
+                      options={FINISH_OPTIONS.map((f) => ({
+                        value: f,
+                        label: f,
+                      }))}
+                      onSelect={(opt) => updateItem(index, { finish: opt.value })}
+                    />
                   </div>
 
                   {/* Box Pc — auto */}

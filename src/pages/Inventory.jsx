@@ -1,13 +1,14 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import ReactDOM from "react-dom";
 import { useNavigate } from "react-router-dom";
-import { Plus, Pencil, Trash2, X, Eye, Search, Check } from "lucide-react";
+import { Plus, Pencil, Trash2, X, Eye, Search, Check, ChevronDown } from "lucide-react";
 import SidebarLayout from "../components/SidebarLayout";
 import SearchFilter from "../components/SearchFilter";
 import StatsCard from "../components/StatsCard";
 import PageHeader from "../components/PageHeader";
 import PrimaryActionButton from "../components/PrimaryActionButton";
 import ConfirmationDialog from "../components/ConfirmationDialog";
+import BillDropdown from "../components/Bills/BillDropdown";
 import { itemBlueprintApi, sizeApi, inventoryApi, axiosInstance, categoryApi, itemApi } from "../services/apiService";
 import AddStockDialog from "../components/Inventory/AddStockDialog";
 import toast from "react-hot-toast";
@@ -107,7 +108,6 @@ const SuggestInput = ({
   onSelect,
   onBlur,
   onKeyDown,
-  inputType,
 }) => {
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [dropdownPos, setDropdownPos] = useState(null);
@@ -195,6 +195,104 @@ const SuggestInput = ({
 };
 
 
+
+const TableDropdown = ({ value, options = [], placeholder = "Select...", onSelect, disabled = false }) => {
+  const [open, setOpen] = useState(false);
+  const [position, setPosition] = useState(null);
+  const buttonRef = useRef(null);
+  const selectedOption = options.find((opt) => String(opt.value) === String(value));
+
+  useEffect(() => {
+    if (disabled) setOpen(false);
+  }, [disabled]);
+
+  useEffect(() => {
+    if (!open) return;
+
+    const updatePosition = () => {
+      if (!buttonRef.current) return;
+      const rect = buttonRef.current.getBoundingClientRect();
+      setPosition({
+        top: rect.bottom + 4,
+        left: rect.left,
+        width: rect.width,
+      });
+    };
+
+    updatePosition();
+    window.addEventListener("resize", updatePosition);
+    window.addEventListener("scroll", updatePosition, true);
+
+    const handleOutsideClick = (e) => {
+      if (buttonRef.current && !buttonRef.current.parentElement?.contains(e.target)) {
+        setOpen(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleOutsideClick);
+
+    return () => {
+      window.removeEventListener("resize", updatePosition);
+      window.removeEventListener("scroll", updatePosition, true);
+      document.removeEventListener("mousedown", handleOutsideClick);
+    };
+  }, [open]);
+
+  return (
+    <div className="relative">
+      <button
+        ref={buttonRef}
+        type="button"
+        disabled={disabled}
+        onClick={() => !disabled && setOpen((prev) => !prev)}
+        className={`w-full rounded-md px-2 py-1.5 text-sm bg-white flex items-center justify-between ${
+          disabled ? "bg-gray-50 text-gray-500 cursor-not-allowed" : ""
+        }`}
+      >
+        <span className={selectedOption ? "text-black" : "text-gray-500"}>
+          {selectedOption?.label || placeholder}
+        </span>
+        <ChevronDown className={`w-4 h-4 text-gray-500 transition-transform ${open ? "rotate-180" : ""}`} />
+      </button>
+
+      {open && !disabled && position &&
+        ReactDOM.createPortal(
+          <div
+            style={{
+              position: "fixed",
+              top: position.top,
+              left: position.left,
+              width: position.width,
+              zIndex: 9999,
+            }}
+            className="bg-white border border-gray-200 rounded-lg shadow-xl max-h-60 overflow-y-auto"
+          >
+            {options.length === 0 ? (
+              <p className="px-4 py-2 text-sm text-gray-400">No options found</p>
+            ) : (
+              options.map((option) => (
+                <button
+                  key={option.value}
+                  type="button"
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    onSelect(option);
+                    setOpen(false);
+                  }}
+                  className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-100 transition ${
+                    String(option.value) === String(value) ? "font-semibold bg-gray-50" : ""
+                  }`}
+                >
+                  {option.label}
+                </button>
+              ))
+            )}
+          </div>,
+          document.body
+        )}
+    </div>
+  );
+};
 
 const Inventory = () => {
   const navigate = useNavigate();
@@ -773,18 +871,15 @@ const Inventory = () => {
           onClick={() => handleCellClick(rowIndex, colIndex)}
         >
           {isRowEditable ? (
-            <select
+            <TableDropdown
               value={row._itemId}
-              onChange={(e) => handleItemChange(rowIndex, e.target.value)}
-              className="w-full h-full bg-transparent text-sm focus:outline-none cursor-pointer px-1"
-            >
-              <option value="">Select Item</option>
-              {items.map((item) => (
-                <option key={item.id} value={item.id}>
-                  {item.itemName}
-                </option>
-              ))}
-            </select>
+              placeholder="Select Item"
+              options={items.map((item) => ({
+                value: String(item.id),
+                label: item.itemName,
+              }))}
+              onSelect={(option) => handleItemChange(rowIndex, option.value)}
+            />
           ) : (
             <span className="text-gray-700 px-1">{row.itemName || "-"}</span>
           )}
@@ -1329,21 +1424,17 @@ const Inventory = () => {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Category <span className="text-red-500">*</span>
-                </label>
-                <select
+                <BillDropdown
+                  label="Category"
+                  required
                   value={newItemCategoryId}
-                  onChange={(e) => setNewItemCategoryId(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-400 bg-white"
-                >
-                  <option value="">Select category…</option>
-                  {categories.map((cat) => (
-                    <option key={cat.id} value={cat.id}>
-                      {cat.name}
-                    </option>
-                  ))}
-                </select>
+                  placeholder="Select category…"
+                  options={categories.map((cat) => ({
+                    value: String(cat.id),
+                    label: cat.name,
+                  }))}
+                  onSelect={(option) => setNewItemCategoryId(String(option.value))}
+                />
               </div>
             </div>
             <div className="bg-gray-50 px-6 py-4 border-t border-gray-200 flex gap-4 justify-end">

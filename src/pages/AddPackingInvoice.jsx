@@ -11,6 +11,7 @@ import {
   clientInventoryApi,
 } from "../services/apiService";
 import { X } from "lucide-react";
+import BillDropdown from "../components/Bills/BillDropdown";
 
 const columns = [
   { key: "date", label: "Date", type: "date" },
@@ -392,6 +393,40 @@ const AddPackingInvoice = () => {
     }
   };
 
+  const partyDropdownOptions = useMemo(
+    () => partyOptions.map((party) => ({ value: party.name, label: party.name, party })),
+    [partyOptions]
+  );
+
+  const itemDropdownOptions = useMemo(
+    () => itemOptions.map((item) => ({ value: item.itemName, label: item.itemName, item })),
+    [itemOptions]
+  );
+
+  const sizeDropdownOptions = useMemo(() => {
+    const itemSizes = form._itemId ? sizesByItem[form._itemId] || [] : [];
+    return itemSizes.map((s) => {
+      const label = `${s.sizeInInch || ""}${s.dozenWeight ? " - " + s.dozenWeight : ""}`;
+      return { value: label, label, size: s };
+    });
+  }, [form._itemId, sizesByItem]);
+
+  const finishOptions = useMemo(() => {
+    if (!form._clientInventory) return Object.values(FINISH_KEY_TO_LABEL);
+    return Object.entries(FINISH_KEY_TO_LABEL)
+      .filter(
+        ([key]) =>
+          form._clientInventory[key] != null &&
+          form._clientInventory[key] !== 0,
+      )
+      .map(([, label]) => label);
+  }, [form._clientInventory]);
+
+  const finishDropdownOptions = useMemo(
+    () => finishOptions.map((finish) => ({ value: finish, label: finish })),
+    [finishOptions]
+  );
+
   const handleItemSelect = (itemName) => {
     const item = itemOptions.find((i) => i.itemName === itemName);
     setForm((prev) =>
@@ -444,17 +479,6 @@ const AddPackingInvoice = () => {
     });
   };
 
-  const finishOptions = useMemo(() => {
-    if (!form._clientInventory) return Object.values(FINISH_KEY_TO_LABEL);
-    return Object.entries(FINISH_KEY_TO_LABEL)
-      .filter(
-        ([key]) =>
-          form._clientInventory[key] != null &&
-          form._clientInventory[key] !== 0,
-      )
-      .map(([, label]) => label);
-  }, [form._clientInventory]);
-
   const handleSave = async () => {
     if (!form._partyId) {
       toast.error("Please select a party");
@@ -503,79 +527,57 @@ const AddPackingInvoice = () => {
 
     if (col.type === "party-select") {
       return (
-        <select
+        <BillDropdown
+          label=""
           value={form.party}
-          onChange={(e) => handlePartySelect(e.target.value)}
-          className="w-full border border-gray-300 rounded-md px-3 py-1.5 text-md bg-white focus:outline-none focus:ring-1 focus:ring-gray-400"
-        >
-          <option value="">Select Party</option>
-          {partyOptions.map((p) => (
-            <option key={p.id} value={p.name}>
-              {p.name}
-            </option>
-          ))}
-        </select>
+          options={partyDropdownOptions}
+          placeholder="Select Party"
+          onSelect={(opt) => handlePartySelect(opt.value)}
+          buttonClassName="w-full border border-gray-300 rounded-md px-3 py-2.5 text-md bg-white focus:outline-none focus:ring-1 focus:ring-gray-400 flex items-center justify-between"
+          labelClassName="sr-only"
+        />
       );
     }
 
     if (col.type === "item-select") {
       return (
-        <select
+        <BillDropdown
+          label=""
           value={form.itemName}
-          onChange={(e) => handleItemSelect(e.target.value)}
-          className="w-full border border-gray-300 rounded-md px-3 py-1.5 text-md bg-white focus:outline-none focus:ring-1 focus:ring-gray-400"
-        >
-          <option value="">Select Item</option>
-          {itemOptions.map((item) => (
-            <option key={item.id} value={item.itemName}>
-              {item.itemName}
-            </option>
-          ))}
-        </select>
+          options={itemDropdownOptions}
+          placeholder="Select Item"
+          onSelect={(opt) => handleItemSelect(opt.value)}
+          buttonClassName="w-full border border-gray-300 rounded-md px-3 py-2.5 text-md bg-white focus:outline-none focus:ring-1 focus:ring-gray-400 flex items-center justify-between"
+          labelClassName="sr-only"
+        />
       );
     }
 
     if (col.type === "size-select") {
-      const itemSizes = form._itemId ? sizesByItem[form._itemId] || [] : [];
       return (
-        <select
+        <BillDropdown
+          label=""
           value={form.size}
-          onChange={(e) => handleSizeSelect(e.target.value)}
-          className="w-full border border-gray-300 rounded-md px-3 py-1.5 text-md bg-white focus:outline-none focus:ring-1 focus:ring-gray-400"
-        >
-          <option value="">
-            {form._itemId ? "Select Size" : "Select Item first"}
-          </option>
-          {itemSizes.map((s) => {
-            const label = `${s.sizeInInch || ""}${s.dozenWeight ? " - " + s.dozenWeight : ""}`;
-            return (
-              <option key={s.id} value={label}>
-                {label}
-              </option>
-            );
-          })}
-        </select>
+          options={sizeDropdownOptions}
+          placeholder={form._itemId ? "Select Size" : "Select Item first"}
+          onSelect={(opt) => handleSizeSelect(opt.value)}
+          buttonClassName="w-full border border-gray-300 rounded-md px-3 py-2.5 text-md bg-white focus:outline-none focus:ring-1 focus:ring-gray-400 flex items-center justify-between"
+          labelClassName="sr-only"
+        />
       );
     }
 
     if (col.type === "finish-select") {
       return (
-        <select
+        <BillDropdown
+          label=""
           value={form.finish}
-          onChange={(e) => handleFinishSelect(e.target.value)}
-          className="w-full border border-gray-300 rounded-md px-3 py-1.5 text-md bg-white focus:outline-none focus:ring-1 focus:ring-gray-400"
-        >
-          <option value="">
-            {form._clientInventory
-              ? "Select Finish"
-              : "Select Party & Size first"}
-          </option>
-          {finishOptions.map((finish) => (
-            <option key={finish} value={finish}>
-              {finish}
-            </option>
-          ))}
-        </select>
+          options={finishDropdownOptions}
+          placeholder={form._clientInventory ? "Select Finish" : "Select Party & Size first"}
+          onSelect={(opt) => handleFinishSelect(opt.value)}
+          buttonClassName="w-full border border-gray-300 rounded-md px-3 py-2.5 text-md bg-white focus:outline-none focus:ring-1 focus:ring-gray-400 flex items-center justify-between"
+          labelClassName="sr-only"
+        />
       );
     }
 

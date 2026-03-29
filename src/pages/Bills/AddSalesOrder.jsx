@@ -3,6 +3,7 @@ import { Plus, ChevronDown, X } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import SidebarLayout from "../../components/SidebarLayout";
 import PageHeader from "../../components/PageHeader";
+import PartyDropdown from "../../components/Bills/PartyDropdown";
 import toast from "react-hot-toast";
 import { partyApi } from "../../services/apiService";
 
@@ -131,27 +132,19 @@ const AddSalesOrder = () => {
         <div className="mt-6 bg-white rounded-lg border border-gray-200 p-5 space-y-5">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="block text-md font-medium text-black mb-2">Customer Name</label>
-              <select
+              <PartyDropdown
+                label="Customer Name"
                 value={form.customerName}
-                onChange={(e) => {
-                  const selectedName = e.target.value;
-                  const selectedParty = partyOptions.find((p) => p.name === selectedName);
+                options={partyOptions}
+                placeholder="Select Party"
+                onSelect={(party) =>
                   setForm((prev) => ({
                     ...prev,
-                    customerName: selectedName,
-                    customerId: selectedParty?.id ? String(selectedParty.id) : "",
-                  }));
-                }}
-                className="w-full border border-gray-300 rounded-md px-3 py-1.5 text-md bg-white focus:outline-none focus:ring-1 focus:ring-gray-400"
-              >
-                <option value="">Select Party</option>
-                {partyOptions.map((party) => (
-                  <option key={party.id} value={party.name}>
-                    {party.name}
-                  </option>
-                ))}
-              </select>
+                    customerName: party.name,
+                    customerId: party.id ? String(party.id) : "",
+                  }))
+                }
+              />
             </div>
             <div>
               <label className="block text-md font-medium text-black mb-2">Customer Chitthi No.</label>
