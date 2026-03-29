@@ -1,9 +1,12 @@
+/* eslint-disable no-unused-vars */
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Calendar, Download, Plus, SquarePen } from "lucide-react";
 import SidebarLayout from "../components/SidebarLayout";
 import PageHeader from "../components/PageHeader";
 import StatsCard from "../components/StatsCard";
 import SearchFilter from "../components/SearchFilter";
+import PackingInvoiceList from "../components/PackingInvoice/PackingInvoiceList";
+import PackingInvoiceDetailDialog from "../components/PackingInvoice/PackingInvoiceDetailDialog";
 import {
   packingInvoiceApi,
   partyApi,
@@ -294,6 +297,7 @@ const PackingInvoice = () => {
   const [typeFilter, setTypeFilter] = useState("");
   const [selectedCell, setSelectedCell] = useState(null);
   const [editingCell, setEditingCell] = useState(null);
+  const [selectedInvoice, setSelectedInvoice] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [downloadingId, setDownloadingId] = useState(null);
@@ -693,6 +697,14 @@ const PackingInvoice = () => {
     navigate(`/packing-invoice/edit/${row.id}`, { state: { invoiceRow: row } });
   };
 
+  const handleOpenInvoice = (invoice) => {
+    setSelectedInvoice(invoice);
+  };
+
+  const handleCloseInvoice = () => {
+    setSelectedInvoice(null);
+  };
+
   const renderCellValue = (row, col) => {
     if (col.key === "date") {
       return row.date ? (
@@ -851,7 +863,7 @@ const PackingInvoice = () => {
               onClick={() => navigate("/packing-invoice/add")}
               icon={Plus}
             >
-              Add Packing
+              New Invoice
             </PrimaryActionButton>
           }
         />
@@ -870,87 +882,26 @@ const PackingInvoice = () => {
           filterPlaceholder="Type"
         />
 
-        <div className="bg-white rounded-lg overflow-hidden border border-gray-200">
-          <div className="max-h-[460px] overflow-auto scrollbar-thin">
-            <table className="w-max min-w-full table-auto">
-              <thead>
-                <tr className="bg-gray-100 border-b border-gray-200">
-                  {columns.map((col) => (
-                    <th
-                      key={col.key}
-                      className={`sticky top-0 z-10 whitespace-normal px-3 py-3 text-center text-sm font-[550] text-gray-900 border-x border-b border-gray-200 bg-gray-100 ${getColumnWidthClass(
-                        col.key,
-                      )}`}
-                    >
-                      <span className="inline-flex flex-col items-center leading-tight">
-                        {splitHeaderLabel(col.label).map((line, idx) => (
-                          <span key={`${col.key}-${idx}`}>{line}</span>
-                        ))}
-                      </span>
-                    </th>
-                  ))}
-                  <th className="sticky top-0 z-10 whitespace-nowrap px-3 py-3 text-center text-sm font-[550] text-gray-900 bg-gray-100 min-w-[150px] border-x border-b border-gray-200">
-                    Action
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {loading ? (
-                  <tr>
-                    <td colSpan={columns.length + 1}>
-                      <Loader text="Loading invoices..." />
-                    </td>
-                  </tr>
-                ) : (
-                  filteredRows.map((row) => (
-                    <tr
-                      key={row.id}
-                      className="border-b border-gray-200 hover:bg-gray-50"
-                    >
-                      {columns.map((col) => {
-                        const cellId = `${row.id}-${col.key}`;
-                        return (
-                          <td
-                            key={cellId}
-                            className={`h-10 px-2 py-1 text-center border-x text-sm text-bllack border-gray-200 ${getColumnWidthClass(
-                              col.key,
-                            )}`}
-                          >
-                            {renderCellValue(row, col)}
-                          </td>
-                        );
-                      })}
-                      <td className="h-12 px-3 py-1 text-center border-x border-gray-200">
-                        <div className="flex items-center justify-center gap-2">
-                          <button
-                            type="button"
-                            disabled={row._isNew}
-                            onClick={() => handleEdit(row)}
-                            className="inline-flex items-center gap-1 px-2 py-1 text-sm border border-gray-300 rounded bg-gray-100 hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
-                          >
-                            
-                            <SquarePen className="w-3.5 h-3.5" />
-                          </button>
-                          <button
-                            type="button"
-                            disabled={downloadingId === row.id || row._isNew}
-                            onClick={() => handleDownload(row)}
-                            className="inline-flex items-center gap-1 px-2 py-1 text-sm border border-gray-300 rounded bg-gray-100 hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
-                          >
-                            {downloadingId === row.id
-                              ? "Downloading..."
-                              : "Download"}
-                            <Download className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
+        <div className="bg-white rounded-2xl overflow-hidden border border-gray-200">
+          <div className="p-4 md:p-5">
+            {loading ? (
+              <Loader text="Loading invoices..." />
+            ) : (
+              <PackingInvoiceList
+                invoices={filteredRows}
+                onOpen={handleOpenInvoice}
+              />
+            )}
           </div>
         </div>
+
+        <PackingInvoiceDetailDialog
+          isOpen={Boolean(selectedInvoice)}
+          invoice={selectedInvoice}
+          onClose={handleCloseInvoice}
+          onDownload={handleDownload}
+          downloading={downloadingId === selectedInvoice?.id}
+        />
       </div>
     </SidebarLayout>
   );
