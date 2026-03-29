@@ -882,8 +882,8 @@ const PackingInvoice = () => {
           filterPlaceholder="Type"
         />
 
-        <div className="bg-white rounded-2xl overflow-hidden border border-gray-200">
-          <div className="p-4 md:p-5">
+        <div className="">
+          <div className="p-1">
             {loading ? (
               <Loader text="Loading invoices..." />
             ) : (
