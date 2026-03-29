@@ -882,7 +882,7 @@ const PackingInvoice = () => {
           filterPlaceholder="Type"
         />
 
-        <div className="">
+        <div>
           <div className="p-1">
             {loading ? (
               <Loader text="Loading invoices..." />
