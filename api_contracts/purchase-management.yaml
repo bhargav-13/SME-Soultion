@@ -1,9 +1,9 @@
 openapi: 3.0.3
 
 info:
-  title: Packing Invoice Management API
+  title: Purchase Management API
   version: 1.0.0
-  description: OpenAPI for Packing Invoice management
+  description: OpenAPI for Purchase Order management
 
 servers:
   - url: http://localhost:8080
@@ -12,32 +12,21 @@ servers:
     description: Production Server
 
 tags:
-  - name: PackingInvoice
-    description: Packing Invoice Endpoints
+  - name: PurchaseOrder
+    description: Purchase Order Endpoints
 
 security:
   - oauth2: [ ]
 
 paths:
-  # -------------------- PACKING INVOICE --------------------
-  /api/v1/packing-invoices:
+  # -------------------- PURCHASE ORDER --------------------
+  /api/v1/purchase-orders:
     get:
-      operationId: getAllPackingInvoices
+      operationId: getAllPurchaseOrders
       tags:
-        - PackingInvoice
-      summary: Get all packing invoices (paginated, filterable by party and month)
+        - PurchaseOrder
+      summary: Get all purchase orders (paginated)
       parameters:
-        - name: partyId
-          in: query
-          description: Filter by party ID
-          schema:
-            type: integer
-            format: int64
-        - name: month
-          in: query
-          description: Filter by month (yyyy-MM, e.g. 2026-03)
-          schema:
-            type: string
         - $ref: '#/components/parameters/searchParam'
         - $ref: '#/components/parameters/pageParam'
         - $ref: '#/components/parameters/sizeParam'
@@ -45,11 +34,11 @@ paths:
         - $ref: '#/components/parameters/directionParam'
       responses:
         '200':
-          description: Paginated packing invoice list
+          description: Paginated purchase order list
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/PaginatedResultPackingInvoice'
+                $ref: '#/components/schemas/PaginatedResultPurchaseOrder'
         '401':
           $ref: '#/components/responses/UnauthorizedError'
         '403':
@@ -58,23 +47,23 @@ paths:
           $ref: '#/components/responses/InternalServerError'
 
     post:
-      operationId: createPackingInvoice
+      operationId: createPurchaseOrder
       tags:
-        - PackingInvoice
-      summary: Create a packing invoice with line items
+        - PurchaseOrder
+      summary: Create a purchase order with line items
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/NewPackingInvoice'
+              $ref: '#/components/schemas/NewPurchaseOrder'
       responses:
         '201':
-          description: Packing invoice created
+          description: Purchase order created
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/PackingInvoice'
+                $ref: '#/components/schemas/PurchaseOrder'
         '401':
           $ref: '#/components/responses/UnauthorizedError'
         '403':
@@ -82,29 +71,29 @@ paths:
         '500':
           $ref: '#/components/responses/InternalServerError'
 
-  /api/v1/packing-invoices/{id}:
+  /api/v1/purchase-orders/{id}:
     get:
-      operationId: getPackingInvoiceById
+      operationId: getPurchaseOrderById
       tags:
-        - PackingInvoice
-      summary: Get packing invoice by ID
+        - PurchaseOrder
+      summary: Get purchase order by ID
       parameters:
         - $ref: '#/components/parameters/idParam'
       responses:
         '200':
-          description: Packing invoice details
+          description: Purchase order details
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/PackingInvoice'
+                $ref: '#/components/schemas/PurchaseOrder'
         '404':
           $ref: '#/components/responses/NotFoundError'
 
     put:
-      operationId: updatePackingInvoice
+      operationId: updatePurchaseOrder
       tags:
-        - PackingInvoice
-      summary: Update packing invoice
+        - PurchaseOrder
+      summary: Update purchase order
       parameters:
         - $ref: '#/components/parameters/idParam'
       requestBody:
@@ -112,14 +101,14 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/NewPackingInvoice'
+              $ref: '#/components/schemas/NewPurchaseOrder'
       responses:
         '200':
-          description: Packing invoice updated
+          description: Purchase order updated
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/PackingInvoice'
+                $ref: '#/components/schemas/PurchaseOrder'
         '401':
           $ref: '#/components/responses/UnauthorizedError'
         '403':
@@ -128,15 +117,15 @@ paths:
           $ref: '#/components/responses/NotFoundError'
 
     delete:
-      operationId: deletePackingInvoice
+      operationId: deletePurchaseOrder
       tags:
-        - PackingInvoice
-      summary: Delete packing invoice
+        - PurchaseOrder
+      summary: Delete purchase order
       parameters:
         - $ref: '#/components/parameters/idParam'
       responses:
         '204':
-          description: Packing invoice deleted
+          description: Purchase order deleted
         '401':
           $ref: '#/components/responses/UnauthorizedError'
         '403':
@@ -203,106 +192,121 @@ components:
         enum:
           - lastUpdatedAt
           - createdAt
-          - invoiceDate
+          - orderDate
 
   schemas:
     # ---- Request ----
-    NewPackingInvoice:
+    NewPurchaseOrder:
       required:
         - partyId
-        - invoiceDate
+        - orderDate
       type: object
       properties:
-        invoiceDate:
-          type: string
-          format: date
-          description: Invoice date (defaults to today)
         partyId:
           type: integer
           format: int64
-          description: Party ID (from party master)
+          description: Seller party ID (from party master)
+        sellerChitthiNo:
+          type: string
+          description: Seller's chitthi/bill reference number
+        sellerChitthiDate:
+          type: string
+          format: date
+          description: Seller's chitthi date
+        orderDate:
+          type: string
+          format: date
+          description: Purchase order date
+        orderTime:
+          type: string
+          description: Purchase order time (HH:mm)
         items:
           type: array
           items:
-            $ref: '#/components/schemas/NewPackingInvoiceItem'
+            $ref: '#/components/schemas/NewPurchaseOrderItem'
 
-    NewPackingInvoiceItem:
-      required:
-        - sizeId
+    NewPurchaseOrderItem:
       type: object
       properties:
         sizeId:
           type: integer
           format: int64
-          description: Size ID from size_inventory (ItemBlueprintDataEntity)
-        finish:
+          description: Size ID from ItemBlueprintDataEntity
+        unitKg:
+          type: number
+          format: double
+          description: Purchase quantity in KG
+        unitType:
           type: string
-          description: Finish type (e.g. S.S + 16, Z.Black, Rose Gold)
-        box:
+          enum:
+            - KG
+            - PC
+          description: Unit type (e.g. Kgs, Pcs)
+        elementCount:
           type: number
           format: double
-        pc:
-          type: number
-          format: double
-        totalPc:
-          type: number
-          format: double
+          description: Number of elements (Peti / Box)
+        elementType:
+          type: string
+          enum:
+            - WOODEN_PETI
+            - PETI
+            - BAG
+            - HEAVY_PETI
+          description: Element type label (e.g. Peti, Box)
         scrap:
           type: number
           format: double
-        laboure:
+        labour:
           type: number
           format: double
-        rsKg:
+        price:
           type: number
           format: double
-        boxWeight:
+          description: Rate per unit
+        totalPrice:
           type: number
           format: double
-        boxWeightAcDocWeight:
+          description: Total purchase price (aavak)
+        javakKgPc:
           type: number
           format: double
-        billCalDocWeight:
+          description: Outgoing (javak) quantity in Kg or Pc
+        javakRs:
           type: number
           format: double
-        ratePc:
+          description: Javak rate (Rs per unit)
+        javakTotalRs:
           type: number
           format: double
-        totalRs:
-          type: number
-          format: double
-        totalKg:
-          type: number
-          format: double
-        asPerDocWeight:
-          type: number
-          format: double
-        loss:
-          type: number
-          format: double
+          description: Total javak amount in Rs
 
     # ---- Response ----
-    PackingInvoice:
+    PurchaseOrder:
       type: object
       properties:
         id:
           type: integer
           format: int64
-        invoiceDate:
+        party:
+          $ref: '#/components/schemas/PurchaseOrderParty'
+        sellerChitthiNo:
+          type: string
+        sellerChitthiDate:
           type: string
           format: date
-        invoiceNo:
+        purchaseNo:
           type: string
-          description: Auto-generated sequential number per party+date (01, 02…)
-        party:
-          $ref: '#/components/schemas/PackingInvoiceParty'
-        cartoonNo:
+          description: Auto-generated purchase number (e.g. 11/PUR-01-2026)
+        orderDate:
           type: string
-          description: Auto-generated cumulative number per party (01, 02…)
+          format: date
+        orderTime:
+          type: string
         items:
           type: array
           items:
-            $ref: '#/components/schemas/PackingInvoiceItem'
+            $ref: '#/components/schemas/PurchaseOrderItem'
         createdAt:
           type: string
           format: date-time
@@ -310,60 +314,55 @@ components:
           type: string
           format: date-time
 
-    PackingInvoiceItem:
+    PurchaseOrderItem:
       type: object
       properties:
         id:
           type: integer
           format: int64
         size:
-          $ref: '#/components/schemas/PackingInvoiceSize'
-        finish:
+          $ref: '#/components/schemas/PurchaseOrderSize'
+        unitKg:
+          type: number
+          format: double
+        unitType:
           type: string
-        box:
+          enum:
+            - KG
+            - PC
+        elementCount:
           type: number
           format: double
-        pc:
-          type: number
-          format: double
-        totalPc:
-          type: number
-          format: double
+        elementType:
+          type: string
+          enum:
+            - WOODEN_PETI
+            - PETI
+            - BAG
+            - HEAVY_PETI
         scrap:
           type: number
           format: double
-        laboure:
+        labour:
           type: number
           format: double
-        rsKg:
+        price:
           type: number
           format: double
-        boxWeight:
+        totalPrice:
           type: number
           format: double
-        boxWeightAcDocWeight:
+        javakKgPc:
           type: number
           format: double
-        billCalDocWeight:
+        javakRs:
           type: number
           format: double
-        ratePc:
-          type: number
-          format: double
-        totalRs:
-          type: number
-          format: double
-        totalKg:
-          type: number
-          format: double
-        asPerDocWeight:
-          type: number
-          format: double
-        loss:
+        javakTotalRs:
           type: number
           format: double
 
-    PackingInvoiceParty:
+    PurchaseOrderParty:
       type: object
       properties:
         id:
@@ -372,7 +371,7 @@ components:
         name:
           type: string
 
-    PackingInvoiceSize:
+    PurchaseOrderSize:
       type: object
       properties:
         id:
@@ -382,18 +381,15 @@ components:
           type: string
         sizeInMm:
           type: string
-        dozenWeight:
-          type: number
-          format: double
 
     # ---- Paginated Response ----
-    PaginatedResultPackingInvoice:
+    PaginatedResultPurchaseOrder:
       type: object
       properties:
         data:
           type: array
           items:
-            $ref: '#/components/schemas/PackingInvoice'
+            $ref: '#/components/schemas/PurchaseOrder'
         totalElements:
           type: integer
         totalPages:
@@ -404,13 +400,10 @@ components:
           type: integer
         empty:
           type: boolean
-          description: Indicates if the current page is empty
         first:
           type: boolean
-          description: Indicates if the current page is the first page
         last:
           type: boolean
-          description: Indicates if the current page is the last page
 
     ErrorResponse:
       type: object

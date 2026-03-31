@@ -24,6 +24,7 @@ const parseNumber = (value) => {
 
 const getAutoNetKg = (form) => {
   const returnKg = parseNumber(form.returnKg);
+  const elementCount = parseNumber(form.returnElement) || 0;
   if (returnKg === null) return "";
 
   const weightKg =
@@ -35,7 +36,7 @@ const getAutoNetKg = (form) => {
         })();
 
   if (weightKg === null) return "";
-  return String(round3(Math.max(0, returnKg - weightKg)));
+  return String(round3(Math.max(0, returnKg - elementCount * weightKg)));
 };
 
 const GresReturnDialog = ({ isOpen, gres, editingReturn, onClose, onSave }) => {
@@ -47,7 +48,7 @@ const GresReturnDialog = ({ isOpen, gres, editingReturn, onClose, onSave }) => {
     setOpenType(false);
     if (editingReturn) {
       setForm({
-        returnElement: editingReturn.returnElement || "",
+        returnElement: editingReturn.returnElement != null ? String(editingReturn.returnElement) : "",
         returnType: editingReturn.returnType || "PETI",
         elementWeightGm:
           editingReturn.elementWeightGm != null
@@ -81,10 +82,6 @@ const GresReturnDialog = ({ isOpen, gres, editingReturn, onClose, onSave }) => {
     const returnKg = Number.parseFloat(form.returnKg);
     const rsKg = Number.parseFloat(form.rsKg);
 
-    if (!form.returnElement.trim()) {
-      toast.error("Return Element is required");
-      return;
-    }
     if (!Number.isFinite(returnKg) || returnKg <= 0) {
       toast.error("Return Kg is required and must be greater than 0");
       return;
@@ -108,7 +105,7 @@ const GresReturnDialog = ({ isOpen, gres, editingReturn, onClose, onSave }) => {
 
     onSave?.({
       id: editingReturn?.id || Date.now(),
-      returnElement: form.returnElement.trim(),
+      returnElement: form.returnElement,
       returnType: form.returnType,
       elementWeightGm: form.returnType === "PETI" ? 900 : parseNumber(form.elementWeightGm),
       returnKg: round3(returnKg),
@@ -132,17 +129,19 @@ const GresReturnDialog = ({ isOpen, gres, editingReturn, onClose, onSave }) => {
             <label className="block text-sm font-medium text-black mb-1">Return Element</label>
             <div className="flex items-center gap-2">
               <input
-                type="text"
+                type="number"
+                min="0"
+                step="1"
                 value={form.returnElement}
                 onChange={(e) => setForm((prev) => ({ ...prev, returnElement: e.target.value }))}
-                placeholder="Enter Element"
+                placeholder="Enter count"
                 className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-500 outline-none placeholder:text-sm placeholder:text-gray-400"
               />
-                <div className="relative w-28">
-                  <button
-                    type="button"
-                    onClick={() => setOpenType((prev) => !prev)}
-                    className="w-full h-10 px-3 border border-gray-300 rounded-lg bg-white text-sm flex items-center justify-between"
+              <div className="relative w-28">
+                <button
+                  type="button"
+                  onClick={() => setOpenType((prev) => !prev)}
+                  className="w-full h-10 px-3 border border-gray-300 rounded-lg bg-white text-sm flex items-center justify-between"
                 >
                   <span>{TYPE_LABEL[form.returnType] || form.returnType}</span>
                   <ChevronDown className={`w-4 h-4 text-gray-500 transition-transform ${openType ? "rotate-180" : ""}`} />
@@ -189,6 +188,9 @@ const GresReturnDialog = ({ isOpen, gres, editingReturn, onClose, onSave }) => {
                 }`}
               />
             </div>
+            <p className="mt-1 text-xs text-gray-400">
+              Enter number of {form.returnType === "PETI" ? "Peti" : "Drum"} elements returned.
+            </p>
           </div>
           <div>
             <label className="block text-sm font-medium text-black mb-1">Return Kg.</label>
@@ -212,7 +214,7 @@ const GresReturnDialog = ({ isOpen, gres, editingReturn, onClose, onSave }) => {
               className="w-full px-4 py-2 border border-gray-200 rounded-lg bg-gray-50 text-gray-700 outline-none placeholder:text-sm placeholder:text-gray-400 cursor-not-allowed"
             />
             <p className="mt-1 text-xs text-gray-400">
-              Net is auto calculated from Return Kg and {form.returnType === "PETI" ? "Peti (900 gm)" : "the manual gm value"}.
+              Net = Return Kg − (Element Count × {form.returnType === "PETI" ? "900 gm" : `${form.elementWeightGm || "?"} gm`})
             </p>
           </div>
           <div>

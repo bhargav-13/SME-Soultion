@@ -31,6 +31,11 @@ import {
     ExportApi,
 } from '../api-clients/export-management';
 import {
+    Configuration as GresMgmtConfiguration,
+    GresFillingApi,
+    GresFillingReturnApi,
+} from '../api-clients/gres-management';
+import {
     CategoryApi,
     ItemApi,
     PartyApi,
@@ -202,6 +207,16 @@ const createExportMgmtConfig = () => {
     });
 };
 
+const createGresMgmtConfig = () => {
+    return new GresMgmtConfiguration({
+        basePath: config.API_BASE_URL,
+        accessToken: getAccessToken(),
+        baseOptions: {
+            adapter: axiosInstance.defaults.adapter,
+        },
+    });
+};
+
 const createPackingInvoiceApi = () => {
     return {
         getAllPackingInvoices: (partyId, startDate, endDate, page = 0, size = 20) =>
@@ -234,6 +249,8 @@ let orderApi = new OrderApi(createOrderMgmtConfig(), config.API_BASE_URL, axiosI
 let orderDispatchApi = new OrderDispatchApi(createOrderMgmtConfig(), config.API_BASE_URL, axiosInstance);
 let packingInvoiceApi = createPackingInvoiceApi();
 let packingInvoiceExportApi = new ExportApi(createExportMgmtConfig(), config.API_BASE_URL, axiosInstance);
+let gresFillingApi = new GresFillingApi(createGresMgmtConfig(), config.API_BASE_URL, axiosInstance);
+let gresFillingReturnApi = new GresFillingReturnApi(createGresMgmtConfig(), config.API_BASE_URL, axiosInstance);
 /**
  * Update all API clients with new token
  * Call this after login or token refresh
@@ -260,6 +277,8 @@ export const updateApiClients = () => {
     orderDispatchApi = new OrderDispatchApi(createOrderMgmtConfig(), config.API_BASE_URL, axiosInstance);
     packingInvoiceApi = createPackingInvoiceApi();
     packingInvoiceExportApi = new ExportApi(createExportMgmtConfig(), config.API_BASE_URL, axiosInstance);
+    gresFillingApi = new GresFillingApi(createGresMgmtConfig(), config.API_BASE_URL, axiosInstance);
+    gresFillingReturnApi = new GresFillingReturnApi(createGresMgmtConfig(), config.API_BASE_URL, axiosInstance);
 };
 
 // Export API clients
@@ -282,6 +301,8 @@ export {
     orderDispatchApi,
     packingInvoiceApi,
     packingInvoiceExportApi,
+    gresFillingApi,
+    gresFillingReturnApi,
 };
 
 // Export a default object with all APIs
@@ -304,4 +325,6 @@ export default {
     orderDispatch: orderDispatchApi,
     packingInvoice: packingInvoiceApi,
     packingInvoiceExport: packingInvoiceExportApi,
+    gresFilling: gresFillingApi,
+    gresFillingReturn: gresFillingReturnApi,
 };

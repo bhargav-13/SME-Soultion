@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { ChevronLeft, Plus } from "lucide-react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import SidebarLayout from "../components/SidebarLayout";
 import SearchFilter from "../components/SearchFilter";
 import ConfirmationDialog from "../components/ConfirmationDialog";
@@ -9,14 +9,66 @@ import StatsCard from "../components/StatsCard";
 import toast from "react-hot-toast";
 import GresCard from "../components/Gres/GresCard";
 import GresReturnDialog from "../components/Gres/GresReturnDialog";
-import { deleteGresRecord, deleteGresReturn, loadGresRecords, upsertGresRecord, upsertGresReturn } from "../utils/gresStorage";
+import { gresFillingApi, gresFillingReturnApi } from "../services/apiService";
+import { printGresFillingPng } from "../utils/gresFillingPrint";
 import PrimaryActionButton from "../components/PrimaryActionButton";
 
 const round3 = (n) => Math.round(n * 1000) / 1000;
 
+const normalizeGresRecord = (apiRecord) => ({
+  id: apiRecord.id,
+  chithiNo: apiRecord.chitthiNo || "",
+  vendorName: apiRecord.party?.name || "",
+  vendorId: apiRecord.party?.id,
+  date: apiRecord.chitthiDate || "",
+  time: apiRecord.orderTime || "",
+  status: apiRecord.status || "PENDING",
+  gresType: "INHOUSE",
+  items: (apiRecord.items || []).map((item) => ({
+    id: item.id,
+    itemName: item.size ? (item.size.sizeInInch || item.size.sizeInMm || "") : "",
+    size: item.size?.sizeInInch || item.size?.sizeInMm || "",
+    qtyPc: item.unitKg != null ? String(item.unitKg) : "",
+    qtyKg: item.netWeight != null ? String(item.netWeight) : "",
+    unitType: item.unitType || "Kgs",
+    element: item.elementCount != null ? String(item.elementCount) : "",
+    elementType: item.elementType || "PETI",
+    elementWeightGm: "900",
+    ratePerKg: item.ratePerKg != null ? String(item.ratePerKg) : "",
+    totalAmount: item.totalAmount != null ? String(item.totalAmount) : "",
+  })),
+  qtyKg: apiRecord.items?.[0]?.netWeight,
+  returns: (apiRecord.returns || []).map((ret) => ({
+    id: ret.id,
+    returnElement: ret.returnElementCount != null ? String(ret.returnElementCount) : "",
+    returnType: ret.elementType || "PETI",
+    returnKg: ret.returnKg != null ? ret.returnKg : 0,
+    netKg: ret.returnKg != null && ret.ghati != null ? round3(ret.returnKg - ret.ghati) : 0,
+    ghati: ret.ghati != null ? ret.ghati : 0,
+    returnDate: ret.returnDate || ret.createdAt || "",
+    rsKg: "",
+  })),
+  createdAt: apiRecord.createdAt || "",
+});
+
+const buildUpdatePayload = (gres, statusOverride) => ({
+  partyId: Number(gres.vendorId),
+  chitthiDate: gres.date || new Date().toISOString().slice(0, 10),
+  orderTime: gres.time || undefined,
+  status: statusOverride || gres.status,
+  items: (gres.items || []).map((item) => ({
+    unitKg: item.qtyPc ? Number(item.qtyPc) || undefined : undefined,
+    unitType: item.unitType || "Kgs",
+    elementCount: item.element ? Number(item.element) || undefined : undefined,
+    elementType: item.elementType,
+    netWeight: item.qtyKg ? Number(item.qtyKg) || undefined : undefined,
+    ratePerKg: item.ratePerKg ? Number(item.ratePerKg) || undefined : undefined,
+    totalAmount: item.totalAmount ? Number(item.totalAmount) || undefined : undefined,
+  })),
+});
+
 const Gres = () => {
   const navigate = useNavigate();
-  const location = useLocation();
   const [records, setRecords] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
@@ -28,99 +80,89 @@ const Gres = () => {
   const [deleting, setDeleting] = useState(false);
   const [deletingReturn, setDeletingReturn] = useState(false);
 
-  const refreshRecords = () => {
-    setRecords(loadGresRecords());
-  };
-
-  useEffect(() => {
+  const refreshRecords = async () => {
     setLoading(true);
     try {
-      refreshRecords();
+      const res = await gresFillingApi.getAllGresFillings(undefined, 0, 100);
+      const data = res.data?.data || [];
+      setRecords(data.map(normalizeGresRecord));
+    } catch {
+      toast.error("Failed to load gres records");
+      setRecords([]);
     } finally {
       setLoading(false);
     }
-  }, []);
+  };
 
   useEffect(() => {
-    const saved = location.state?.savedGres;
-    if (!saved?.job) return;
+    refreshRecords();
+  }, []);
 
-    const { mode, job } = saved;
-    const normalized = {
-      ...job,
-      id: job.id || Date.now(),
-      returns: job.returns || [],
-      createdAt: job.createdAt || new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
-
-    setRecords((prev) => {
-      const current = prev.length ? prev : loadGresRecords();
-      const targetId = String(normalized.id);
-      const exists = current.some((item) => String(item.id) === targetId);
-      const next = mode === "edit" || exists
-        ? current.map((item) => (String(item.id) === targetId ? { ...item, ...normalized } : item))
-        : [normalized, ...current];
-      upsertGresRecord(normalized);
-      return next;
-    });
-  }, [location.state]);
-
-  const handleStatusChange = (gres, newStatus) => {
-    const next = { ...gres, status: newStatus };
-    upsertGresRecord(next);
-    setRecords((prev) => prev.map((item) => (item.id === gres.id ? next : item)));
+  const handleStatusChange = async (gres, newStatus) => {
+    try {
+      const payload = buildUpdatePayload(gres, newStatus);
+      await gresFillingApi.updateGresFilling(gres.id, payload);
+      setRecords((prev) => prev.map((item) => (item.id === gres.id ? { ...item, status: newStatus } : item)));
+    } catch {
+      toast.error("Failed to update status");
+    }
   };
 
   const handleTypeChange = (gres, newType) => {
-    const next = { ...gres, gresType: newType };
-    upsertGresRecord(next);
-    setRecords((prev) => prev.map((item) => (item.id === gres.id ? next : item)));
+    setRecords((prev) => prev.map((item) => (item.id === gres.id ? { ...item, gresType: newType } : item)));
   };
 
-  const handleDelete = () => {
+  const handleDelete = async () => {
     if (!deleteTarget) return;
     setDeleting(true);
     try {
-      deleteGresRecord(deleteTarget.id);
+      await gresFillingApi.deleteGresFilling(deleteTarget.id);
       setRecords((prev) => prev.filter((item) => item.id !== deleteTarget.id));
       toast.success("Gres record deleted!");
+    } catch {
+      toast.error("Failed to delete gres record");
     } finally {
       setDeleting(false);
       setDeleteTarget(null);
     }
   };
 
-  const handleReturnSaved = (payload) => {
+  const handleReturnSaved = async (payload) => {
     if (!returnTarget) return;
-    const nextReturn = {
-      ...payload,
-      returnDate: new Date().toISOString(),
+    const apiPayload = {
+      returnKg: payload.returnKg,
+      ghati: payload.ghati,
+      returnElementCount: payload.returnElement ? Number(payload.returnElement) || undefined : undefined,
+      elementType: payload.returnType,
+      returnDate: new Date().toISOString().slice(0, 10),
     };
-    upsertGresReturn(returnTarget.id, nextReturn);
-    setRecords(loadGresRecords());
-    setReturnTarget(null);
-    setEditingReturn(null);
-
-    const fresh = loadGresRecords().find((item) => String(item.id) === String(returnTarget.id));
-    const totalReturned = round3((fresh?.returns || []).reduce((sum, item) => sum + (Number(item.returnKg) || 0), 0));
-    const sentKg = Number(fresh?.qtyKg) || 0;
-    if (sentKg > 0 && totalReturned >= sentKg && fresh?.status !== "COMPLETE") {
-      upsertGresRecord({ ...fresh, status: "COMPLETE" });
-      setRecords(loadGresRecords());
+    try {
+      if (editingReturn?.id) {
+        await gresFillingReturnApi.updateGresFillingReturn(returnTarget.id, editingReturn.id, apiPayload);
+      } else {
+        await gresFillingReturnApi.createGresFillingReturn(returnTarget.id, apiPayload);
+      }
+      toast.success("Return saved!");
+      setReturnTarget(null);
+      setEditingReturn(null);
+      await refreshRecords();
+    } catch {
+      toast.error("Failed to save return");
     }
   };
 
-  const handleDeleteReturn = () => {
+  const handleDeleteReturn = async () => {
     if (!deleteReturnTarget) return;
     setDeletingReturn(true);
     try {
-      deleteGresReturn(deleteReturnTarget.gres.id, deleteReturnTarget.ret.id);
-      setRecords(loadGresRecords());
+      await gresFillingReturnApi.deleteGresFillingReturn(deleteReturnTarget.gres.id, deleteReturnTarget.ret.id);
       toast.success("Return record deleted!");
+      setDeleteReturnTarget(null);
+      await refreshRecords();
+    } catch {
+      toast.error("Failed to delete return record");
     } finally {
       setDeletingReturn(false);
-      setDeleteReturnTarget(null);
     }
   };
 
@@ -168,19 +210,12 @@ const Gres = () => {
             <ChevronLeft className="w-4 h-4" />
             <span>Back to Order List</span>
           </button>
-          {/* <button
-            type="button"
+          <PrimaryActionButton
             onClick={() => navigate("/gres/move")}
-            className="px-4 py-2 rounded-md bg-gray-800 text-white text-sm font-medium hover:bg-gray-700 transition"
+            icon={Plus}
           >
             Add Gres
-          </button> */}
-           <PrimaryActionButton
-                          onClick={() => navigate("/gres/move")}
-                          icon={Plus}
-                        >
-                          Add Gres
-                        </PrimaryActionButton>
+          </PrimaryActionButton>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
@@ -225,6 +260,7 @@ const Gres = () => {
                 onDeleteReturn={(ret) => setDeleteReturnTarget({ gres, ret })}
                 onEdit={() => navigate("/gres/move", { state: { mode: "edit", gresId: gres.id } })}
                 onDelete={() => setDeleteTarget(gres)}
+                onPrint={(id, formType, setLoadingKey) => printGresFillingPng(id, formType, setLoadingKey)}
               />
             ))}
           </div>

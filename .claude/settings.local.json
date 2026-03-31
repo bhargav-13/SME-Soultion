@@ -2,7 +2,9 @@
   "permissions": {
     "allow": [
       "Bash(cd /d/ishita-industry/SME-Soultion && npm run generate:api-clients 2>&1)",
-      "Bash(tail:*)"
+      "Bash(tail:*)",
+      "mcp__Claude_Preview__preview_start",
+      "Bash(find D:ishita-industrySME-Soultionsrc -type f \\\\\\(-name *Dropdown* -o -name *dropdown* \\\\\\))"
     ]
   }
 }

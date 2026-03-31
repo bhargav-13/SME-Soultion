@@ -8,9 +8,7 @@ info:
 servers:
   - url: http://localhost:8080
     description: Local development server
-  - url: http://3.7.63.123:8080
-    description: Development Server
-  - url: http://13.205.54.102:8080
+  - url: https://sme-api.duckdns.org
     description: Production Server
 
 tags:
@@ -1072,6 +1070,16 @@ components:
           $ref: '#/components/schemas/JobWorkStatus'
         jobWorkType:
           $ref: '#/components/schemas/JobWorkType'
+        chitthiNo:
+          type: string
+          description: Chitthi/bill reference number
+        chitthiDate:
+          type: string
+          format: date
+          description: Chitthi date
+        orderTime:
+          type: string
+          description: Order time (HH:mm)
 
     JobWork:
       type: object
@@ -1113,6 +1121,13 @@ components:
         createdAt:
           type: string
           format: date-time
+        chitthiNo:
+          type: string
+        chitthiDate:
+          type: string
+          format: date
+        orderTime:
+          type: string
 
     JobWorkParty:
       type: object
@@ -1176,10 +1191,6 @@ components:
         - returnKg
       type: object
       properties:
-        partyId:
-          type: integer
-          format: int64
-          description: ID of the party returning the job work
         returnKg:
           type: number
           format: double
@@ -1201,8 +1212,6 @@ components:
         id:
           type: integer
           format: int64
-        party:
-          $ref: '#/components/schemas/JobWorkParty'
         returnKg:
           type: number
           format: double

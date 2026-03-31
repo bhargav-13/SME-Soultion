@@ -1,0 +1,610 @@
+openapi: 3.0.3
+
+info:
+  title: Gres Management API
+  version: 1.0.0
+  description: OpenAPI for Gres Filling management
+
+servers:
+  - url: http://localhost:8080
+    description: Local development server
+  - url: https://sme-api.duckdns.org
+    description: Production Server
+
+tags:
+  - name: GresFilling
+    description: Gres Filling Endpoints
+  - name: GresFillingReturn
+    description: Gres Filling Return Endpoints (gres-filling-scoped)
+
+security:
+  - oauth2: [ ]
+
+paths:
+  # -------------------- GRES FILLING --------------------
+  /api/v1/gres-fillings:
+    get:
+      operationId: getAllGresFillings
+      tags:
+        - GresFilling
+      summary: Get all gres fillings (paginated)
+      parameters:
+        - $ref: '#/components/parameters/searchParam'
+        - $ref: '#/components/parameters/pageParam'
+        - $ref: '#/components/parameters/sizeParam'
+        - $ref: '#/components/parameters/SortByFields'
+        - $ref: '#/components/parameters/directionParam'
+      responses:
+        '200':
+          description: Paginated gres filling list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedResultGresFilling'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+    post:
+      operationId: createGresFilling
+      tags:
+        - GresFilling
+      summary: Create a gres filling record with items
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NewGresFilling'
+      responses:
+        '201':
+          description: Gres filling created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GresFilling'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/v1/gres-fillings/{id}:
+    get:
+      operationId: getGresFillingById
+      tags:
+        - GresFilling
+      summary: Get gres filling by ID
+      parameters:
+        - $ref: '#/components/parameters/idParam'
+      responses:
+        '200':
+          description: Gres filling details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GresFilling'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+
+    put:
+      operationId: updateGresFilling
+      tags:
+        - GresFilling
+      summary: Update gres filling
+      parameters:
+        - $ref: '#/components/parameters/idParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NewGresFilling'
+      responses:
+        '200':
+          description: Gres filling updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GresFilling'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+
+    delete:
+      operationId: deleteGresFilling
+      tags:
+        - GresFilling
+      summary: Delete gres filling
+      parameters:
+        - $ref: '#/components/parameters/idParam'
+      responses:
+        '204':
+          description: Gres filling deleted
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+
+  # -------------------- GRES FILLING RETURN --------------------
+  /api/v1/gres-fillings/{gresFillingId}/returns:
+    get:
+      operationId: getAllGresFillingReturns
+      tags:
+        - GresFillingReturn
+      summary: Get all returns for a gres filling (paginated)
+      parameters:
+        - $ref: '#/components/parameters/gresFillingIdParam'
+        - $ref: '#/components/parameters/searchParam'
+        - $ref: '#/components/parameters/pageParam'
+        - $ref: '#/components/parameters/sizeParam'
+        - $ref: '#/components/parameters/SortByFields'
+        - $ref: '#/components/parameters/directionParam'
+      responses:
+        '200':
+          description: Paginated return list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedResultGresFillingReturn'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+    post:
+      operationId: createGresFillingReturn
+      tags:
+        - GresFillingReturn
+      summary: Create a gres filling return
+      parameters:
+        - $ref: '#/components/parameters/gresFillingIdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NewGresFillingReturn'
+      responses:
+        '201':
+          description: Gres filling return created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GresFillingReturn'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/v1/gres-fillings/{gresFillingId}/returns/{id}:
+    get:
+      operationId: getGresFillingReturnById
+      tags:
+        - GresFillingReturn
+      summary: Get gres filling return by ID
+      parameters:
+        - $ref: '#/components/parameters/gresFillingIdParam'
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: Gres filling return details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GresFillingReturn'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+
+    put:
+      operationId: updateGresFillingReturn
+      tags:
+        - GresFillingReturn
+      summary: Update gres filling return
+      parameters:
+        - $ref: '#/components/parameters/gresFillingIdParam'
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NewGresFillingReturn'
+      responses:
+        '200':
+          description: Gres filling return updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GresFillingReturn'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+
+    delete:
+      operationId: deleteGresFillingReturn
+      tags:
+        - GresFillingReturn
+      summary: Delete gres filling return
+      parameters:
+        - $ref: '#/components/parameters/gresFillingIdParam'
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '204':
+          description: Gres filling return deleted
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+
+components:
+
+  securitySchemes:
+    oauth2:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    idParam:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: integer
+        format: int64
+
+    gresFillingIdParam:
+      name: gresFillingId
+      in: path
+      required: true
+      schema:
+        type: integer
+        format: int64
+
+    pageParam:
+      name: page
+      in: query
+      description: Page number starting from 0
+      schema:
+        type: integer
+        default: 0
+
+    sizeParam:
+      name: size
+      in: query
+      description: Number of items per page
+      schema:
+        type: integer
+        default: 10
+
+    directionParam:
+      name: direction
+      in: query
+      description: Sort direction
+      schema:
+        type: string
+        enum:
+          - ASC
+          - DESC
+
+    searchParam:
+      name: search
+      in: query
+      description: Search text to filter results
+      schema:
+        type: string
+
+    SortByFields:
+      name: sortByFields
+      in: query
+      description: Field to sort by
+      schema:
+        type: string
+        enum:
+          - lastUpdatedAt
+          - createdAt
+          - chitthiDate
+
+  schemas:
+
+    # ---- Request ----
+    NewGresFilling:
+      required:
+        - partyId
+        - chitthiDate
+      type: object
+      properties:
+        partyId:
+          type: integer
+          format: int64
+          description: Vendor party ID
+        chitthiNo:
+          type: string
+          description: Auto-generated chitthi reference number
+        chitthiDate:
+          type: string
+          format: date
+        orderTime:
+          type: string
+          description: Time (HH:mm)
+        status:
+          $ref: '#/components/schemas/GresFillingStatus'
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/NewGresFillingItem'
+
+    NewGresFillingItem:
+      type: object
+      properties:
+        sizeId:
+          type: integer
+          format: int64
+          description: Size ID from ItemBlueprintDataEntity
+        unitKg:
+          type: number
+          format: double
+          description: Quantity in KG
+        unitType:
+          type: string
+          description: Unit type (Kgs / Pcs)
+        elementCount:
+          type: number
+          format: double
+        elementType:
+          $ref: '#/components/schemas/GresElementType'
+        netWeight:
+          type: number
+          format: double
+        ratePerKg:
+          type: number
+          format: double
+        totalAmount:
+          type: number
+          format: double
+
+    NewGresFillingReturn:
+      required:
+        - returnKg
+      type: object
+      properties:
+        returnKg:
+          type: number
+          format: double
+        ghati:
+          type: number
+          format: double
+        returnElementCount:
+          type: number
+          format: double
+        elementType:
+          $ref: '#/components/schemas/GresElementType'
+        returnDate:
+          type: string
+          format: date
+
+    # ---- Response ----
+    GresFilling:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        party:
+          $ref: '#/components/schemas/GresFillingParty'
+        chitthiNo:
+          type: string
+        chitthiDate:
+          type: string
+          format: date
+        orderTime:
+          type: string
+        status:
+          $ref: '#/components/schemas/GresFillingStatus'
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/GresFillingItem'
+        returns:
+          type: array
+          items:
+            $ref: '#/components/schemas/GresFillingReturn'
+        createdAt:
+          type: string
+          format: date-time
+        lastUpdatedAt:
+          type: string
+          format: date-time
+
+    GresFillingItem:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        size:
+          $ref: '#/components/schemas/GresFillingSize'
+        unitKg:
+          type: number
+          format: double
+        unitType:
+          type: string
+        elementCount:
+          type: number
+          format: double
+        elementType:
+          $ref: '#/components/schemas/GresElementType'
+        netWeight:
+          type: number
+          format: double
+        ratePerKg:
+          type: number
+          format: double
+        totalAmount:
+          type: number
+          format: double
+
+    GresFillingReturn:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        returnKg:
+          type: number
+          format: double
+        ghati:
+          type: number
+          format: double
+        returnElementCount:
+          type: number
+          format: double
+        elementType:
+          $ref: '#/components/schemas/GresElementType'
+        returnDate:
+          type: string
+          format: date
+        createdAt:
+          type: string
+          format: date-time
+
+    GresFillingParty:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        name:
+          type: string
+
+    GresFillingSize:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        sizeInInch:
+          type: string
+        sizeInMm:
+          type: string
+
+    PaginatedResultGresFilling:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/GresFilling'
+        totalElements:
+          type: integer
+        totalPages:
+          type: integer
+        page:
+          type: integer
+        size:
+          type: integer
+        empty:
+          type: boolean
+        first:
+          type: boolean
+        last:
+          type: boolean
+
+    PaginatedResultGresFillingReturn:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/GresFillingReturn'
+        empty:
+          type: boolean
+        last:
+          type: boolean
+        first:
+          type: boolean
+        totalPages:
+          type: integer
+        totalElements:
+          type: integer
+        size:
+          type: integer
+
+    # ---- Enums ----
+    GresFillingStatus:
+      type: string
+      enum:
+        - PENDING
+        - COMPLETE
+        - REJECT
+
+    GresElementType:
+      type: string
+      enum:
+        - PETI
+        - DRUM
+
+    ErrorResponse:
+      type: object
+      properties:
+        message:
+          type: string
+        code:
+          type: string
+        detail:
+          type: object
+
+  responses:
+    UnauthorizedError:
+      description: Unauthorized
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+    ForbiddenError:
+      description: Forbidden
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+    NotFoundError:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+    InternalServerError:
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'

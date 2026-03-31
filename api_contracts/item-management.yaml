@@ -8,9 +8,7 @@ info:
 servers:
   - url: http://localhost:8080
     description: Local development server
-  - url: http://3.7.63.123:8080
-    description: Development Server
-  - url: http://13.205.54.102:8080
+  - url: https://sme-api.duckdns.org
     description: Production Server
 
 tags:

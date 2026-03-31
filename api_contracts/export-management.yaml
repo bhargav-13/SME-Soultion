@@ -8,9 +8,7 @@ info:
 servers:
   - url: http://localhost:8080
     description: Local development server
-  - url: http://3.7.63.123:8080
-    description: Development Server
-  - url: http://13.205.54.102:8080
+  - url: https://sme-api.duckdns.org
     description: Production Server
 
 tags:
@@ -98,6 +96,43 @@ paths:
         '403':
           $ref: '#/components/responses/ForbiddenError'
 
+  /api/v1/gres-fillings/{id}/type/{gresFillingFormType}/png:
+    get:
+      tags:
+        - Export
+      operationId: getGresFillingPng
+      summary: Get Gres Filling png
+      description: Returns Gres Filling chitthi as PNG
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - name: gresFillingFormType
+          in: path
+          required: true
+          description: The variant of the gres filling form
+          schema:
+            $ref: '#/components/schemas/GresFillingFormType'
+      responses:
+        '200':
+          description: PNG generated successfully
+          content:
+            image/png:
+              schema:
+                type: string
+                format: binary
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+
   /api/v1/packing-invoices/{id}/pdf:
     get:
       tags:
@@ -122,6 +157,166 @@ paths:
                 format: binary
         '404':
           $ref: '#/components/responses/NotFoundError'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+
+  /api/v1/gres-fillings/report/pdf:
+    get:
+      tags:
+        - Export
+      operationId: getGresFillingReportPdf
+      summary: Get Gres Filling Date Range PDF Report for a Party
+      parameters:
+        - name: partyId
+          in: query
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - name: startDate
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+        - name: endDate
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+      responses:
+        '200':
+          description: PDF report generated successfully
+          content:
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+
+  /api/v1/job-works/report/pdf:
+    get:
+      tags:
+        - Export
+      operationId: getJobWorkReportPdf
+      summary: Get Job Work Date Range PDF Report for a Party
+      parameters:
+        - name: partyId
+          in: query
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - name: startDate
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+        - name: endDate
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+      responses:
+        '200':
+          description: PDF report generated successfully
+          content:
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+
+  /api/v1/purchase-orders/report/pdf:
+    get:
+      tags:
+        - Export
+      operationId: getPurchaseReportPdf
+      summary: Get Purchase Order Date Range PDF Report for a Party
+      parameters:
+        - name: partyId
+          in: query
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - name: startDate
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+        - name: endDate
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+      responses:
+        '200':
+          description: PDF report generated successfully
+          content:
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+
+  /api/v1/sales-orders/report/pdf:
+    get:
+      tags:
+        - Export
+      operationId: getSalesReportPdf
+      summary: Get Sales Order Date Range PDF Report for a Party
+      parameters:
+        - name: partyId
+          in: query
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - name: startDate
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+        - name: endDate
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+      responses:
+        '200':
+          description: PDF report generated successfully
+          content:
+            application/pdf:
+              schema:
+                type: string
+                format: binary
         '500':
           $ref: '#/components/responses/InternalServerError'
         '401':
@@ -155,6 +350,10 @@ components:
       type: string
       enum:
         - AAVAK
+        - JAVAK
+    GresFillingFormType:
+      type: string
+      enum:
         - JAVAK
 
   responses:

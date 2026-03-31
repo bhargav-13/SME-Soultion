@@ -14,8 +14,19 @@ const fmtDate = (s) => {
   }
 };
 
-const GresCard = ({ gres, onEdit, onDelete, onStatusChange, onTypeChange, onReturnRecord, onEditReturn, onDeleteReturn }) => {
+const GresCard = ({
+  gres,
+  onEdit,
+  onDelete,
+  onStatusChange,
+  onTypeChange,
+  onReturnRecord,
+  onEditReturn,
+  onDeleteReturn,
+  onPrint,
+}) => {
   const [expanded, setExpanded] = useState(false);
+  const [printLoading, setPrintLoading] = useState(null);
   const primaryItem = gres.items?.[0] || {};
   const returns = useMemo(() => gres.returns || [], [gres.returns]);
 
@@ -26,13 +37,24 @@ const GresCard = ({ gres, onEdit, onDelete, onStatusChange, onTypeChange, onRetu
     return { totalReturn, totalNet, totalGhati };
   }, [returns]);
 
-  const sizeLabel = [primaryItem.size].filter(Boolean).join(" ") || "—";
+  const productName = primaryItem.itemName || primaryItem.size || "—";
+  const sizeLabel = primaryItem.size || "—";
   const elementLabel = primaryItem.element != null
     ? `${primaryItem.element} ${primaryItem.elementType === "DRUM" ? "Drum" : "Peti"}`
     : "—";
 
+  const handlePrint = () => onPrint?.(gres.id, "JAVAK", setPrintLoading);
+
   return (
     <div className="border border-gray-200 rounded-xl bg-white p-4 shadow-sm">
+      {/* Product name - prominent above */}
+      <div className="mb-2">
+        <span className="text-base font-semibold text-black">{productName}</span>
+        {primaryItem.size && primaryItem.size !== productName && (
+          <span className="ml-2 text-sm text-gray-500">({primaryItem.size})</span>
+        )}
+      </div>
+
       <div className="flex items-start justify-between gap-3 mb-3">
         <div>
           <div className="flex items-center gap-3 text-black">
@@ -47,8 +69,6 @@ const GresCard = ({ gres, onEdit, onDelete, onStatusChange, onTypeChange, onRetu
           <div className="flex flex-wrap items-center gap-2 mt-1 text-sm text-gray-500">
             <span>{gres.vendorName || "—"}</span>
             <span className="w-1 h-1 rounded-full bg-gray-400 inline-block" />
-            <span>Product: <span className="font-bold text-black">{fmt(primaryItem.itemName)}</span></span>
-            <span className="w-1 h-1 rounded-full bg-gray-400 inline-block" />
             <span>Rate: <span className="font-bold text-black">{fmt(primaryItem.ratePerKg)}</span></span>
           </div>
         </div>
@@ -62,12 +82,17 @@ const GresCard = ({ gres, onEdit, onDelete, onStatusChange, onTypeChange, onRetu
         <div className="border border-gray-200 rounded-xl bg-gray-50 p-4">
           <div className="flex items-center justify-between mb-3">
             <p className="text-black font-semibold">Items</p>
-            <button type="button" className="inline-flex items-center gap-1.5 px-3 py-1 text-sm border border-gray-300 rounded-md text-black hover:bg-gray-100 transition">
-              Print <Printer className="w-4 h-4" />
+            <button
+              type="button"
+              onClick={handlePrint}
+              disabled={printLoading === "javak"}
+              className="inline-flex items-center gap-1.5 px-3 py-1 text-sm border border-gray-300 rounded-md text-black hover:bg-gray-100 transition disabled:opacity-50"
+            >
+              {printLoading === "javak" ? "Printing…" : "Print"} <Printer className="w-4 h-4" />
             </button>
           </div>
           <div className="grid grid-cols-4 text-xs text-gray-400 mb-1">
-            <span>Sizes</span>
+            <span>Size</span>
             <span className="text-center">Element</span>
             <span className="text-center">Kg.</span>
             <span className="text-right">Rate/Kg</span>
@@ -98,8 +123,13 @@ const GresCard = ({ gres, onEdit, onDelete, onStatusChange, onTypeChange, onRetu
                   <ChevronDown className={`w-3.5 h-3.5 transition-transform ${expanded ? "rotate-180" : ""}`} />
                 </button>
               )}
-              <button type="button" className="inline-flex items-center gap-1.5 px-3 py-1 text-sm border border-gray-300 rounded-md text-black hover:bg-gray-100 transition">
-                Print <Printer className="w-4 h-4" />
+              <button
+                type="button"
+                onClick={handlePrint}
+                disabled={printLoading === "javak"}
+                className="inline-flex items-center gap-1.5 px-3 py-1 text-sm border border-gray-300 rounded-md text-black hover:bg-gray-100 transition disabled:opacity-50"
+              >
+                {printLoading === "javak" ? "Printing…" : "Print"} <Printer className="w-4 h-4" />
               </button>
             </div>
           </div>
