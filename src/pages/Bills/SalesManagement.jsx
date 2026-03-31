@@ -1,10 +1,12 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Plus } from "lucide-react";
+import { Plus, Download } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 import SidebarLayout from "../../components/SidebarLayout";
 import PageHeader from "../../components/PageHeader";
 import SearchFilter from "../../components/SearchFilter";
 import PrimaryActionButton from "../../components/PrimaryActionButton";
+import { exportApi } from "../../services/apiService";
+import DownloadStatementModal from "../../components/DownloadStatementModal";
 
 const SALES_ORDERS_KEY = "bills:salesOrders";
 
@@ -14,6 +16,7 @@ const SalesManagement = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [typeFilter, setTypeFilter] = useState("");
   const [salesRows, setSalesRows] = useState([]);
+  const [statementOpen, setStatementOpen] = useState(false);
 
   useEffect(() => {
     try {
@@ -85,8 +88,28 @@ const SalesManagement = () => {
             setTypeFilter={setTypeFilter}
             filterOptions={["Type", "Sales"]}
             filterPlaceholder="Type"
+            extraButton={
+              <button
+                type="button"
+                onClick={() => setStatementOpen(true)}
+                className="inline-flex items-center gap-2 px-4 py-3 border border-gray-300 rounded-lg bg-white text-sm text-gray-700 hover:bg-gray-50 transition whitespace-nowrap"
+              >
+                <Download className="w-4 h-4" />
+                Download Statement
+              </button>
+            }
           />
         </div>
+
+        <DownloadStatementModal
+          isOpen={statementOpen}
+          onClose={() => setStatementOpen(false)}
+          title="Download Sales Statement"
+          fileName="sales_statement"
+          onDownload={(partyId, startDate, endDate) =>
+            exportApi.getSalesReportPdf(partyId, startDate, endDate, { responseType: "blob" })
+          }
+        />
 
         <div className="bg-white rounded-lg overflow-hidden border border-gray-200">
           <div className="max-h-[500px] overflow-auto scrollbar-thin">

@@ -1,4 +1,4 @@
-﻿import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Printer,
   SquarePen,
@@ -7,6 +7,7 @@ import {
   ChevronDown,
   RefreshCw,
   ChevronLeft,
+  Download,
 } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 import SidebarLayout from "../components/SidebarLayout";
@@ -14,7 +15,7 @@ import PageHeader from "../components/PageHeader";
 import SearchFilter from "../components/SearchFilter";
 import ConfirmationDialog from "../components/ConfirmationDialog";
 import StatsCard from "../components/StatsCard";
-import { jobWorkApi, jobWorkReturnApi, axiosInstance } from "../services/apiService";
+import { jobWorkApi, jobWorkReturnApi, axiosInstance, exportApi } from "../services/apiService";
 import toast from "react-hot-toast";
 import Loader from "../components/Loader";
 import { normalizeJobWorkLabel, removeOrderJobOverride, upsertOrderJobOverride } from "../utils/orderJobWorkSync";
@@ -22,6 +23,7 @@ import { printJobWorkPng as sharedPrintJobWorkPng } from "../utils/jobWorkPrint"
 import JobWorkStatusDropdownShared from "../components/JobWork/JobWorkStatusDropdown";
 import JobWorkTypeDropdownShared from "../components/JobWork/JobWorkTypeDropdown";
 import JobWorkReturnRecordDialogShared from "../components/JobWork/JobWorkReturnRecordDialog";
+import DownloadStatementModal from "../components/DownloadStatementModal";
 
 const printJobWorkPng = sharedPrintJobWorkPng;
 
@@ -255,6 +257,7 @@ const JobWork = () => {
   const [deleting,     setDeleting]     = useState(false);
   const [deleteReturnTarget, setDeleteReturnTarget] = useState(null); // { jw, ret } for deleting a specific return
   const [deletingReturn, setDeletingReturn] = useState(false);
+  const [statementOpen, setStatementOpen] = useState(false);
 
   const mergeSavedJobWork = useCallback((list) => {
     if (!savedJobWork?.job) return list;
@@ -489,8 +492,28 @@ const JobWork = () => {
             setTypeFilter={setTypeFilter}
             filterOptions={["IN_HOUSE", "JOB_WORK"]}
             filterPlaceholder="Type"
+            extraButton={
+              <button
+                type="button"
+                onClick={() => setStatementOpen(true)}
+                className="inline-flex items-center gap-2 px-4 py-3 border border-gray-300 rounded-lg bg-white text-sm text-gray-700 hover:bg-gray-50 transition whitespace-nowrap"
+              >
+                <Download className="w-4 h-4" />
+                Download Statement
+              </button>
+            }
           />
         </div>
+
+        <DownloadStatementModal
+          isOpen={statementOpen}
+          onClose={() => setStatementOpen(false)}
+          title="Download Job Work Statement"
+          fileName="jobwork_statement"
+          onDownload={(partyId, startDate, endDate) =>
+            exportApi.getJobWorkReportPdf(partyId, startDate, endDate, { responseType: "blob" })
+          }
+        />
 
         {/* Content */}
         {loading ? (

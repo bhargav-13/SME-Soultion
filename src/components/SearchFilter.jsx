@@ -8,6 +8,7 @@ const SearchFilter = ({
   setTypeFilter,
   filterOptions,
   filterPlaceholder,
+  extraButton,
 }) => {
   const [isTypeFilterOpen, setIsTypeFilterOpen] = useState(false);
 
@@ -24,6 +25,7 @@ const SearchFilter = ({
           className="w-full pl-10 pr-4 py-3 border bg-white border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-500"
         />
       </div>
+      {extraButton && extraButton}
       {filterOptions && (
         <div className="relative w-40">
           <button

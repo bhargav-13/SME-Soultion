@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { ChevronLeft, Plus } from "lucide-react";
+import { ChevronLeft, Plus, Download } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import SidebarLayout from "../components/SidebarLayout";
 import SearchFilter from "../components/SearchFilter";
@@ -9,9 +9,10 @@ import StatsCard from "../components/StatsCard";
 import toast from "react-hot-toast";
 import GresCard from "../components/Gres/GresCard";
 import GresReturnDialog from "../components/Gres/GresReturnDialog";
-import { gresFillingApi, gresFillingReturnApi } from "../services/apiService";
+import { gresFillingApi, gresFillingReturnApi, exportApi } from "../services/apiService";
 import { printGresFillingPng } from "../utils/gresFillingPrint";
 import PrimaryActionButton from "../components/PrimaryActionButton";
+import DownloadStatementModal from "../components/DownloadStatementModal";
 
 const round3 = (n) => Math.round(n * 1000) / 1000;
 
@@ -79,6 +80,7 @@ const Gres = () => {
   const [deleteReturnTarget, setDeleteReturnTarget] = useState(null);
   const [deleting, setDeleting] = useState(false);
   const [deletingReturn, setDeletingReturn] = useState(false);
+  const [statementOpen, setStatementOpen] = useState(false);
 
   const refreshRecords = async () => {
     setLoading(true);
@@ -232,8 +234,28 @@ const Gres = () => {
             setTypeFilter={setTypeFilter}
             filterOptions={["INHOUSE", "OUTSIDE"]}
             filterPlaceholder="Type"
+            extraButton={
+              <button
+                type="button"
+                onClick={() => setStatementOpen(true)}
+                className="inline-flex items-center gap-2 px-4 py-3 border border-gray-300 rounded-lg bg-white text-sm text-gray-700 hover:bg-gray-50 transition whitespace-nowrap"
+              >
+                <Download className="w-4 h-4" />
+                Download Statement
+              </button>
+            }
           />
         </div>
+
+        <DownloadStatementModal
+          isOpen={statementOpen}
+          onClose={() => setStatementOpen(false)}
+          title="Download Gres Statement"
+          fileName="gres_statement"
+          onDownload={(partyId, startDate, endDate) =>
+            exportApi.getGresFillingReportPdf(partyId, startDate, endDate, { responseType: "blob" })
+          }
+        />
 
         {loading ? (
           <Loader text="Loading gres records..." />
