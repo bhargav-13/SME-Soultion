@@ -54,7 +54,7 @@ const PackingInvoiceList = ({ invoices = [], onOpen }) => {
                   <div className="h-[50px] rounded-md border border-gray-400 bg-white shadow-sm flex items-center justify-center  font-medium text-black transition hover:border-gray-600 hover:shadow-md">
                     {invoice.invoiceId || `In-${invoice.id}`}
                   </div>
-                  <p className="mt-1  text-black text-center truncate">
+                  <p className="mt-1 text-black text-center font-[300]">
                     {invoice.party || "-"}
                   </p>
                 </button>
