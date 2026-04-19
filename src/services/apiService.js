@@ -81,8 +81,8 @@ const createAxiosInstance = () => {
         async (error) => {
             const originalRequest = error.config;
 
-            // Handle 401 Unauthorized
-            if (error.response?.status === 401 && !originalRequest._retry) {
+            // Handle 401 Unauthorized or 403 Forbidden (backend returns 403 for expired tokens)
+            if ((error.response?.status === 401 || error.response?.status === 403) && !originalRequest._retry) {
                 originalRequest._retry = true;
 
                 // Try to refresh token
