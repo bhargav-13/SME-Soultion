@@ -3,7 +3,6 @@ import ReactDOM from "react-dom";
 import { useNavigate } from "react-router-dom";
 import { Plus, Pencil, Trash2, X, Eye, Search, Check, ChevronDown } from "lucide-react";
 import SidebarLayout from "../components/SidebarLayout";
-import SearchFilter from "../components/SearchFilter";
 import StatsCard from "../components/StatsCard";
 import PageHeader from "../components/PageHeader";
 import PrimaryActionButton from "../components/PrimaryActionButton";
@@ -305,7 +304,7 @@ const Inventory = () => {
   const [editingCell, setEditingCell] = useState(null);
 
   const [searchTerm, setSearchTerm] = useState("");
-  const [typeFilter, setTypeFilter] = useState("");
+  const [stockFilter, setStockFilter] = useState("ALL");
 
   const [addItemDialog, setAddItemDialog] = useState(false);
   const [viewItemsDialog, setViewItemsDialog] = useState(false);
@@ -375,20 +374,36 @@ const Inventory = () => {
           const invData = invResponse.data?.data || invResponse.data || [];
           const invList = Array.isArray(invData) ? invData : [];
           const sizes = item.sizes || [];
-          for (const inv of invList) {
-            const row = apiRowToTableRow(inv, item.id, sizes);
 
-            // Match stock entry via size to compute stock status
-            const inch = (inv.sizeInInch || "").trim();
-            const mm = (inv.sizeInMm || "").trim();
-            const matchedSize = sizes.find(
-              (s) =>
-                (s.sizeInInch || "").trim() === inch &&
-                (s.sizeInMm || "").trim() === mm
+          // Show a row for every defined size, matched to inventory if it exists
+          for (const size of sizes) {
+            const inch = (size.sizeInInch || "").trim();
+            const mm = (size.sizeInMm || "").trim();
+
+            const matchingInv = invList.find(
+              (inv) =>
+                (inv.sizeInInch || "").trim() === inch &&
+                (inv.sizeInMm || "").trim() === mm
             );
-            if (matchedSize?.id) {
+
+            let row;
+            if (matchingInv) {
+              row = apiRowToTableRow(matchingInv, item.id, sizes);
+            } else {
+              row = { _itemId: String(item.id), _inventoryId: null, _sizes: sizes, _isNew: false, _editing: false };
+              columns.forEach((col) => {
+                if (col.key === "itemName") row[col.key] = item.itemName || "";
+                else if (col.key === "sizeInInch") row[col.key] = size.sizeInInch || "";
+                else if (col.key === "sizeInMm") row[col.key] = size.sizeInMm || "";
+                else if (col.key === "dozenWeight") row[col.key] = size.dozenWeight != null ? String(size.dozenWeight) : "";
+                else row[col.key] = "";
+              });
+            }
+
+            // Compute stock status using size.id directly
+            if (size.id) {
               const stockEntry = allStockEntries.find(
-                (st) => Number(st.sizeId) === Number(matchedSize.id)
+                (st) => Number(st.sizeId) === Number(size.id)
               );
               if (stockEntry) {
                 const totalPc = parseFloat(stockEntry.totalPc) || 0;
@@ -404,6 +419,20 @@ const Inventory = () => {
             }
 
             allRows.push(row);
+          }
+
+          // Include any inventory records with no matching size (edge case)
+          for (const inv of invList) {
+            const invInch = (inv.sizeInInch || "").trim();
+            const invMm = (inv.sizeInMm || "").trim();
+            const hasMatchingSize = sizes.some(
+              (s) =>
+                (s.sizeInInch || "").trim() === invInch &&
+                (s.sizeInMm || "").trim() === invMm
+            );
+            if (!hasMatchingSize) {
+              allRows.push(apiRowToTableRow(inv, item.id, sizes));
+            }
           }
         } catch (err) {
           console.error(`Error fetching inventory for item ${item.id}:`, err);
@@ -819,12 +848,17 @@ const Inventory = () => {
     return tableData
       .map((row, originalIndex) => ({ ...row, _originalIndex: originalIndex }))
       .filter((row) => {
+        if (row._isNew) return true;
         const rowText = columns.map((c) => row[c.key] || "").join(" ").toLowerCase();
         const matchesSearch = !searchTerm || rowText.includes(searchTerm.toLowerCase());
-        const matchesType = !typeFilter || rowText.includes(typeFilter.toLowerCase());
-        return matchesSearch && matchesType;
+        let matchesStock = true;
+        if      (stockFilter === "IN_STOCK")     matchesStock = row.stockStatus === "IN_STOCK";
+        else if (stockFilter === "LOW")          matchesStock = row.stockStatus === "LOW";
+        else if (stockFilter === "OUT_OF_STOCK") matchesStock = row.stockStatus === "OUT_OF_STOCK";
+        else if (stockFilter === "NO_ENTRY")     matchesStock = !row.stockStatus;
+        return matchesSearch && matchesStock;
       });
-  }, [searchTerm, tableData, typeFilter]);
+  }, [searchTerm, tableData, stockFilter]);
 
   const getSuggestions = (row, colKey) => {
     const sizes = row._sizes || [];
@@ -1047,15 +1081,41 @@ const Inventory = () => {
             <StatsCard label="Total Items" value={items.length} />
           </div>
 
-          <div className="mt-3">
-            <SearchFilter
-              searchQuery={searchTerm}
-              setSearchQuery={setSearchTerm}
-              typeFilter={typeFilter}
-              setTypeFilter={setTypeFilter}
-              filterOptions={[]}
-              filterPlaceholder="Filter"
-            />
+          <div className="mt-3 mb-6 flex flex-wrap items-center gap-3">
+            {/* Search */}
+            <div className="flex-1 relative min-w-[200px]">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <input
+                type="text"
+                placeholder="Search..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full pl-9 pr-4 py-2.5 border border-gray-300 bg-white rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-400 text-sm"
+              />
+            </div>
+            {/* Stock status radio tabs */}
+            <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1">
+              {[
+                { value: "ALL",          label: "All Items" },
+                { value: "IN_STOCK",     label: "In Stock" },
+                { value: "LOW",          label: "Low Stock" },
+                { value: "OUT_OF_STOCK", label: "Out of Stock" },
+                { value: "NO_ENTRY",     label: "No Entry" },
+              ].map((opt) => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => setStockFilter(opt.value)}
+                  className={`px-3 py-1.5 rounded-md text-xs font-medium transition whitespace-nowrap ${
+                    stockFilter === opt.value
+                      ? "bg-white shadow text-gray-900"
+                      : "text-gray-500 hover:text-gray-700"
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
           </div>
 
           {loading ? (

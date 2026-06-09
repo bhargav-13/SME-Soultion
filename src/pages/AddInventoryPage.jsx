@@ -62,6 +62,7 @@ const AddInventoryPage = () => {
   const [blueprintSizes, setBlueprintSizes] = useState([]);
   const [loading,        setLoading]        = useState(true);
   const [saving,         setSaving]         = useState(false);
+  const [savingSize,     setSavingSize]     = useState(false);
 
   // ── Section 1 : Blueprint ─────────────────────────────────────────────────
   const [blueprintMode,          setBlueprintMode]          = useState("existing");
@@ -232,6 +233,60 @@ const AddInventoryPage = () => {
 
   const onPackingChange = (key, val) =>
     setPacking((prev) => ({ ...prev, [key]: val }));
+
+  // ── Save Size Only ────────────────────────────────────────────────────────
+  const handleSaveSize = async () => {
+    const isNew = blueprintMode === "new";
+    if (isNew  && !newBlueprintName.trim())    { toast.error("Item name is required");      return; }
+    if (isNew  && !newBlueprintCategoryId)     { toast.error("Category is required");       return; }
+    if (!isNew && !selectedBlueprintId)        { toast.error("Select a blueprint");         return; }
+    if (!sizeInInch.trim() || !sizeInMm.trim()) { toast.error("Size In Inch and MM are required"); return; }
+
+    setSavingSize(true);
+    try {
+      let blueprintId;
+      if (isNew) {
+        const res = await itemBlueprintApi.createItem({
+          itemName:   newBlueprintName.trim(),
+          categoryId: Number(newBlueprintCategoryId),
+        });
+        blueprintId = res.data?.id;
+      } else {
+        blueprintId = Number(selectedBlueprintId);
+      }
+      if (!blueprintId) throw new Error("Blueprint ID not found");
+
+      const inch = sizeInInch.trim();
+      const mm   = sizeInMm.trim();
+      const dz   = sizeDozenWeight ? parseFloat(sizeDozenWeight) : null;
+      const szPayload = { sizeInInch: inch, sizeInMm: mm };
+      if (dz !== null) szPayload.dozenWeight = dz;
+      const szRes = await sizeApi.createSize(blueprintId, szPayload);
+
+      // Refresh sizes list and keep the new size selected (chip highlights automatically)
+      try {
+        const sizesRes = await sizeApi.getSizesByItemId(blueprintId);
+        const updated = Array.isArray(sizesRes.data) ? sizesRes.data : [];
+        setBlueprintSizes(updated);
+        // Auto-select: keep inch/mm fields filled so the new chip appears active
+        // If the API returned the new size with an id, use its values to ensure exact match
+        const saved = szRes.data || updated.find(
+          (s) => (s.sizeInInch || "").trim() === inch && (s.sizeInMm || "").trim() === mm
+        );
+        if (saved) {
+          setSizeInInch(saved.sizeInInch || inch);
+          setSizeInMm(saved.sizeInMm || mm);
+          if (saved.dozenWeight != null) setSizeDozenWeight(String(saved.dozenWeight));
+        }
+      } catch { /* keep existing sizes list */ }
+
+      toast.success("Size saved!");
+    } catch (error) {
+      toast.error(error.response?.data?.message || error.message || "Failed to save size");
+    } finally {
+      setSavingSize(false);
+    }
+  };
 
   // ── Save ──────────────────────────────────────────────────────────────────
   const handleSave = async (e) => {
@@ -558,6 +613,42 @@ const AddInventoryPage = () => {
                 </div>
               </div>
 
+              {/* ── Save Size Only — quick save before stock entry ── */}
+              {(() => {
+                const isNew = blueprintMode === "new";
+                const blueprintReady = isNew
+                  ? newBlueprintName.trim() && newBlueprintCategoryId
+                  : selectedBlueprintId;
+                const sizeFieldsFilled = sizeInInch.trim() && sizeInMm.trim();
+                const sizeAlreadyExists = blueprintSizes.some(
+                  (s) =>
+                    (s.sizeInInch || "").trim() === sizeInInch.trim() &&
+                    (s.sizeInMm   || "").trim() === sizeInMm.trim()
+                );
+                const canSaveSize = blueprintReady && sizeFieldsFilled && !sizeAlreadyExists;
+                return (
+                  <div className="flex justify-end">
+                    <button
+                      type="button"
+                      disabled={savingSize || !canSaveSize}
+                      onClick={handleSaveSize}
+                      title={
+                        sizeAlreadyExists
+                          ? "This size already exists"
+                          : !sizeFieldsFilled
+                          ? "Fill Size in Inch and MM first"
+                          : !blueprintReady
+                          ? "Select or fill blueprint first"
+                          : ""
+                      }
+                      className="px-6 py-2 border border-gray-400 text-gray-700 rounded-lg hover:bg-gray-50 transition text-sm font-medium disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                      {savingSize ? "Saving..." : "Save Size Only"}
+                    </button>
+                  </div>
+                );
+              })()}
+
               {/* ════ Section 3: Stock Entry ════════════════════════════ */}
               <div
                 ref={stockSectionRef}
@@ -675,7 +766,7 @@ const AddInventoryPage = () => {
                 ))}
               </div>
 
-              {/* ── Action Buttons — identical to AddItem.jsx ── */}
+              {/* ── Action Buttons ── */}
               <div className="flex gap-4 justify-center pt-2">
                 <button
                   type="submit"
