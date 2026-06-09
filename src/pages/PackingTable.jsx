@@ -194,6 +194,8 @@ const apiToRow = (inv) => {
     _sizeId: sizeObj?.id || null,
     _itemId: null, // populated from sizeToItem reverse lookup
     _clientInventory: null, // fetched on demand
+    _createdAt: inv.createdAt || null,
+    _updatedAt: inv.lastUpdatedAt || null,
     date: inv.invoiceDate || "",
     invoiceId: inv.invoiceNo || "",
     party: inv.party?.name || "",
@@ -868,7 +870,7 @@ const PackingInvoice = () => {
                   </tr>
                 ) : (
                   filteredRows.map((row, rowIndex) => (
-                    <tr key={row.id} className="border-b border-gray-200 hover:bg-gray-50">
+                    <tr key={row.id} className={`border-b border-gray-200 ${row._updatedAt && row._createdAt && row._updatedAt !== row._createdAt ? "bg-yellow-50" : "hover:bg-gray-50"}`}>
                       {columns.map((col, colIndex) => {
                         const cellId = `${row.id}-${col.key}`;
                         const isSelected = selectedCell === cellId;

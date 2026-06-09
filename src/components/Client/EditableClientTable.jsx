@@ -43,10 +43,11 @@ const EditableClientTable = ({
   onCellChange,
   onCellBlur,
   onLastCellTab,
-  readOnlyCols = [],          // array of column indices that are read-only
-  colWidths = {},             // { [colIndex]: 'min-w-[Xpx]' }
+  readOnlyCols = [],
+  colWidths = {},
   tableMinWidth = "",
   scrollHeightClass = "max-h-[560px]",
+  modifiedRowIndices = new Set(),
 }) => {
   const readOnlySet = new Set(readOnlyCols);
 
@@ -74,7 +75,7 @@ const EditableClientTable = ({
           </thead>
           <tbody>
             {rows.map((row, rowIndex) => (
-              <tr key={`row-${rowIndex}`} className="border-b border-gray-200 hover:bg-gray-50">
+              <tr key={`row-${rowIndex}`} className={`border-b border-gray-200 ${modifiedRowIndices.has(rowIndex) ? "bg-yellow-50" : "hover:bg-gray-50"}`}>
                 {row.map((value, colIndex) => {
                   const cellId = `${rowIndex}-${colIndex}`;
                   const isReadOnly = readOnlySet.has(colIndex);

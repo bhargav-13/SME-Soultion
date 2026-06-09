@@ -942,8 +942,12 @@ components:
         jobWorkNo:
           type: number
           format: double
-        dispatch:
-          $ref: '#/components/schemas/OrderDispatch'
+        totalDispatchedPc:
+          type: number
+          format: double
+        lastDispatchDate:
+          type: string
+          format: date
 
     OrderItemSize:
       type: object

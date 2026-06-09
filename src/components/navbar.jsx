@@ -1,7 +1,7 @@
 // src/components/Navbar.jsx
 import React, { useState } from "react";
-import { Menu, User, LogOut } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { Menu, User, LogOut, LayoutDashboard } from "lucide-react";
+import { useNavigate, useLocation, Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import ConfirmationDialog from "./ConfirmationDialog";
 
@@ -9,6 +9,8 @@ const Navbar = ({ showSidebarMenu = false, onOpenSidebar = () => {} }) => {
   const { user, logout } = useAuth();
   const [showLogoutDialog, setShowLogoutDialog] = useState(false);
   const navigate = useNavigate();
+  const location = useLocation();
+  const isDashboardActive = location.pathname === "/";
 
   const handleLogoutClick = () => {
     setShowLogoutDialog(true);
@@ -38,6 +40,17 @@ const Navbar = ({ showSidebarMenu = false, onOpenSidebar = () => {} }) => {
                 <Menu className="w-5 h-5" />
               </button>
             ) : null}
+            <Link
+              to="/"
+              className={`inline-flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
+                isDashboardActive
+                  ? "bg-white border border-black text-black"
+                  : "text-gray-600 hover:text-black hover:bg-gray-50"
+              }`}
+            >
+              <LayoutDashboard className="w-4 h-4" />
+              Dashboard
+            </Link>
           </div>
 
           {/* Right Section */}

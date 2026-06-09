@@ -8,6 +8,7 @@ import {
   itemBlueprintApi,
   sizeApi,
   clientInventoryApi,
+  itemApi,
   axiosInstance,
 } from "../../services/apiService";
 
@@ -33,23 +34,31 @@ const createEmptyItem = () => ({
   selectedSize: null,
   sizes: [],
   sizesLoading: false,
-  // user inputs
   qtyPc: "",
   stickerQty: "",
   finish: "",
-  // raw rates from client inventory (used for calculations)
-  rawPcPerBox: "",      // pcsPerBox  — the rate, never changes
-  rawBoxPerCartoon: "", // boxPerCarton — the rate, never changes
-  // calculated display values (derived from qtyPc + raw rates)
+  rawPcPerBox: "",
+  rawBoxPerCartoon: "",
   pcPerBox: "",
   boxPerCartoon: "",
   pcPerCartoon: "",
   qtyKg: "",
   clientInventoryLoading: false,
-  // item search
+  stockStatus: null,
+  stockTotalPc: null,
+  stockLowWarn: 0,
   itemSearch: "",
   itemDropdownOpen: false,
 });
+
+const computeStockStatus = (totalPc, lowWarn, orderedQty) => {
+  if (totalPc === null) return null;
+  const ordered = parseFloat(orderedQty) || 0;
+  if (totalPc <= 0) return "OUT_OF_STOCK";
+  if (ordered > totalPc) return "EXCEEDS";
+  if (lowWarn > 0 && totalPc <= lowWarn) return "LOW";
+  return "IN_STOCK";
+};
 
 // ─── Derive box / carton / kg from user's qtyPc input ────────────────────────
 // boxes   = ceil(qtyPc / pcPerBox_rate)
@@ -235,6 +244,7 @@ const AddOrder = () => {
   const [saving, setSaving] = useState(false);
   const [allItems, setAllItems] = useState([]);
   const [itemsLoading, setItemsLoading] = useState(false);
+  const [allStockEntries, setAllStockEntries] = useState([]);
 
   useEffect(() => {
     itemBlueprintApi.getAllItems()
@@ -242,6 +252,15 @@ const AddOrder = () => {
       .catch(() => toast.error("Failed to load items"))
       .finally(() => setItemsLoading(false));
     setItemsLoading(true);
+  }, []);
+
+  useEffect(() => {
+    itemApi.getAllItems(undefined, undefined, 0, 1000)
+      .then((res) => {
+        const data = res.data?.data || res.data || [];
+        setAllStockEntries(Array.isArray(data) ? data : []);
+      })
+      .catch(() => {});
   }, []);
 
   const updateItem = useCallback((index, patch) => {
@@ -292,19 +311,30 @@ const AddOrder = () => {
         rawBoxPerCartoon,
         size.dozenWeight
       );
+      const stockEntry = allStockEntries.find((st) => Number(st.sizeId) === Number(size.id));
+      let stockTotalPc = null;
+      let stockLowWarn = 0;
+      if (stockEntry) {
+        stockTotalPc = parseFloat(stockEntry.totalPc) || 0;
+        stockLowWarn = parseFloat(stockEntry.lowStockWarning) || 0;
+      }
+      const stockStatus = computeStockStatus(stockTotalPc, stockLowWarn, currentQtyPc);
+
       updateItem(index, {
         clientInventoryLoading: false,
         rawPcPerBox,
         rawBoxPerCartoon,
         pcPerCartoon: m?.pcsPerCarton != null ? String(m.pcsPerCarton) : "",
-        // Re-derive using qtyPc that was entered BEFORE size change
         ...derived,
         stickerQty: derived.pcPerBox,
+        stockStatus,
+        stockTotalPc,
+        stockLowWarn,
       });
     } catch {
       updateItem(index, { clientInventoryLoading: false });
     }
-  }, [selectedParty, updateItem]);
+  }, [selectedParty, updateItem, allStockEntries]);
 
   const addItem = () => setItems((prev) => [...prev, createEmptyItem()]);
   const removeItem = (idx) =>
@@ -462,6 +492,29 @@ const AddOrder = () => {
                       loading={item.sizesLoading}
                       onSelect={(opt) => handleSelectSize(index, opt.raw, item.qtyPc)}
                     />
+                    {item.selectedSize && (
+                      <span className={`mt-1.5 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${
+                        !item.stockStatus
+                          ? "bg-gray-50 text-gray-500 border-gray-200"
+                          : item.stockStatus === "IN_STOCK"
+                          ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                          : item.stockStatus === "LOW"
+                          ? "bg-yellow-50 text-yellow-700 border-yellow-200"
+                          : item.stockStatus === "EXCEEDS"
+                          ? "bg-orange-50 text-orange-700 border-orange-200"
+                          : "bg-red-50 text-red-700 border-red-200"
+                      }`}>
+                        {!item.stockStatus
+                          ? "Stock not added"
+                          : item.stockStatus === "IN_STOCK"
+                          ? `In Stock (${item.stockTotalPc} pc)`
+                          : item.stockStatus === "LOW"
+                          ? `Low Stock (${item.stockTotalPc} pc)`
+                          : item.stockStatus === "EXCEEDS"
+                          ? `Exceeds Stock (only ${item.stockTotalPc} pc available)`
+                          : "Out of Stock"}
+                      </span>
+                    )}
                   </div>
 
                   {/* Pcs */}
@@ -483,6 +536,7 @@ const AddOrder = () => {
                           qtyPc,
                           ...derived,
                           stickerQty: derived.pcPerBox,
+                          stockStatus: computeStockStatus(item.stockTotalPc, item.stockLowWarn, qtyPc),
                         });
                       }}
                       placeholder="Enter Pc."

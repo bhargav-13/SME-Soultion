@@ -220,6 +220,17 @@ const ClientSelect = () => {
     [filteredRowEntries]
   );
 
+  const modifiedRowIndices = useMemo(() => {
+    const s = new Set();
+    filteredRowEntries.forEach(({ sourceIndex }, filteredIndex) => {
+      const item = apiItems[sourceIndex];
+      if (item?.createdAt && item?.lastUpdatedAt && item.createdAt !== item.lastUpdatedAt) {
+        s.add(filteredIndex);
+      }
+    });
+    return s;
+  }, [filteredRowEntries, apiItems]);
+
   // ── Dialog helpers ────────────────────────────────────────────
   const openClientDialogForTable = () => {
     setClientDialogMode("table");
@@ -414,6 +425,7 @@ const ClientSelect = () => {
                   onCellChange={handleCellChange}
                   onCellBlur={handleInlineCellBlur}
                   onLastCellTab={handleInlineLastCellTab}
+                  modifiedRowIndices={modifiedRowIndices}
                 />
                 <div className="mt-4">
                   <div className="flex items-center justify-center gap-3">
@@ -470,6 +482,7 @@ const ClientSelect = () => {
         onDeleteAll={handleDeleteAll}
         onClose={handleCloseDetails}
         readOnlyCols={READ_ONLY_COLS}
+        modifiedRowIndices={modifiedRowIndices}
       />
     </SidebarLayout>
   );

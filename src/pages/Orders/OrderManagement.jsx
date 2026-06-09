@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Plus, SquarePen, Eye, Trash2, ChevronDown, X, ChevronLeft, ChevronRight, BriefcaseBusiness } from "lucide-react";
+import { Plus, SquarePen, Eye, Trash2, ChevronDown, X, ChevronLeft, ChevronRight, BriefcaseBusiness, Truck } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import SidebarLayout from "../../components/SidebarLayout";
 import SearchFilter from "../../components/SearchFilter";
@@ -8,7 +8,7 @@ import PageHeader from "../../components/PageHeader";
 import PrimaryActionButton from "../../components/PrimaryActionButton";
 import ConfirmationDialog from "../../components/ConfirmationDialog";
 import toast from "react-hot-toast";
-import { axiosInstance } from "../../services/apiService";
+import { axiosInstance, partyApi, orderDispatchApi } from "../../services/apiService";
 import Loader from "../../components/Loader";
 import {
   normalizeJobWorkLabel,
@@ -38,8 +38,10 @@ const flattenOrders = (apiData) => {
         cartoon:      item.boxPerCartoon ?? "—",
         pcCartoon:    item.pcPerCartoon  ?? "—",
         stickerQty:   item.stickerQty   ?? "—",
-        dispatchDate: item.dispatch?.dispatchDate  ?? "—",
-        dispatchPcs:  item.dispatch?.dispatchPcs   ?? "—",
+        dispatchDate: item.lastDispatchDate ?? null,
+        dispatchPcs:  item.totalDispatchedPc != null
+          ? item.totalDispatchedPc
+          : (item.qtyPc != null && item.pendingPc != null ? item.qtyPc - item.pendingPc : null),
         pendingPc:    item.pendingPc    ?? "—",
         jobWork:      item.platingType  ?? null,
         platingStatus:item.jobActionDone ?? false,
@@ -126,6 +128,14 @@ const OrderManagement = () => {
   const [moveToJobWorkRow, setMoveToJobWorkRow] = useState(null);
   const [selectedMoveType, setSelectedMoveType] = useState("OUTSIDE");
 
+  // ── Parties + Dispatch ────────────────────────────────────────────────────
+  const [parties, setParties]         = useState([]);
+  const [partySearch, setPartySearch] = useState("");
+  const [partyDropOpen, setPartyDropOpen] = useState(false);
+  const partyDropRef                  = useRef(null);
+  const [dispatchDialog, setDispatchDialog] = useState(null);
+  const [savingEdit, setSavingEdit]   = useState(false);
+
   // ── Debounce search ───────────────────────────────────────────────────────
   const searchDebounceRef = useRef(null);
   const debouncedSearch   = useRef("");
@@ -183,6 +193,23 @@ const OrderManagement = () => {
       window.removeEventListener("storage", reloadOverrides);
     };
   }, []);
+
+  useEffect(() => {
+    partyApi.getAllParties()
+      .then((res) => setParties(Array.isArray(res.data) ? res.data : []))
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    if (!partyDropOpen) return;
+    const handler = (e) => {
+      if (partyDropRef.current && !partyDropRef.current.contains(e.target)) {
+        setPartyDropOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [partyDropOpen]);
 
   // ── Client-side search + type filter ──────────────────────────────────────
   const filteredOrders = useMemo(() => {
@@ -287,33 +314,111 @@ const OrderManagement = () => {
     setMoveToJobWorkRow(null);
   };
 
-  const handleEditOrderSave = () => {
-    if (!editOrder) return;
-    const existingOverride = getRowOverride(editOrder);
-    const currentJobWork = normalizeJobWorkLabel(existingOverride?.jobWork ?? editOrder.jobWork);
-    const overridePatch = {
-      platingStatus: editOrder.platingStatus,
-      jobWorkNo: editOrder.jobWorkNo,
-    };
-
-    if (currentJobWork !== "—") {
-      overridePatch.jobWork = currentJobWork;
+  const normalizeToISO = (dateStr) => {
+    if (!dateStr || dateStr === "—") return null;
+    if (dateStr.includes("/")) {
+      const [d, m, y] = dateStr.split("/");
+      return `${y}-${m}-${d}`;
     }
+    return dateStr;
+  };
 
-    setOrders((prev) =>
-      prev.map((row) => (row.id === editOrder.id ? { ...row, ...editOrder } : row))
-    );
+  const handleEditOrderSave = async () => {
+    if (!editOrder) return;
+    setSavingEdit(true);
+    try {
+      // Fetch full order to preserve all items
+      const orderRes = await axiosInstance.get(
+        `/api/v1/parties/${editOrder.partyId}/orders/${editOrder.orderId}`
+      );
+      const fullOrder = orderRes.data;
+      const updatedItems = (fullOrder.orderItems || []).map((item) => {
+        const isTarget = item.id === editOrder.id;
+        return {
+          itemSizeId:    item.itemSize?.id,
+          plating:       isTarget ? editOrder.plating        : item.plating,
+          qtyPc:         isTarget ? (parseFloat(editOrder.qtyPc)       || 0) : item.qtyPc,
+          qtyKg:         isTarget ? (parseFloat(editOrder.qtyKg)       || null) : item.qtyKg,
+          pcPerBox:      isTarget ? (parseFloat(editOrder.boxPc)       || null) : item.pcPerBox,
+          boxPerCartoon: isTarget ? (parseFloat(editOrder.cartoon)     || null) : item.boxPerCartoon,
+          pcPerCartoon:  isTarget ? (parseFloat(editOrder.pcCartoon)   || null) : item.pcPerCartoon,
+          stickerQty:    isTarget ? (parseFloat(editOrder.stickerQty)  || null) : item.stickerQty,
+          pendingPc:     isTarget ? (parseFloat(editOrder.pendingPc)   || null) : item.pendingPc,
+          jobActionDone: isTarget ? editOrder.platingStatus : item.jobActionDone,
+          platingType:   item.platingType,
+        };
+      });
 
-    setOrderJobOverrides(
-      upsertOrderJobOverride({
-        orderItemId: editOrder.id,
-        orderId: editOrder.orderId,
-        ...overridePatch,
-      })
-    );
+      await axiosInstance.put(
+        `/api/v1/parties/${editOrder.partyId}/orders/${editOrder.orderId}`,
+        { orderDate: normalizeToISO(editOrder.date) || fullOrder.orderDate, items: updatedItems }
+      );
 
-    setEditOrder(null);
-    toast.success("Order updated");
+      // Update local state + overrides
+      const existingOverride = getRowOverride(editOrder);
+      const currentJobWork = normalizeJobWorkLabel(existingOverride?.jobWork ?? editOrder.jobWork);
+      const overridePatch = { platingStatus: editOrder.platingStatus, jobWorkNo: editOrder.jobWorkNo };
+      if (currentJobWork !== "—") overridePatch.jobWork = currentJobWork;
+
+      setOrders((prev) => prev.map((row) => (row.id === editOrder.id ? { ...row, ...editOrder } : row)));
+      setOrderJobOverrides(upsertOrderJobOverride({ orderItemId: editOrder.id, orderId: editOrder.orderId, ...overridePatch }));
+      setEditOrder(null);
+      toast.success("Order updated");
+      triggerFetch(debouncedSearch.current, page);
+    } catch (err) {
+      toast.error(err?.response?.data?.message || "Failed to update order");
+    } finally {
+      setSavingEdit(false);
+    }
+  };
+
+  // ── Dispatch ──────────────────────────────────────────────────────────────
+  const fetchDispatches = async (row) => {
+    const res = await orderDispatchApi.getAllOrderDispatches(row.partyId, row.orderId, row.id, undefined, 0, 100);
+    return res.data?.data || [];
+  };
+
+  const openDispatchDialog = async (row) => {
+    setDispatchDialog({ row, dispatches: [], loading: true, newDate: "", newPcs: "", saving: false });
+    try {
+      const dispatches = await fetchDispatches(row);
+      setDispatchDialog((prev) => ({ ...prev, dispatches, loading: false }));
+    } catch {
+      toast.error("Failed to load dispatches");
+      setDispatchDialog(null);
+    }
+  };
+
+  const handleAddDispatch = async () => {
+    const { row, newDate, newPcs } = dispatchDialog;
+    if (!newDate) { toast.error("Enter dispatch date"); return; }
+    if (!newPcs || parseFloat(newPcs) <= 0) { toast.error("Enter valid pcs"); return; }
+    setDispatchDialog((prev) => ({ ...prev, saving: true }));
+    try {
+      await orderDispatchApi.createOrderDispatch(row.partyId, row.orderId, row.id, {
+        dispatchDate: newDate,
+        dispatchPcs: parseFloat(newPcs),
+      });
+      const dispatches = await fetchDispatches(row);
+      setDispatchDialog((prev) => ({ ...prev, dispatches, newDate: "", newPcs: "", saving: false }));
+      toast.success("Dispatch added");
+      triggerFetch(debouncedSearch.current, page);
+    } catch (err) {
+      toast.error(err?.response?.data?.message || "Failed to add dispatch");
+      setDispatchDialog((prev) => ({ ...prev, saving: false }));
+    }
+  };
+
+  const handleDeleteDispatch = async (dispatchId) => {
+    const { row } = dispatchDialog;
+    try {
+      await orderDispatchApi.deleteOrderDispatch(row.partyId, row.orderId, row.id, dispatchId);
+      setDispatchDialog((prev) => ({ ...prev, dispatches: prev.dispatches.filter((d) => d.id !== dispatchId) }));
+      toast.success("Dispatch deleted");
+      triggerFetch(debouncedSearch.current, page);
+    } catch (err) {
+      toast.error(err?.response?.data?.message || "Failed to delete dispatch");
+    }
   };
 
   const renderMoveOption = (value, label) => {
@@ -375,13 +480,58 @@ const OrderManagement = () => {
       ["Plating Status", "platingStatus"],
     ];
 
+    const filteredParties = parties.filter((p) =>
+      (p.name || "").toLowerCase().includes(partySearch.toLowerCase())
+    );
+
     return (
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {fields.map(([label, key]) => (
           <div key={key}>
             <p className="text-xs text-gray-500 mb-1">{label}</p>
             {isEditable ? (
-              key === "platingStatus" ? (
+              key === "partyName" ? (
+                <div ref={partyDropRef} className="relative">
+                  <div
+                    className={`flex items-center border rounded-md overflow-hidden transition ${partyDropOpen ? "ring-1 ring-gray-400 border-gray-400" : "border-gray-300"}`}
+                  >
+                    <input
+                      type="text"
+                      value={partyDropOpen ? partySearch : (editOrder?.partyName ?? "")}
+                      onChange={(e) => setPartySearch(e.target.value)}
+                      onClick={() => { setPartySearch(""); setPartyDropOpen(true); }}
+                      placeholder="Search party…"
+                      className="flex-1 px-3 py-2 text-sm focus:outline-none bg-transparent"
+                    />
+                    <ChevronDown
+                      onClick={() => { setPartySearch(""); setPartyDropOpen((o) => !o); }}
+                      className={`w-4 h-4 text-gray-400 mr-2 cursor-pointer transition-transform ${partyDropOpen ? "rotate-180" : ""}`}
+                    />
+                  </div>
+                  {partyDropOpen && (
+                    <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-48 overflow-y-auto">
+                      {filteredParties.length === 0 ? (
+                        <div className="px-3 py-2 text-sm text-gray-400">No parties found</div>
+                      ) : (
+                        filteredParties.map((p) => (
+                          <button
+                            key={p.id}
+                            type="button"
+                            onMouseDown={(e) => {
+                              e.preventDefault();
+                              setEditOrder((prev) => ({ ...prev, partyName: p.name, partyId: p.id }));
+                              setPartyDropOpen(false);
+                            }}
+                            className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-50 ${editOrder?.partyId === p.id ? "font-medium" : "text-gray-700"}`}
+                          >
+                            {p.name}
+                          </button>
+                        ))
+                      )}
+                    </div>
+                  )}
+                </div>
+              ) : key === "platingStatus" ? (
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
@@ -392,13 +542,17 @@ const OrderManagement = () => {
                   </button>
                   <span className="text-sm text-gray-600">{editOrder?.[key] ? "Enabled" : "Disabled"}</span>
                 </div>
-              ) : key === "date" || key === "dispatchDate" ? (
+              ) : key === "date" ? (
                 <input
                   type="date"
                   value={convertToDateInput(editOrder?.[key] ?? "")}
-                  onChange={(e) => setEditOrder((prev) => ({ ...prev, [key]: convertFromDateInput(e.target.value) }))}
+                  onChange={(e) => setEditOrder((prev) => ({ ...prev, [key]: e.target.value }))}
                   className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-gray-400"
                 />
+              ) : key === "dispatchDate" || key === "dispatchPcs" ? (
+                <p className="text-sm text-gray-500 border border-gray-200 rounded-md px-3 py-2 bg-gray-50 italic">
+                  Manage via Dispatch button in table
+                </p>
               ) : (
                 <input
                   value={editOrder?.[key] ?? ""}
@@ -563,8 +717,26 @@ const OrderManagement = () => {
                           <td className="px-3 py-4 text-sm text-center text-gray-700 border-r border-gray-200 whitespace-nowrap">{row.cartoon}</td>
                           <td className="px-3 py-4 text-sm text-center text-gray-700 border-r border-gray-200 whitespace-nowrap">{row.pcCartoon}</td>
                           <td className="px-3 py-4 text-sm text-center text-gray-700 border-r border-gray-200 whitespace-nowrap">{effectiveStickerQty}</td>
-                          <td className="px-3 py-4 text-sm text-center text-gray-700 border-r border-gray-200 whitespace-nowrap">{row.dispatchDate}</td>
-                          <td className="px-3 py-4 text-sm text-center text-gray-700 border-r border-gray-200 whitespace-nowrap">{row.dispatchPcs}</td>
+                          <td className="px-3 py-4 text-sm text-center text-gray-700 border-r border-gray-200 whitespace-nowrap">
+                            <button
+                              type="button"
+                              onClick={() => openDispatchDialog(row)}
+                              className="inline-flex flex-col items-center gap-0.5 group"
+                              title="Manage dispatches"
+                            >
+                              <Truck className="w-3.5 h-3.5 text-gray-400 group-hover:text-gray-700" />
+                              <span className="text-xs text-gray-600">
+                                {row.dispatchDate ?? <span className="text-gray-400">+ Add</span>}
+                              </span>
+                            </button>
+                          </td>
+                          <td className="px-3 py-4 text-sm text-center text-gray-700 border-r border-gray-200 whitespace-nowrap">
+                            <button type="button" onClick={() => openDispatchDialog(row)} className="hover:text-gray-900">
+                              {row.dispatchPcs != null
+                                ? <span className="font-medium">{row.dispatchPcs} <span className="text-gray-400 text-xs">/ {row.qtyPc}</span></span>
+                                : <span className="text-gray-400 text-xs">+ Add</span>}
+                            </button>
+                          </td>
                           <td className="px-3 py-4 text-sm text-center text-gray-700 border-r border-gray-200 whitespace-nowrap">{row.pendingPc}</td>
                         
                           <td className="px-3 py-4 border-r border-gray-200 whitespace-nowrap">
@@ -676,14 +848,16 @@ const OrderManagement = () => {
               <button
                 type="button"
                 onClick={handleEditOrderSave}
-                className="px-8 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition text-sm"
+                disabled={savingEdit}
+                className="px-8 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition text-sm disabled:opacity-60"
               >
-                Save
+                {savingEdit ? "Saving…" : "Save"}
               </button>
               <button
                 type="button"
                 onClick={() => setEditOrder(null)}
-                className="px-8 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition text-sm"
+                disabled={savingEdit}
+                className="px-8 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition text-sm disabled:opacity-60"
               >
                 Cancel
               </button>
@@ -702,6 +876,105 @@ const OrderManagement = () => {
         onCancel={() => setDeleteTarget(null)}
         onConfirm={confirmDelete}
       />
+
+      {/* Dispatch dialog */}
+      {dispatchDialog && (
+        <div className="fixed inset-0 z-50 bg-black/30 flex items-center justify-center p-4">
+          <div className="bg-white rounded-lg w-full max-w-lg border border-gray-200 max-h-[90vh] flex flex-col">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200 flex-shrink-0">
+              <div>
+                <h2 className="text-base font-medium text-gray-900">Dispatch</h2>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  {dispatchDialog.row.partyName} · {dispatchDialog.row.size} · Qty {dispatchDialog.row.qtyPc} pc
+                </p>
+              </div>
+              <button type="button" onClick={() => setDispatchDialog(null)}>
+                <X className="w-4 h-4 text-gray-600" />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-5 space-y-4">
+              {/* Existing dispatches */}
+              {dispatchDialog.loading ? (
+                <Loader text="Loading dispatches…" />
+              ) : dispatchDialog.dispatches.length === 0 ? (
+                <p className="text-sm text-gray-400 text-center py-4">No dispatches yet</p>
+              ) : (
+                <div className="border border-gray-200 rounded-lg overflow-hidden">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="bg-gray-50 border-b border-gray-200">
+                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">#</th>
+                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">Date</th>
+                        <th className="px-4 py-2 text-right text-xs font-medium text-gray-500">Pcs</th>
+                        <th className="px-4 py-2 w-8" />
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {dispatchDialog.dispatches.map((d, i) => (
+                        <tr key={d.id} className="border-b border-gray-100 last:border-0">
+                          <td className="px-4 py-2 text-gray-400">{i + 1}</td>
+                          <td className="px-4 py-2 text-gray-700">{d.dispatchDate}</td>
+                          <td className="px-4 py-2 text-right text-gray-700 font-medium">{d.dispatchPcs}</td>
+                          <td className="px-4 py-2">
+                            <button type="button" onClick={() => handleDeleteDispatch(d.id)} className="text-red-400 hover:text-red-600">
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                    <tfoot>
+                      <tr className="bg-gray-50 border-t border-gray-200">
+                        <td colSpan={2} className="px-4 py-2 text-xs font-medium text-gray-500">Total dispatched</td>
+                        <td className="px-4 py-2 text-right text-sm font-semibold text-gray-800">
+                          {dispatchDialog.dispatches.reduce((s, d) => s + (parseFloat(d.dispatchPcs) || 0), 0)}
+                        </td>
+                        <td />
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+              )}
+
+              {/* Add new dispatch */}
+              <div className="border border-gray-200 rounded-lg p-4 space-y-3">
+                <p className="text-xs font-medium text-gray-600 uppercase tracking-wide">Add Dispatch</p>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs text-gray-500 mb-1 block">Date</label>
+                    <input
+                      type="date"
+                      value={dispatchDialog.newDate}
+                      onChange={(e) => setDispatchDialog((prev) => ({ ...prev, newDate: e.target.value }))}
+                      className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-gray-400"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-500 mb-1 block">Pcs</label>
+                    <input
+                      type="number"
+                      min="1"
+                      placeholder="e.g. 50"
+                      value={dispatchDialog.newPcs}
+                      onChange={(e) => setDispatchDialog((prev) => ({ ...prev, newPcs: e.target.value }))}
+                      className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-gray-400"
+                    />
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleAddDispatch}
+                  disabled={dispatchDialog.saving}
+                  className="w-full py-2 bg-gray-900 text-white text-sm rounded-md hover:bg-gray-800 transition disabled:opacity-60"
+                >
+                  {dispatchDialog.saving ? "Adding…" : "Add Dispatch"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {moveToJobWorkRow && (
         <div className="fixed inset-0 z-50 bg-black/30 flex items-center justify-center p-4">

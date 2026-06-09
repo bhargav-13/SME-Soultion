@@ -18,6 +18,7 @@ const ClientDetailsDialog = ({
   onDeleteAll,
   onClose,
   readOnlyCols = [],
+  modifiedRowIndices = new Set(),
 }) => {
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
@@ -49,6 +50,7 @@ const ClientDetailsDialog = ({
             onCellChange={isEditMode ? onCellChange : () => {}}
             onCellBlur={isEditMode ? onCellBlur : () => {}}
             onLastCellTab={isEditMode ? onLastCellTab : () => {}}
+            modifiedRowIndices={modifiedRowIndices}
           />
 
           {rows.length === 0 && <p className="mt-2 text-xs text-gray-500">No matching rows.</p>}

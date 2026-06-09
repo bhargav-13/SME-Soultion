@@ -107,11 +107,6 @@ const SidebarLayout = ({ children }) => {
   // Sidebar links
   const links = [
     {
-      to: "/",
-      label: "Dashboard",
-      icon: <LayoutDashboard className="w-5 h-5" />,
-    },
-    {
       key: "bills",
       to: "/bills",
       label: "Bills",
