@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   SquarePen,
   Trash2,
@@ -16,6 +17,7 @@ import toast from "react-hot-toast";
 import Loader from "../../../components/Loader";
 
 const CategoryMaster = () => {
+  const navigate = useNavigate();
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [deleteDialog, setDeleteDialog] = useState({
@@ -172,21 +174,22 @@ const CategoryMaster = () => {
             filteredCategories.map((category) => (
               <div
                 key={category.id}
-                className="bg-white rounded-lg border border-gray-200 px-4 py-3 flex items-center justify-between hover:shadow-sm transition"
+                onClick={() => navigate("/inventory", { state: { categoryId: category.id, categoryName: category.categoryName } })}
+                className="bg-white rounded-lg border border-gray-200 px-4 py-3 flex items-center justify-between hover:shadow-md hover:border-gray-400 cursor-pointer transition"
               >
                 <span className="text-sm font-medium text-gray-800">
                   {category.categoryName}
                 </span>
                 <div className="flex items-center gap-2">
                   <button
-                    onClick={() => handleEditCategory(category)}
+                    onClick={(e) => { e.stopPropagation(); handleEditCategory(category); }}
                     className="text-gray-500 hover:text-gray-800 transition"
                     title="Edit"
                   >
                     <SquarePen className="w-4 h-4" />
                   </button>
                   <button
-                    onClick={() => handleDeleteClick(category)}
+                    onClick={(e) => { e.stopPropagation(); handleDeleteClick(category); }}
                     className="text-red-500 hover:text-red-700 transition"
                     title="Delete"
                   >

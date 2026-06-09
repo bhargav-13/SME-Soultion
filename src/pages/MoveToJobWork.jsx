@@ -7,6 +7,13 @@ import toast from "react-hot-toast";
 import { jobWorkApi, partyApi } from "../services/apiService";
 import { upsertOrderJobOverride } from "../utils/orderJobWorkSync";
 
+const getNow = () => {
+  const d = new Date();
+  const date = d.toISOString().split("T")[0];
+  const time = d.toTimeString().slice(0, 5);
+  return { date, time };
+};
+
 const EMPTY_FORM = {
   partyName: "",
   partyId: "",
@@ -76,7 +83,7 @@ const createItemRow = (seed = {}) => ({
 const MoveToJobWork = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const [formData, setFormData] = useState(EMPTY_FORM);
+  const [formData, setFormData] = useState(() => ({ ...EMPTY_FORM, ...getNow() }));
   const [items, setItems] = useState([createItemRow()]);
   const [openElementTypeIndex, setOpenElementTypeIndex] = useState(null);
   const [openUnitTypeIndex, setOpenUnitTypeIndex] = useState(null);

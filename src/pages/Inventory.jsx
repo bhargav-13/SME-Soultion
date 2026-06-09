@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import ReactDOM from "react-dom";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { Plus, Pencil, Trash2, X, Eye, Search, Check, ChevronDown } from "lucide-react";
 import SidebarLayout from "../components/SidebarLayout";
 import StatsCard from "../components/StatsCard";
@@ -295,9 +295,11 @@ const TableDropdown = ({ value, options = [], placeholder = "Select...", onSelec
 
 const Inventory = () => {
   const navigate = useNavigate();
+  const location = useLocation();
 
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [categoryFilter, setCategoryFilter] = useState(null); // { id, name }
 
   const [tableData, setTableData] = useState([]);
   const [selectedCell, setSelectedCell] = useState(null);
@@ -336,6 +338,9 @@ const Inventory = () => {
   useEffect(() => {
     loadAll();
     loadCategories();
+    if (location.state?.categoryId) {
+      setCategoryFilter({ id: location.state.categoryId, name: location.state.categoryName });
+    }
   }, []);
 
   // Check if there are any dirty (editing) rows that can be saved
@@ -856,9 +861,14 @@ const Inventory = () => {
         else if (stockFilter === "LOW")          matchesStock = row.stockStatus === "LOW";
         else if (stockFilter === "OUT_OF_STOCK") matchesStock = row.stockStatus === "OUT_OF_STOCK";
         else if (stockFilter === "NO_ENTRY")     matchesStock = !row.stockStatus;
-        return matchesSearch && matchesStock;
+        let matchesCategory = true;
+        if (categoryFilter) {
+          const item = items.find((i) => String(i.id) === String(row._itemId));
+          matchesCategory = item?.category?.id === categoryFilter.id || item?.categoryId === categoryFilter.id;
+        }
+        return matchesSearch && matchesStock && matchesCategory;
       });
-  }, [searchTerm, tableData, stockFilter]);
+  }, [searchTerm, tableData, stockFilter, categoryFilter, items]);
 
   const getSuggestions = (row, colKey) => {
     const sizes = row._sizes || [];
@@ -1117,6 +1127,22 @@ const Inventory = () => {
               ))}
             </div>
           </div>
+
+          {categoryFilter && (
+            <div className="mb-3 flex items-center gap-2">
+              <span className="text-xs text-gray-500">Filtered by category:</span>
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-gray-900 text-white text-xs font-medium">
+                {categoryFilter.name}
+                <button
+                  type="button"
+                  onClick={() => setCategoryFilter(null)}
+                  className="hover:text-gray-300 transition"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              </span>
+            </div>
+          )}
 
           {loading ? (
             <Loader text="Loading inventory..." />

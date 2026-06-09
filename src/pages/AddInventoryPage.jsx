@@ -55,7 +55,10 @@ const SectionDivider = ({ title }) => (
 const AddInventoryPage = () => {
   const navigate  = useNavigate();
   const location  = useLocation();
-  const stockSectionRef = useRef(null);
+  const stockSectionRef   = useRef(null);
+  const bpDropdownRef     = useRef(null);
+  const catDropdownRef    = useRef(null);
+  const unitDropdownRef   = useRef(null);
 
   const [blueprints,     setBlueprints]     = useState([]);
   const [categories,     setCategories]     = useState([]);
@@ -94,6 +97,17 @@ const AddInventoryPage = () => {
 
   // ── Highlight stock section on navigate-from-sheet ────────────────────────
   const [stockHighlight, setStockHighlight] = useState(false);
+
+  // ── Close dropdowns on outside click ─────────────────────────────────────
+  useEffect(() => {
+    const handle = (e) => {
+      if (bpDropdownRef.current   && !bpDropdownRef.current.contains(e.target))   setIsBpOpen(false);
+      if (catDropdownRef.current  && !catDropdownRef.current.contains(e.target))  setIsCatOpen(false);
+      if (unitDropdownRef.current && !unitDropdownRef.current.contains(e.target)) setIsWeightUnitOpen(false);
+    };
+    document.addEventListener("mousedown", handle);
+    return () => document.removeEventListener("mousedown", handle);
+  }, []);
 
   // ── Load data ─────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -474,7 +488,7 @@ const AddInventoryPage = () => {
 
                   {blueprintMode === "existing" ? (
                     /* Select existing — dropdown inside the left column */
-                    <div className="relative">
+                    <div className="relative" ref={bpDropdownRef}>
                       <button
                         type="button"
                         onClick={() => setIsBpOpen(!isBpOpen)}
@@ -528,7 +542,7 @@ const AddInventoryPage = () => {
                         Category<span className="text-black">*</span>
                       </label>
                     </div>
-                    <div className="relative">
+                    <div className="relative" ref={catDropdownRef}>
                       <button
                         type="button"
                         onClick={() => setIsCatOpen(!isCatOpen)}
@@ -676,7 +690,7 @@ const AddInventoryPage = () => {
                         placeholder="Enter Weight/Pc."
                         className={inputCls} />
                       {/* Unit dropdown */}
-                      <div className="relative w-28 shrink-0">
+                      <div className="relative w-28 shrink-0" ref={unitDropdownRef}>
                         <button
                           type="button"
                           onClick={() => setIsWeightUnitOpen(!isWeightUnitOpen)}

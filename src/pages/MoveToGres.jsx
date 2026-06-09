@@ -105,6 +105,13 @@ const ButtonDropdown = ({ value, placeholder, options, onSelect, disabled = fals
 };
 // ---- End dropdown components ----
 
+const getNow = () => {
+  const d = new Date();
+  const date = d.toISOString().split("T")[0];
+  const time = d.toTimeString().slice(0, 5);
+  return { date, time };
+};
+
 const EMPTY_FORM = {
   vendorName: "",
   vendorId: "",
@@ -160,7 +167,7 @@ const calcTotalAmount = (qtyKg, ratePerKg) => {
   const qty = parseNumber(qtyKg);
   const rate = parseNumber(ratePerKg);
   if (qty === null || rate === null) return "";
-  return String(round3(qty * rate));
+  return String(Math.round(qty * rate));
 };
 
 const calcNetWeight = (qtyPc, element, elementWeightGm) => {
@@ -177,7 +184,7 @@ const toApiElementType = (uiType) => (uiType === "Drum" ? "DRUM" : "PETI");
 const MoveToGres = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const [formData, setFormData] = useState(EMPTY_FORM);
+  const [formData, setFormData] = useState(() => ({ ...EMPTY_FORM, ...getNow() }));
   const [formStatus, setFormStatus] = useState("PENDING");
   const [items, setItems] = useState([createItemRow()]);
   const [openElementTypeIndex, setOpenElementTypeIndex] = useState(null);
