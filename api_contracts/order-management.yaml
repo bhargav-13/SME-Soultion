@@ -948,6 +948,12 @@ components:
         lastDispatchDate:
           type: string
           format: date
+        createdAt:
+          type: string
+          format: date-time
+        lastUpdatedAt:
+          type: string
+          format: date-time
 
     OrderItemSize:
       type: object

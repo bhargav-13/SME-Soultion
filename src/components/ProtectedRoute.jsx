@@ -8,8 +8,8 @@ import { useAuth } from '../context/AuthContext';
  * Wraps routes that require authentication.
  * Redirects to login if user is not authenticated.
  */
-const ProtectedRoute = ({ children }) => {
-  const { isAuthenticated, loading } = useAuth();
+const ProtectedRoute = ({ children, allowedRoles }) => {
+  const { isAuthenticated, loading, role } = useAuth();
   const location = useLocation();
 
   // Show loading state while checking authentication
@@ -28,6 +28,11 @@ const ProtectedRoute = ({ children }) => {
   if (!isAuthenticated) {
     // Save the location they were trying to access
     return <Navigate to="/login" state={{ from: location }} replace />;
+  }
+
+  // Redirect if the authenticated user's role isn't allowed for this route
+  if (allowedRoles && !allowedRoles.includes(role)) {
+    return <Navigate to={role === "CLIENT" ? "/shop" : "/"} replace />;
   }
 
   // Render children if authenticated

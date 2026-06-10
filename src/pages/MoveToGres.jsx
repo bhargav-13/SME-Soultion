@@ -282,11 +282,16 @@ const MoveToGres = () => {
     fetchForEdit();
   }, [editGresId]);
 
+  const vendorParties = useMemo(
+    () => parties.filter((p) => p.partyType === "VENDOR" || p.partyType === "BOTH"),
+    [parties]
+  );
+
   const filteredParties = useMemo(() => {
     const q = partySearch.trim().toLowerCase();
-    if (!q) return parties;
-    return parties.filter((p) => String(p.name || "").toLowerCase().includes(q));
-  }, [parties, partySearch]);
+    if (!q) return vendorParties;
+    return vendorParties.filter((p) => String(p.name || "").toLowerCase().includes(q));
+  }, [vendorParties, partySearch]);
 
   const updateItem = useCallback((index, patch) => {
     setItems((prev) => prev.map((it, i) => (i === index ? { ...it, ...patch } : it)));

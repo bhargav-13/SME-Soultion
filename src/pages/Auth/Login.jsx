@@ -22,9 +22,7 @@ const Login = () => {
     const newErrors = {};
 
     if (!formData.username.trim()) {
-      newErrors.username = 'Email is required';
-    } else if (!/\S+@\S+\.\S+/.test(formData.username)) {
-      newErrors.username = 'Please enter a valid email';
+      newErrors.username = 'Username or email is required';
     }
 
     if (!formData.password) {
@@ -87,20 +85,20 @@ const Login = () => {
 
           {/* Login Form */}
           <form onSubmit={handleSubmit} className="space-y-6">
-            {/* Email Field */}
+            {/* Username/Email Field */}
             <div>
               <label
                 htmlFor="username"
                 className="block text-sm font-medium text-gray-700 mb-2"
               >
-                Email Address
+                Username or Email
               </label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                   <Mail className="h-5 w-5 text-gray-400" />
                 </div>
                 <input
-                  type="email"
+                  type="text"
                   id="username"
                   name="username"
                   value={formData.username}

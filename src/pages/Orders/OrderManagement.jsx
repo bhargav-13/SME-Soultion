@@ -27,6 +27,8 @@ const flattenOrders = (apiData) => {
         orderId:  order.id,
         partyId:  partyResp.party?.id,
         sizeId:   item.itemSize?.id,
+        _createdAt: item.createdAt || null,
+        _updatedAt: item.lastUpdatedAt || null,
         // display fields
         partyName:    partyResp.party?.name || "—",
         date:         order.orderDate || "—",
@@ -682,7 +684,14 @@ const OrderManagement = () => {
                       const effectiveJobWorkKey = String(effectiveJobWork || "").toLowerCase().replace(/[\s-]/g, "");
 
                       return (
-                        <tr key={row.id} className="border-b border-gray-200 hover:bg-gray-50">
+                        <tr
+                          key={row.id}
+                          className={`border-b border-gray-200 ${
+                            row._updatedAt && row._createdAt && row._updatedAt !== row._createdAt
+                              ? "bg-yellow-50"
+                              : "hover:bg-gray-50"
+                          }`}
+                        >
                           {showGroupedColumns && (
                             <td rowSpan={groupRowSpan} className="px-3 py-4 text-sm text-gray-700 border-r border-gray-200 whitespace-nowrap align-top">
                               <div className="inline-flex items-center gap-1 cursor-pointer">

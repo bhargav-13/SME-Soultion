@@ -277,7 +277,6 @@ components:
         username:
           type: string
           description: Username or email
-          format: email
         password:
           type: string
           description: Plain-text password (sent over HTTPS only)
@@ -334,6 +333,9 @@ components:
           type: integer
           format: int64
           description: User ID
+        username:
+          type: string
+          description: Login username
         email:
           type: string
           description: User's email
@@ -342,6 +344,10 @@ components:
         enabled:
           type: boolean
           description: Whether the account is enabled
+        partyId:
+          type: integer
+          format: int64
+          description: Linked party ID (CLIENT users only)
 
     UpdateUserGroupRequest:
       type: object
@@ -354,6 +360,7 @@ components:
       type: string
       enum:
         - Admin
+        - Client
       description: User Group
     PaginatedResultUser:
       type: object

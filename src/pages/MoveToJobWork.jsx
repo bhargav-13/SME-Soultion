@@ -63,6 +63,27 @@ const FORM_INPUT_CLASS =
 const FORM_SELECT_CLASS =
   "w-full h-10 px-3 border border-gray-300 rounded-lg bg-white text-sm flex items-center justify-between focus:ring-2 focus:ring-gray-500 outline-none";
 
+const round3 = (n) => Math.round(n * 1000) / 1000;
+const parseNumber = (value) => {
+  const parsed = Number.parseFloat(value);
+  return Number.isFinite(parsed) ? parsed : null;
+};
+const calcTotalAmount = (qtyKg, ratePerKg) => {
+  const qty = parseNumber(qtyKg);
+  const rate = parseNumber(ratePerKg);
+  if (qty === null || rate === null) return "";
+  return String(Math.round(qty * rate));
+};
+
+const calcNetWeight = (qtyPc, element, elementWeightGm) => {
+  const unitKg = parseNumber(qtyPc);
+  const count = parseNumber(element);
+  const gmWeight = parseNumber(elementWeightGm);
+  if (unitKg === null || count === null || gmWeight === null || count <= 0) return "";
+  const net = round3(count * (unitKg - gmWeight / 1000));
+  return net > 0 ? String(net) : "";
+};
+
 const createItemRow = (seed = {}) => ({
   itemName: "",
   size: "",
@@ -86,7 +107,6 @@ const MoveToJobWork = () => {
   const [formData, setFormData] = useState(() => ({ ...EMPTY_FORM, ...getNow() }));
   const [items, setItems] = useState([createItemRow()]);
   const [openElementTypeIndex, setOpenElementTypeIndex] = useState(null);
-  const [openUnitTypeIndex, setOpenUnitTypeIndex] = useState(null);
   const [saving, setSaving] = useState(false);
   const [parties, setParties] = useState([]);
   const [isPartyOpen, setIsPartyOpen] = useState(false);
@@ -96,6 +116,17 @@ const MoveToJobWork = () => {
   const removeItem = (idx) => setItems((prev) => (prev.length === 1 ? prev : prev.filter((_, i) => i !== idx)));
   const updateItem = (idx, patch) =>
     setItems((prev) => prev.map((row, i) => (i === idx ? { ...row, ...patch } : row)));
+
+  const updateItemWithAutoCalc = (idx, patch) =>
+    setItems((prev) =>
+      prev.map((row, i) => {
+        if (i !== idx) return row;
+        const next = { ...row, ...patch };
+        next.qtyKg = calcNetWeight(next.qtyPc, next.element, next.elementWeightGm);
+        next.totalAmount = calcTotalAmount(next.qtyKg, next.ratePerKg);
+        return next;
+      })
+    );
 
   // Close party dropdown on outside click
   useEffect(() => {
@@ -131,11 +162,16 @@ const MoveToJobWork = () => {
     fetchParties();
   }, []);
 
+  const vendorParties = useMemo(
+    () => parties.filter((p) => p.partyType === "VENDOR" || p.partyType === "BOTH"),
+    [parties]
+  );
+
   const filteredParties = useMemo(() => {
     const q = partySearch.trim().toLowerCase();
-    if (!q) return parties;
-    return parties.filter(p => (p.name || "").toLowerCase().includes(q));
-  }, [parties, partySearch]);
+    if (!q) return vendorParties;
+    return vendorParties.filter(p => (p.name || "").toLowerCase().includes(q));
+  }, [vendorParties, partySearch]);
 
   const inHouseStatus = useMemo(() => {
     if (mode === "edit") return editJob?.inHouseStatus || "In-House";
@@ -561,43 +597,16 @@ const MoveToJobWork = () => {
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
                   <div>
-                    <label className={FORM_LABEL_CLASS}>Unit Kg/Pcs.</label>
+                    <label className={FORM_LABEL_CLASS}>Unit Kgs.</label>
                     <div className="grid grid-cols-2 gap-2">
                       <input
                         value={item.qtyPc}
-                        onChange={(e) => updateItem(index, { qtyPc: e.target.value })}
+                        onChange={(e) => updateItemWithAutoCalc(index, { qtyPc: e.target.value })}
                         className={FORM_INPUT_CLASS}
                         placeholder="100"
                       />
-                      <div className="relative">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setOpenUnitTypeIndex((prev) => (prev === index ? null : index));
-                            setOpenElementTypeIndex(null);
-                          }}
-                          className={FORM_SELECT_CLASS}
-                        >
-                          <span>{item.unitType || "Select unit"}</span>
-                          <ChevronDown className={`w-4 h-4 transition-transform ${openUnitTypeIndex === index ? "rotate-180" : ""}`} />
-                        </button>
-                        {openUnitTypeIndex === index && (
-                          <div className="absolute z-10 mt-1 w-full rounded-md border border-gray-200 bg-white overflow-hidden shadow">
-                            {["Kgs", "Pcs"].map((option) => (
-                              <button
-                                key={option}
-                                type="button"
-                                onClick={() => {
-                                  updateItem(index, { unitType: option });
-                                  setOpenUnitTypeIndex(null);
-                                }}
-                                className="w-full px-3 py-2.5 text-left text-sm hover:bg-gray-100"
-                              >
-                                {option}
-                              </button>
-                            ))}
-                          </div>
-                        )}
+                      <div className="w-full h-10 px-3 border border-gray-200 rounded-lg bg-gray-50 text-sm text-gray-600 flex items-center cursor-not-allowed">
+                        Kgs
                       </div>
                     </div>
                   </div>
@@ -606,7 +615,7 @@ const MoveToJobWork = () => {
                     <div className="grid grid-cols-3 gap-2">
                       <input
                         value={item.element}
-                        onChange={(e) => updateItem(index, { element: e.target.value })}
+                        onChange={(e) => updateItemWithAutoCalc(index, { element: e.target.value })}
                         className={FORM_INPUT_CLASS}
                         placeholder="02"
                       />
@@ -615,7 +624,6 @@ const MoveToJobWork = () => {
                           type="button"
                           onClick={() => {
                             setOpenElementTypeIndex((prev) => (prev === index ? null : index));
-                            setOpenUnitTypeIndex(null);
                           }}
                             className={FORM_SELECT_CLASS}
                         >
@@ -629,7 +637,7 @@ const MoveToJobWork = () => {
                                 key={option}
                                 type="button"
                                 onClick={() => {
-                                  updateItem(index, { elementType: option, elementWeightGm: option === "Peti" ? "900" : "" });
+                                  updateItemWithAutoCalc(index, { elementType: option, elementWeightGm: option === "Peti" ? "900" : "" });
                                   setOpenElementTypeIndex(null);
                                 }}
                                 className="w-full px-3 py-2.5 text-left text-sm hover:bg-gray-100"
@@ -642,7 +650,7 @@ const MoveToJobWork = () => {
                       </div>
                       <input
                         value={item.elementWeightGm}
-                        onChange={(e) => updateItem(index, { elementWeightGm: e.target.value })}
+                        onChange={(e) => updateItemWithAutoCalc(index, { elementWeightGm: e.target.value })}
                         className={FORM_INPUT_CLASS}
                         placeholder={item.elementType === "Peti" ? "900" : "Enter gm"}
                       />
@@ -652,9 +660,9 @@ const MoveToJobWork = () => {
                     <label className={FORM_LABEL_CLASS}>Net Weight</label>
                     <input
                       value={item.qtyKg}
-                      onChange={(e) => updateItem(index, { qtyKg: e.target.value })}
-                      className={FORM_INPUT_CLASS}
-                      placeholder="98 KGS"
+                      readOnly
+                      className="w-full px-4 py-2 border border-gray-200 rounded-lg bg-gray-50 text-gray-700 outline-none placeholder:text-sm placeholder:text-gray-400 cursor-not-allowed"
+                      placeholder="Auto calculated"
                     />
                   </div>
                 </div>
@@ -685,7 +693,13 @@ const MoveToJobWork = () => {
                     <label className={FORM_LABEL_CLASS}>Rate / Kgs</label>
                     <input
                       value={item.ratePerKg}
-                      onChange={(e) => updateItem(index, { ratePerKg: e.target.value })}
+                      onChange={(e) => {
+                        const ratePerKg = e.target.value;
+                        updateItem(index, {
+                          ratePerKg,
+                          totalAmount: calcTotalAmount(item.qtyKg, ratePerKg),
+                        });
+                      }}
                       className={FORM_INPUT_CLASS}
                       placeholder="875"
                     />
@@ -694,8 +708,8 @@ const MoveToJobWork = () => {
                     <label className={FORM_LABEL_CLASS}>Total Amount</label>
                     <input
                       value={item.totalAmount}
-                      onChange={(e) => updateItem(index, { totalAmount: e.target.value })}
-                      className={FORM_INPUT_CLASS}
+                      readOnly
+                      className="w-full px-4 py-2 border border-gray-200 rounded-lg bg-gray-50 text-gray-700 outline-none placeholder:text-sm placeholder:text-gray-400 cursor-not-allowed"
                       placeholder="Auto"
                     />
                   </div>

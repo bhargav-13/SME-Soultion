@@ -12,14 +12,21 @@ import {
   ListTodo,
   FileText,
   BriefcaseBusiness,
+  KeyRound,
+  ClipboardList,
+  ShoppingBag,
 } from "lucide-react"; // icons
 
 import Navbar from "./navbar";
 import logo from "../assets/logo.png";
+import { useAuth } from "../context/AuthContext";
+import { clientPortalAdminApi } from "../services/apiService";
 
 const SIDEBAR_STATE_KEY = "sidebar:isOpen";
 
 const SidebarLayout = ({ children }) => {
+  const { isClient } = useAuth();
+  const [unseenRequestCount, setUnseenRequestCount] = useState(0);
   const [isOpen, setIsOpen] = useState(() => {
     try {
       const raw = localStorage.getItem(SIDEBAR_STATE_KEY);
@@ -64,6 +71,40 @@ const SidebarLayout = ({ children }) => {
     return () => clearTimeout(closeTimer.current);
   }, []);
 
+  // Notification badge: count of client order requests pending admin approval.
+  useEffect(() => {
+    if (isClient) return;
+
+    let cancelled = false;
+    const refreshUnseenCount = async () => {
+      try {
+        const response = await clientPortalAdminApi.getAllOrderRequests(
+          0,
+          1,
+          undefined,
+          undefined,
+          undefined,
+          "PENDING_APPROVAL"
+        );
+        if (!cancelled) {
+          setUnseenRequestCount(response.data?.totalElements || 0);
+        }
+      } catch {
+        // Ignore errors fetching the notification count
+      }
+    };
+    refreshUnseenCount();
+
+    window.addEventListener("focus", refreshUnseenCount);
+    const interval = setInterval(refreshUnseenCount, 10000);
+
+    return () => {
+      cancelled = true;
+      window.removeEventListener("focus", refreshUnseenCount);
+      clearInterval(interval);
+    };
+  }, [isClient, location.pathname]);
+
   useEffect(() => {
     try {
       localStorage.setItem(SIDEBAR_STATE_KEY, String(isOpen));
@@ -101,6 +142,25 @@ const SidebarLayout = ({ children }) => {
       to: "/bills/sales",
       icon: <FileText className="w-4 h-4" />,
       label: "Sels Bill",
+    },
+  ];
+
+  // Sidebar links for CLIENT users
+  const clientLinks = [
+    {
+      to: "/shop",
+      label: "Shop",
+      icon: <ShoppingBag className="w-5 h-5" />,
+    },
+    {
+      to: "/my-orders",
+      label: "My Orders",
+      icon: <ClipboardList className="w-5 h-5" />,
+    },
+    {
+      to: "/my-profile",
+      label: "My Profile",
+      icon: <User className="w-5 h-5" />,
     },
   ];
 
@@ -150,6 +210,12 @@ const SidebarLayout = ({ children }) => {
       activePaths: ["/client-management/select", "/client-management"],
     },
     {
+      to: "/client-portal",
+      label: "Client Portal",
+      icon: <KeyRound className="w-5 h-5" />,
+      badge: unseenRequestCount > 0 ? unseenRequestCount : null,
+    },
+    {
       to: "/invoices",
       label: "Invoices",
       icon: <FileText className="w-5 h-5" />,
@@ -187,7 +253,7 @@ const SidebarLayout = ({ children }) => {
 
           {/* Sidebar Links */}
           <nav className="px-3 py-4 space-y-2 pe-20">
-            {links.map((link) => (
+            {(isClient ? clientLinks : links).map((link) => (
               <div key={link.to}>
                 {link.submenu ? (
                   // Menu with right-side popover
@@ -230,14 +296,21 @@ const SidebarLayout = ({ children }) => {
                     return (
                   <Link
                     to={link.to}
-                    className={`flex items-center px-3 py-2.5 rounded-lg transition-all duration-200 ${
+                    className={`flex items-center justify-between px-3 py-2.5 rounded-lg transition-all duration-200 ${
                       isActive
                         ? "bg-white text-gray-900 font-semibold border border-black ml-2"
                         : "text-black hover:border-1 hover:border-black hover:ml-2"
                     }`}
                   >
-                    <span className="mr-3 text-gray-500">{link.icon}</span>
-                    <span className="text-sm font-medium">{link.label}</span>
+                    <span className="flex items-center">
+                      <span className="mr-3 text-gray-500">{link.icon}</span>
+                      <span className="text-sm font-medium">{link.label}</span>
+                    </span>
+                    {link.badge ? (
+                      <span className="ml-2 inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1.5 rounded-full bg-red-500 text-white text-xs font-semibold">
+                        {link.badge}
+                      </span>
+                    ) : null}
                   </Link>
                     );
                   })()

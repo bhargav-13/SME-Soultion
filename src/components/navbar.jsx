@@ -6,11 +6,12 @@ import { useAuth } from "../context/AuthContext";
 import ConfirmationDialog from "./ConfirmationDialog";
 
 const Navbar = ({ showSidebarMenu = false, onOpenSidebar = () => {} }) => {
-  const { user, logout } = useAuth();
+  const { user, logout, isClient } = useAuth();
   const [showLogoutDialog, setShowLogoutDialog] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
-  const isDashboardActive = location.pathname === "/";
+  const homePath = isClient ? "/my-orders" : "/";
+  const isDashboardActive = location.pathname === homePath;
 
   const handleLogoutClick = () => {
     setShowLogoutDialog(true);
@@ -41,7 +42,7 @@ const Navbar = ({ showSidebarMenu = false, onOpenSidebar = () => {} }) => {
               </button>
             ) : null}
             <Link
-              to="/"
+              to={homePath}
               className={`inline-flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
                 isDashboardActive
                   ? "bg-white border border-black text-black"
@@ -49,7 +50,7 @@ const Navbar = ({ showSidebarMenu = false, onOpenSidebar = () => {} }) => {
               }`}
             >
               <LayoutDashboard className="w-4 h-4" />
-              Dashboard
+              {isClient ? "My Orders" : "Dashboard"}
             </Link>
           </div>
 

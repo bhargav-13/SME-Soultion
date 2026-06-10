@@ -1,0 +1,882 @@
+openapi: 3.0.3
+info:
+  title: Client Portal API
+  version: 1.0.0
+  description: OpenAPI for the Client Portal feature - admin management of client (party) accounts/credentials and the client-facing profile, password and order views.
+servers:
+  - url: http://localhost:8080
+    description: Local development server
+  - url: https://sme-api.duckdns.org
+    description: Production Server
+
+tags:
+  - name: Admin
+    description: Admin endpoints to manage client portal accounts (list parties with credentials, export, reset credentials)
+  - name: Client
+    description: Client-facing endpoints (profile, change password, own orders)
+  - name: ClientInvoices
+    description: Client-facing endpoints for viewing and downloading their own invoices
+
+paths:
+  /api/v1/client-portal/admin/clients:
+    get:
+      tags:
+        - Admin
+      operationId: getAllClientAccounts
+      summary: Get all parties with their client portal account info (Admin only)
+      parameters:
+        - $ref: '#/components/parameters/pageParam'
+        - $ref: '#/components/parameters/sizeParam'
+        - name: search
+          in: query
+          required: false
+          schema:
+            type: string
+        - $ref: '#/components/parameters/SortByFields'
+        - $ref: '#/components/parameters/directionParam'
+      responses:
+        '200':
+          description: Paginated list of parties with their client account info
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedResultClientAccount'
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden - Admin access required
+      security:
+        - oauth2: [ ]
+
+  /api/v1/client-portal/admin/clients/export:
+    get:
+      tags:
+        - Admin
+      operationId: exportClientCredentials
+      summary: Download client portal credentials as an Excel sheet (Admin only)
+      description: Generates an Excel workbook listing party details and client portal login credentials. The initial password is only included for accounts that have not changed their password yet.
+      parameters:
+        - name: onlyPending
+          in: query
+          required: false
+          description: When true, only include accounts whose initial password has not yet been changed
+          schema:
+            type: boolean
+            default: false
+      responses:
+        '200':
+          description: Excel workbook (.xlsx)
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema:
+                type: string
+                format: binary
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden - Admin access required
+      security:
+        - oauth2: [ ]
+
+  /api/v1/client-portal/admin/clients/{partyId}/reset-credentials:
+    post:
+      tags:
+        - Admin
+      operationId: resetClientCredentials
+      summary: Regenerate login credentials for a party's client account (Admin only)
+      description: Generates a new random password for the client account linked to the given party and marks it as pending (so it appears again in the export until the client changes it).
+      parameters:
+        - name: partyId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: New credentials generated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClientCredentials'
+        '404':
+          description: Party or linked client account not found
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden - Admin access required
+      security:
+        - oauth2: [ ]
+
+  /api/v1/client-portal/me/profile:
+    get:
+      tags:
+        - Client
+      operationId: getMyProfile
+      summary: Get the authenticated client's profile
+      responses:
+        '200':
+          description: Client profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClientProfile'
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden - Client access required
+      security:
+        - oauth2: [ ]
+
+    put:
+      tags:
+        - Client
+      operationId: updateMyProfile
+      summary: Update the authenticated client's profile
+      description: Allows the client to fill in/update optional profile information such as email and contact number.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateClientProfileRequest'
+      responses:
+        '200':
+          description: Updated client profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClientProfile'
+        '400':
+          description: Bad request (validation error)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden - Client access required
+      security:
+        - oauth2: [ ]
+
+  /api/v1/client-portal/me/change-password:
+    post:
+      tags:
+        - Client
+      operationId: changeMyPassword
+      summary: Change the authenticated client's password
+      description: Requires the current password. Once changed, the auto-generated initial password is cleared and the account no longer appears as "pending" in the admin export.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChangePasswordRequest'
+      responses:
+        '204':
+          description: Password changed successfully
+        '400':
+          description: Bad request (validation error or incorrect current password)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden - Client access required
+      security:
+        - oauth2: [ ]
+
+  /api/v1/client-portal/me/orders:
+    get:
+      tags:
+        - Client
+      operationId: getMyOrders
+      summary: Get the authenticated client's own orders
+      parameters:
+        - $ref: '#/components/parameters/pageParam'
+        - $ref: '#/components/parameters/sizeParam'
+        - $ref: '#/components/parameters/SortByFields'
+        - $ref: '#/components/parameters/directionParam'
+      responses:
+        '200':
+          description: Paginated list of the client's own orders
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedResultClientOrder'
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden - Client access required
+      security:
+        - oauth2: [ ]
+
+  /api/v1/client-portal/me/catalog:
+    get:
+      tags:
+        - Client
+      operationId: getMyCatalog
+      summary: Get the product catalog available to the authenticated client
+      description: Returns the list of items available for ordering, with their sizes and available platings/finishes. Stock quantities are intentionally never included.
+      responses:
+        '200':
+          description: List of catalog items
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/CatalogItem'
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden - Client access required
+      security:
+        - oauth2: [ ]
+
+  /api/v1/client-portal/me/order-requests:
+    get:
+      tags:
+        - Client
+      operationId: getMyOrderRequests
+      summary: Get the authenticated client's own order requests
+      parameters:
+        - $ref: '#/components/parameters/pageParam'
+        - $ref: '#/components/parameters/sizeParam'
+        - $ref: '#/components/parameters/SortByFields'
+        - $ref: '#/components/parameters/directionParam'
+      responses:
+        '200':
+          description: Paginated list of the client's own order requests
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedResultOrderRequest'
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden - Client access required
+      security:
+        - oauth2: [ ]
+
+    post:
+      tags:
+        - Client
+      operationId: submitOrderRequest
+      summary: Submit a new order request from the authenticated client's cart
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NewOrderRequest'
+      responses:
+        '201':
+          description: Order request created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderRequest'
+        '400':
+          description: Bad request (validation error)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden - Client access required
+      security:
+        - oauth2: [ ]
+
+  /api/v1/client-portal/admin/order-requests:
+    get:
+      tags:
+        - Admin
+      operationId: getAllOrderRequests
+      summary: Get all client order requests (Admin only)
+      parameters:
+        - $ref: '#/components/parameters/pageParam'
+        - $ref: '#/components/parameters/sizeParam'
+        - $ref: '#/components/parameters/SortByFields'
+        - $ref: '#/components/parameters/directionParam'
+        - name: partyId
+          in: query
+          required: false
+          description: Filter by party (client) id
+          schema:
+            type: integer
+            format: int64
+        - name: status
+          in: query
+          required: false
+          description: Filter by order request status
+          schema:
+            $ref: '#/components/schemas/OrderRequestStatus'
+        - name: search
+          in: query
+          required: false
+          description: Search by party name
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Paginated list of order requests
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedResultOrderRequest'
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden - Admin access required
+      security:
+        - oauth2: [ ]
+
+  /api/v1/client-portal/admin/order-requests/{id}/status:
+    post:
+      tags:
+        - Admin
+      operationId: updateOrderRequestStatus
+      summary: Approve, reject, or otherwise update the status of a client order request (Admin only)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateOrderRequestStatusRequest'
+      responses:
+        '200':
+          description: Updated order request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderRequest'
+        '404':
+          description: Order request not found
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden - Admin access required
+      security:
+        - oauth2: [ ]
+
+  /api/v1/client-portal/me/invoices:
+    get:
+      tags:
+        - ClientInvoices
+      operationId: getMyInvoices
+      summary: Get the authenticated client's own invoices
+      description: Returns invoices whose bill-to party matches the authenticated client's party (best-effort match by name).
+      parameters:
+        - $ref: '#/components/parameters/pageParam'
+        - $ref: '#/components/parameters/sizeParam'
+        - $ref: '#/components/parameters/SortByFields'
+        - $ref: '#/components/parameters/directionParam'
+      responses:
+        '200':
+          description: Paginated list of the client's own invoices
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedResultClientInvoice'
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden - Client access required
+      security:
+        - oauth2: [ ]
+
+  /api/v1/client-portal/me/invoices/{id}/pdf:
+    get:
+      tags:
+        - ClientInvoices
+      operationId: getMyInvoicePdf
+      summary: Download a PDF of one of the authenticated client's own invoices
+      description: Only invoices belonging to the authenticated client's party can be downloaded.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: Invoice PDF
+          content:
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+        '404':
+          description: Invoice not found or does not belong to the authenticated client
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden - Client access required
+      security:
+        - oauth2: [ ]
+
+components:
+  securitySchemes:
+    oauth2:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    pageParam:
+      name: page
+      in: query
+      description: Page number starting from 0
+      required: false
+      schema:
+        type: integer
+        default: 0
+
+    sizeParam:
+      name: size
+      in: query
+      description: Number of items (records) per page
+      required: false
+      schema:
+        type: integer
+        default: 10
+
+    directionParam:
+      name: direction
+      in: query
+      description: Sort direction
+      schema:
+        type: string
+        enum: [ ASC, DESC ]
+
+    SortByFields:
+      name: sortByFields
+      in: query
+      description: Field to sort by
+      schema:
+        type: string
+        enum: [ lastUpdatedAt, createdAt ]
+
+  schemas:
+    ErrorResponse:
+      type: object
+      properties:
+        message:
+          type: string
+        code:
+          type: string
+        detail:
+          type: object
+
+    ClientAccount:
+      type: object
+      properties:
+        userId:
+          type: integer
+          format: int64
+          description: Client user account ID
+        partyId:
+          type: integer
+          format: int64
+        partyName:
+          type: string
+        gst:
+          type: string
+        contactNo:
+          type: string
+        email:
+          type: string
+        partyType:
+          $ref: '#/components/schemas/PartyType'
+        username:
+          type: string
+          description: Login username for the client portal
+        credentialsPending:
+          type: boolean
+          description: True if the client has not yet changed the auto-generated initial password
+        initialPassword:
+          type: string
+          description: Auto-generated initial password, only present while credentialsPending is true
+        enabled:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+
+    PaginatedResultClientAccount:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/ClientAccount'
+        empty:
+          type: boolean
+        last:
+          type: boolean
+        first:
+          type: boolean
+        totalPages:
+          type: integer
+        totalElements:
+          type: integer
+        size:
+          type: integer
+
+    ClientCredentials:
+      type: object
+      properties:
+        username:
+          type: string
+        password:
+          type: string
+          description: Plain-text password (only ever returned once, on generation/reset)
+
+    PartyType:
+      type: string
+      enum:
+        - CUSTOMER
+        - VENDOR
+        - BOTH
+
+    ClientProfile:
+      type: object
+      properties:
+        username:
+          type: string
+        partyId:
+          type: integer
+          format: int64
+        name:
+          type: string
+        gst:
+          type: string
+        contactNo:
+          type: string
+        email:
+          type: string
+        partyType:
+          $ref: '#/components/schemas/PartyType'
+
+    UpdateClientProfileRequest:
+      type: object
+      properties:
+        email:
+          type: string
+        contactNo:
+          type: string
+
+    ChangePasswordRequest:
+      type: object
+      required:
+        - currentPassword
+        - newPassword
+      properties:
+        currentPassword:
+          type: string
+        newPassword:
+          type: string
+          description: New plain-text password (min 6 characters)
+
+    ClientOrder:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        orderDate:
+          type: string
+          format: date
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/ClientOrderItem'
+        createdAt:
+          type: string
+          format: date-time
+
+    ClientOrderItem:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        itemName:
+          type: string
+        sizeInInch:
+          type: string
+        sizeInMm:
+          type: string
+        plating:
+          type: string
+        qtyPc:
+          type: number
+          format: double
+        qtyKg:
+          type: number
+          format: double
+        pendingPc:
+          type: number
+          format: double
+        dispatchedPc:
+          type: number
+          format: double
+        jobActionDone:
+          type: boolean
+
+    PaginatedResultClientOrder:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/ClientOrder'
+        empty:
+          type: boolean
+        last:
+          type: boolean
+        first:
+          type: boolean
+        totalPages:
+          type: integer
+        totalElements:
+          type: integer
+        size:
+          type: integer
+
+    CatalogItemSize:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        sizeInInch:
+          type: string
+        sizeInMm:
+          type: string
+
+    CatalogItem:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        itemName:
+          type: string
+        category:
+          type: string
+        sizes:
+          type: array
+          items:
+            $ref: '#/components/schemas/CatalogItemSize'
+        platings:
+          type: array
+          items:
+            type: string
+
+    OrderRequestStatus:
+      type: string
+      description: Lifecycle status of a client order request
+      enum:
+        - PENDING_APPROVAL
+        - APPROVED
+        - IN_PROGRESS
+        - COMPLETED
+        - REJECTED
+
+    NewOrderRequestItem:
+      type: object
+      required:
+        - itemName
+        - plating
+        - qtyPc
+      properties:
+        itemId:
+          type: integer
+          format: int64
+          description: Catalog item id (if known)
+        sizeId:
+          type: integer
+          format: int64
+          description: Catalog item size id (if known)
+        itemName:
+          type: string
+        category:
+          type: string
+        sizeInInch:
+          type: string
+        sizeInMm:
+          type: string
+        plating:
+          type: string
+        qtyPc:
+          type: number
+          format: double
+        qtyKg:
+          type: number
+          format: double
+
+    NewOrderRequest:
+      type: object
+      required:
+        - items
+      properties:
+        orderDate:
+          type: string
+          format: date
+          description: Defaults to today if not provided
+        items:
+          type: array
+          minItems: 1
+          items:
+            $ref: '#/components/schemas/NewOrderRequestItem'
+
+    OrderRequestItem:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        itemId:
+          type: integer
+          format: int64
+        sizeId:
+          type: integer
+          format: int64
+        itemName:
+          type: string
+        category:
+          type: string
+        sizeInInch:
+          type: string
+        sizeInMm:
+          type: string
+        plating:
+          type: string
+        qtyPc:
+          type: number
+          format: double
+        qtyKg:
+          type: number
+          format: double
+        pendingPc:
+          type: number
+          format: double
+
+    OrderRequest:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        partyId:
+          type: integer
+          format: int64
+        partyName:
+          type: string
+        username:
+          type: string
+        status:
+          $ref: '#/components/schemas/OrderRequestStatus'
+        orderDate:
+          type: string
+          format: date
+        orderId:
+          type: integer
+          format: int64
+          description: ID of the order created in Order Management once approved, if any.
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/OrderRequestItem'
+        createdAt:
+          type: string
+          format: date-time
+
+    PaginatedResultOrderRequest:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/OrderRequest'
+        empty:
+          type: boolean
+        last:
+          type: boolean
+        first:
+          type: boolean
+        totalPages:
+          type: integer
+        totalElements:
+          type: integer
+        size:
+          type: integer
+
+    UpdateOrderRequestStatusRequest:
+      type: object
+      required:
+        - status
+      properties:
+        status:
+          $ref: '#/components/schemas/OrderRequestStatus'
+
+    ClientInvoiceType:
+      type: string
+      enum:
+        - EXPORT
+        - COMMERCIAL
+        - PACKAGING_LIST
+
+    ClientInvoice:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        invoiceNo:
+          type: string
+        invoiceDate:
+          type: string
+          format: date
+        invoiceType:
+          $ref: '#/components/schemas/ClientInvoiceType'
+        exporterCompanyName:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+
+    PaginatedResultClientInvoice:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/ClientInvoice'
+        empty:
+          type: boolean
+        last:
+          type: boolean
+        first:
+          type: boolean
+        totalPages:
+          type: integer
+        totalElements:
+          type: integer
+        size:
+          type: integer

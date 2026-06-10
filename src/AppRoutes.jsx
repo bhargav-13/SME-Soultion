@@ -25,6 +25,11 @@ import PurchaseManagement from "./pages/Bills/PurchaseManagement";
 import AddPurchaseOrder from "./pages/Bills/AddPurchaseOrder";
 import SalesManagement from "./pages/Bills/SalesManagement";
 import AddSalesOrder from "./pages/Bills/AddSalesOrder";
+import ClientPortalAdmin from "./pages/ClientPortal/ClientPortalAdmin";
+import ClientOrderApprovals from "./pages/ClientPortal/ClientOrderApprovals";
+import MyOrders from "./pages/ClientPortal/MyOrders";
+import MyProfile from "./pages/ClientPortal/MyProfile";
+import ProductCatalog from "./pages/ClientPortal/ProductCatalog";
 
 const AppRoutes = () => {
 
@@ -37,7 +42,7 @@ const AppRoutes = () => {
       <Route
         path="/"
         element={
-          <ProtectedRoute>
+          <ProtectedRoute allowedRoles={["ADMIN"]}>
             <Admin />
            </ProtectedRoute>
         }
@@ -45,7 +50,7 @@ const AppRoutes = () => {
       <Route
         path="/masters/party"
         element={
-          <ProtectedRoute>
+          <ProtectedRoute allowedRoles={["ADMIN"]}>
             <PartyMaster />
           </ProtectedRoute>
         }
@@ -53,7 +58,7 @@ const AppRoutes = () => {
       <Route
         path="/masters/party/add"
         element={
-          <ProtectedRoute>
+          <ProtectedRoute allowedRoles={["ADMIN"]}>
             <AddParty />
           </ProtectedRoute>
         }
@@ -61,15 +66,15 @@ const AppRoutes = () => {
       <Route
         path="/masters/party/edit/:id"
         element={
-          <ProtectedRoute>
+          <ProtectedRoute allowedRoles={["ADMIN"]}>
             <AddParty />
-          </ProtectedRoute> 
+          </ProtectedRoute>
         }
       />
       <Route
         path="/add-party"
         element={
-          <ProtectedRoute>
+          <ProtectedRoute allowedRoles={["ADMIN"]}>
             <AddParty />
            </ProtectedRoute>
         }
@@ -77,7 +82,7 @@ const AppRoutes = () => {
       <Route
         path="/masters/category"
         element={
-          <ProtectedRoute>
+          <ProtectedRoute allowedRoles={["ADMIN"]}>
             <CategoryMaster />
            </ProtectedRoute>
         }
@@ -85,7 +90,7 @@ const AppRoutes = () => {
       <Route
         path="/order"
         element={
-          <ProtectedRoute>
+          <ProtectedRoute allowedRoles={["ADMIN"]}>
             <OrderManagement />
           </ProtectedRoute>
         }
@@ -93,7 +98,7 @@ const AppRoutes = () => {
       <Route
         path="/order/select"
         element={
-          <ProtectedRoute>
+          <ProtectedRoute allowedRoles={["ADMIN"]}>
             <OrderList />
           </ProtectedRoute>
         }
@@ -101,7 +106,7 @@ const AppRoutes = () => {
       <Route
         path="/order/add"
         element={
-          <ProtectedRoute>
+          <ProtectedRoute allowedRoles={["ADMIN"]}>
             <AddOrder />
           </ProtectedRoute>
         }
@@ -109,7 +114,7 @@ const AppRoutes = () => {
       <Route
         path="/inventory"
         element={
-          <ProtectedRoute>
+          <ProtectedRoute allowedRoles={["ADMIN"]}>
             <Inventory />
           </ProtectedRoute>
         }
@@ -117,7 +122,7 @@ const AppRoutes = () => {
       <Route
         path="/packing-invoice"
         element={
-          <ProtectedRoute>
+          <ProtectedRoute allowedRoles={["ADMIN"]}>
             <PackingInvoice />
           </ProtectedRoute>
         }
@@ -125,7 +130,7 @@ const AppRoutes = () => {
       <Route
         path="/packing-invoice/add"
         element={
-          <ProtectedRoute>
+          <ProtectedRoute allowedRoles={["ADMIN"]}>
             <AddPackingInvoice />
           </ProtectedRoute>
         }
@@ -133,7 +138,7 @@ const AppRoutes = () => {
       <Route
         path="/packing-invoice/edit/:id"
         element={
-          <ProtectedRoute>
+          <ProtectedRoute allowedRoles={["ADMIN"]}>
             <AddPackingInvoice />
           </ProtectedRoute>
         }
@@ -141,7 +146,7 @@ const AppRoutes = () => {
       <Route
         path="/bills/purchase"
         element={
-          <ProtectedRoute>
+          <ProtectedRoute allowedRoles={["ADMIN"]}>
             <PurchaseManagement />
           </ProtectedRoute>
         }
@@ -149,7 +154,7 @@ const AppRoutes = () => {
       <Route
         path="/bills/purchase/add"
         element={
-          <ProtectedRoute>
+          <ProtectedRoute allowedRoles={["ADMIN"]}>
             <AddPurchaseOrder />
           </ProtectedRoute>
         }
@@ -157,7 +162,7 @@ const AppRoutes = () => {
       <Route
         path="/bills/sales"
         element={
-          <ProtectedRoute>
+          <ProtectedRoute allowedRoles={["ADMIN"]}>
             <SalesManagement />
           </ProtectedRoute>
         }
@@ -165,7 +170,7 @@ const AppRoutes = () => {
       <Route
         path="/bills/sales/add"
         element={
-          <ProtectedRoute>
+          <ProtectedRoute allowedRoles={["ADMIN"]}>
             <AddSalesOrder />
           </ProtectedRoute>
         }
@@ -173,7 +178,7 @@ const AppRoutes = () => {
       <Route
         path="/add-inventory"
         element={
-          <ProtectedRoute>
+          <ProtectedRoute allowedRoles={["ADMIN"]}>
             <AddInventoryPage />
           </ProtectedRoute>
         }
@@ -181,7 +186,7 @@ const AppRoutes = () => {
       <Route
         path="/job-work"
         element={
-          <ProtectedRoute>
+          <ProtectedRoute allowedRoles={["ADMIN"]}>
             <JobWork />
           </ProtectedRoute>
         }
@@ -189,7 +194,7 @@ const AppRoutes = () => {
       <Route
         path="/job-work/move"
         element={
-          <ProtectedRoute>
+          <ProtectedRoute allowedRoles={["ADMIN"]}>
             <MoveToJobWork />
           </ProtectedRoute>
         }
@@ -197,7 +202,7 @@ const AppRoutes = () => {
       <Route
         path="/gres"
         element={
-          <ProtectedRoute>
+          <ProtectedRoute allowedRoles={["ADMIN"]}>
             <Gres />
           </ProtectedRoute>
         }
@@ -205,7 +210,7 @@ const AppRoutes = () => {
       <Route
         path="/gres/move"
         element={
-          <ProtectedRoute>
+          <ProtectedRoute allowedRoles={["ADMIN"]}>
             <MoveToGres />
           </ProtectedRoute>
         }
@@ -213,7 +218,7 @@ const AppRoutes = () => {
       <Route
         path="/client-management/select"
         element={
-          <ProtectedRoute>
+          <ProtectedRoute allowedRoles={["ADMIN"]}>
             <ClientSelect />
           </ProtectedRoute>
         }
@@ -221,7 +226,7 @@ const AppRoutes = () => {
       <Route
         path="/client-management"
         element={
-          <ProtectedRoute>
+          <ProtectedRoute allowedRoles={["ADMIN"]}>
             <ClientManagement />
           </ProtectedRoute>
         }
@@ -229,18 +234,62 @@ const AppRoutes = () => {
       <Route
         path="/invoices"
         element={
-           <ProtectedRoute>
+           <ProtectedRoute allowedRoles={["ADMIN"]}>
             <InvoicesList />
             </ProtectedRoute>
             }
-         
+
       />
       <Route
         path="/invoices/create"
         element={
-           <ProtectedRoute>
+           <ProtectedRoute allowedRoles={["ADMIN"]}>
             <CreateInvoice />
             </ProtectedRoute>
+        }
+      />
+
+      {/* Client Portal - Admin */}
+      <Route
+        path="/client-portal"
+        element={
+          <ProtectedRoute allowedRoles={["ADMIN"]}>
+            <ClientPortalAdmin />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/client-portal/orders"
+        element={
+          <ProtectedRoute allowedRoles={["ADMIN"]}>
+            <ClientOrderApprovals />
+          </ProtectedRoute>
+        }
+      />
+
+      {/* Client Portal - Client-facing */}
+      <Route
+        path="/shop"
+        element={
+          <ProtectedRoute allowedRoles={["CLIENT"]}>
+            <ProductCatalog />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/my-orders"
+        element={
+          <ProtectedRoute allowedRoles={["CLIENT"]}>
+            <MyOrders />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/my-profile"
+        element={
+          <ProtectedRoute allowedRoles={["CLIENT"]}>
+            <MyProfile />
+          </ProtectedRoute>
         }
       />
 

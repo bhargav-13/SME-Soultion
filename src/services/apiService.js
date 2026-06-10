@@ -36,6 +36,12 @@ import {
     GresFillingReturnApi,
 } from '../api-clients/gres-management';
 import {
+    Configuration as ClientPortalMgmtConfiguration,
+    AdminApi as ClientPortalAdminApi,
+    ClientApi as ClientPortalClientApi,
+    ClientInvoicesApi as ClientPortalInvoicesApi,
+} from '../api-clients/client-portal-management';
+import {
     CategoryApi,
     ItemApi,
     PartyApi,
@@ -217,6 +223,16 @@ const createGresMgmtConfig = () => {
     });
 };
 
+const createClientPortalMgmtConfig = () => {
+    return new ClientPortalMgmtConfiguration({
+        basePath: config.API_BASE_URL,
+        accessToken: getAccessToken(),
+        baseOptions: {
+            adapter: axiosInstance.defaults.adapter,
+        },
+    });
+};
+
 const createPackingInvoiceApi = () => {
     return {
         getAllPackingInvoices: (partyId, startDate, endDate, page = 0, size = 20) =>
@@ -251,6 +267,9 @@ let packingInvoiceApi = createPackingInvoiceApi();
 let packingInvoiceExportApi = new ExportApi(createExportMgmtConfig(), config.API_BASE_URL, axiosInstance);
 let gresFillingApi = new GresFillingApi(createGresMgmtConfig(), config.API_BASE_URL, axiosInstance);
 let gresFillingReturnApi = new GresFillingReturnApi(createGresMgmtConfig(), config.API_BASE_URL, axiosInstance);
+let clientPortalAdminApi = new ClientPortalAdminApi(createClientPortalMgmtConfig(), config.API_BASE_URL, axiosInstance);
+let clientPortalClientApi = new ClientPortalClientApi(createClientPortalMgmtConfig(), config.API_BASE_URL, axiosInstance);
+let clientPortalInvoicesApi = new ClientPortalInvoicesApi(createClientPortalMgmtConfig(), config.API_BASE_URL, axiosInstance);
 /**
  * Update all API clients with new token
  * Call this after login or token refresh
@@ -279,6 +298,9 @@ export const updateApiClients = () => {
     packingInvoiceExportApi = new ExportApi(createExportMgmtConfig(), config.API_BASE_URL, axiosInstance);
     gresFillingApi = new GresFillingApi(createGresMgmtConfig(), config.API_BASE_URL, axiosInstance);
     gresFillingReturnApi = new GresFillingReturnApi(createGresMgmtConfig(), config.API_BASE_URL, axiosInstance);
+    clientPortalAdminApi = new ClientPortalAdminApi(createClientPortalMgmtConfig(), config.API_BASE_URL, axiosInstance);
+    clientPortalClientApi = new ClientPortalClientApi(createClientPortalMgmtConfig(), config.API_BASE_URL, axiosInstance);
+    clientPortalInvoicesApi = new ClientPortalInvoicesApi(createClientPortalMgmtConfig(), config.API_BASE_URL, axiosInstance);
 };
 
 // Export API clients
@@ -303,6 +325,9 @@ export {
     packingInvoiceExportApi,
     gresFillingApi,
     gresFillingReturnApi,
+    clientPortalAdminApi,
+    clientPortalClientApi,
+    clientPortalInvoicesApi,
 };
 
 // Export a default object with all APIs
@@ -327,4 +352,7 @@ export default {
     packingInvoiceExport: packingInvoiceExportApi,
     gresFilling: gresFillingApi,
     gresFillingReturn: gresFillingReturnApi,
+    clientPortalAdmin: clientPortalAdminApi,
+    clientPortalClient: clientPortalClientApi,
+    clientPortalInvoices: clientPortalInvoicesApi,
 };

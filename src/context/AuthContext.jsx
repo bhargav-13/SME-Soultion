@@ -5,6 +5,27 @@ import toast from 'react-hot-toast';
 
 const AuthContext = createContext(null);
 
+/**
+ * Decode a JWT payload without any external dependency.
+ */
+const decodeJwt = (token) => {
+  try {
+    const payload = token.split('.')[1];
+    const json = atob(payload.replace(/-/g, '+').replace(/_/g, '/'));
+    return JSON.parse(json);
+  } catch {
+    return null;
+  }
+};
+
+const extractRole = (accessToken) => {
+  const claims = decodeJwt(accessToken);
+  const roles = (claims?.roles || []).map((r) => (typeof r === 'string' ? r : r?.authority));
+  if (roles.includes('ROLE_CLIENT')) return 'CLIENT';
+  if (roles.includes('ROLE_ADMIN')) return 'ADMIN';
+  return null;
+};
+
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -60,10 +81,10 @@ export const AuthProvider = ({ children }) => {
         localStorage.setItem(config.REFRESH_TOKEN_KEY, refreshToken);
       }
 
-      // Create user object (you might want to decode JWT or fetch user details)
+      // Create user object (role is decoded from the JWT claims)
       const userData = {
         email: username,
-        // Add more user details if available from response
+        role: extractRole(accessToken),
       };
 
       localStorage.setItem(config.USER_KEY, JSON.stringify(userData));
@@ -133,6 +154,8 @@ export const AuthProvider = ({ children }) => {
     user,
     loading,
     isAuthenticated,
+    role: user?.role || null,
+    isClient: user?.role === 'CLIENT',
     login,
     logout,
     refreshToken,
