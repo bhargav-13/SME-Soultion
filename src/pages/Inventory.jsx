@@ -820,7 +820,12 @@ const Inventory = () => {
       toast.error(`${errorCount} row(s) failed to save.`);
     }
 
-    await loadAll();
+    // Mark saved rows as non-editing instead of re-fetching everything
+    setTableData((prev) =>
+      prev.map((row) =>
+        row._editing && row._itemId ? { ...row, _editing: false } : row
+      )
+    );
     setSaving(false);
     _setEditingCell(null);
     _setSelectedCell(null);
@@ -849,7 +854,10 @@ const Inventory = () => {
       const invId = Number(row._inventoryId);
       await inventoryApi.deleteInventory(itemId, invId);
       toast.success("Row deleted successfully!");
-      await loadAll();
+      setTableData((prev) => {
+        const updated = prev.filter((_, idx) => idx !== rowIndex);
+        return updated.length === 0 ? [createEmptyRow()] : updated;
+      });
     } catch (error) {
       console.error("Error deleting row:", error);
       toast.error(
