@@ -359,9 +359,9 @@ const SidebarLayout = ({ children }) => {
         })()}
 
         {/* Main content */}
-        <main className="flex-1 w-full overflow-y-auto scrollbar-hide">
+        <main className="flex-1 w-full overflow-y-auto scrollbar-hide bg-gray-50/60">
           <Navbar showSidebarMenu={!isOpen} onOpenSidebar={() => setIsOpen(true)} />
-          <div className="p-6 bg-gray-50/60">{children}</div>
+          <div className="p-6">{children}</div>
         </main>
 
         {/* Mobile overlay */}

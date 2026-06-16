@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import ReactDOM from "react-dom";
 import { useNavigate, useLocation } from "react-router-dom";
-import { Plus, Pencil, Trash2, X, Eye, Search, Check, ChevronDown } from "lucide-react";
+import { Plus, Pencil, Trash2, X, Eye, Search, Check, ChevronDown, Upload } from "lucide-react";
 import SidebarLayout from "../components/SidebarLayout";
 import StatsCard from "../components/StatsCard";
 import PageHeader from "../components/PageHeader";
@@ -14,27 +14,29 @@ import toast from "react-hot-toast";
 import Loader from "../components/Loader";
 
 const columns = [
-  { key: "itemName", label: "Item Name", type: "dropdown" },
-  { key: "sizeInInch", label: "Size in Inch", type: "suggest" },
-  { key: "sizeInMm", label: "In MM", type: "suggest" },
-  { key: "dozenWeight", label: "Dozen Wt.", type: "suggest" },
-  { key: "stockStatus", label: "Stock Status", type: "status" },
-  { key: "pcsPerBox", label: "Pc./Box", type: "number" },
-  { key: "boxPerCarton", label: "Box/Carton", type: "number" },
-  { key: "pcsPerCarton", label: "Pcs/Carton", type: "number" },
-  { key: "cartonWeight", label: "Carton Wt.", type: "number" },
-  { key: "sssatinlacq", label: "S.S & Sartin Lacq", type: "number" },
-  { key: "antiq", label: "ANTQ", type: "number" },
-  { key: "sidegold", label: "Side Gold", type: "number" },
-  { key: "zblack", label: "Z-Black.", type: "number" },
-  { key: "grblack", label: "Gr. Black.", type: "number" },
-  { key: "mattss", label: "Matt S.S", type: "number" },
-  { key: "mattantiq", label: "Matt ANTQ", type: "number" },
-  { key: "pvdrose", label: "PVD Rose", type: "number" },
-  { key: "pvdgold", label: "PVD Gold", type: "number" },
-  { key: "pvdblack", label: "PVD Black", type: "number" },
-  { key: "rosegold", label: "Rose Gold", type: "number" },
-  { key: "clearlacq", label: "Clear Lacq.", type: "number" },
+  { key: "itemName",    label: "Doz.",                 type: "dropdown" },
+  { key: "sizeInInch", label: "Size In INCH",          type: "suggest"  },
+  { key: "sizeInMm",   label: "Size In MM",            type: "suggest"  },
+  { key: "dozenWeight",label: "Doz. Weight",           type: "suggest"  },
+  { key: "pcsWeight",  label: "PCS Weight",            type: "readonly" },
+  { key: "stockStatus",label: "Stock Status",          type: "status"   },
+  { key: "pcsPerBox",      label: "Box / Pcs",              type: "number" },
+  { key: "boxPerCarton",   label: "Box / Cartoon",          type: "number" },
+  { key: "pcsPerCarton",   label: "Total Pcs / Cartoon",    type: "number" },
+  { key: "cartonWeight",   label: "Total Cartoon Weight",   type: "number" },
+  { key: "ss",         label: "S.S.",           type: "number" },
+  { key: "antiq",      label: "Antq.",          type: "number" },
+  { key: "sidegold",   label: "Side Gold",      type: "number" },
+  { key: "sartinlacq", label: "Sartin Lacqur",  type: "number" },
+  { key: "zblack",     label: "Z Black",        type: "number" },
+  { key: "grblack",    label: "Gr. Black",      type: "number" },
+  { key: "mattss",     label: "Matt S.S.",      type: "number" },
+  { key: "mattantiq",  label: "Matt Antq.",     type: "number" },
+  { key: "pvdrose",    label: "PVD Rose Gold",  type: "number" },
+  { key: "pvdgold",    label: "PVD Gold",       type: "number" },
+  { key: "pvdblack",   label: "PVD Black",      type: "number" },
+  { key: "rosegold",   label: "Rose Gold",      type: "number" },
+  { key: "clearlacq",  label: "Clear Lacqur",   type: "number" },
 ];
 
 const splitHeaderLabel = (label, maxChars = 8) => {
@@ -67,10 +69,37 @@ const splitHeaderLabel = (label, maxChars = 8) => {
 
 const numericFields = [
   "pcsPerBox", "boxPerCarton", "pcsPerCarton", "cartonWeight",
-  "sssatinlacq", "antiq", "sidegold", "zblack", "grblack",
+  "ss", "antiq", "sidegold", "sartinlacq", "zblack", "grblack",
   "mattss", "mattantiq", "pvdrose", "pvdgold", "pvdblack",
   "rosegold", "clearlacq",
 ];
+
+const FINISH_KEYS = ["ss","antiq","sidegold","sartinlacq","zblack","grblack","mattss","mattantiq","pvdrose","pvdgold","pvdblack","rosegold","clearlacq"];
+const hasFinishData = (row) => row && FINISH_KEYS.some((k) => row[k] !== "" && row[k] != null);
+
+// Format number for display: strip excess decimals, max 3 places
+const fmtNum = (val) => {
+  if (val === "" || val == null) return "-";
+  const n = parseFloat(val);
+  if (isNaN(n)) return val || "-";
+  return String(Math.round(n * 1000) / 1000);
+};
+
+// Offsets applied to all finish fields when SS changes (from Stock Master Excel row 2)
+const SS_OFFSETS = {
+  antiq:     10,
+  sidegold:  12,
+  sartinlacq: 0,
+  zblack:   105,
+  grblack:   60,
+  mattss:    30,
+  mattantiq: 60,
+  pvdrose:  400,
+  pvdgold:  400,
+  pvdblack: 400,
+  rosegold: 400,
+  clearlacq:400,
+};
 
 const createEmptyRow = () => {
   const row = { _itemId: "", _inventoryId: null, _sizes: [], _isNew: true, _editing: true };
@@ -91,9 +120,16 @@ const apiRowToTableRow = (inv, itemId, sizes) => {
     _createdAt: inv.createdAt || null,
     _updatedAt: inv.updatedAt || null,
   };
+  const matchingSize = (sizes || []).find(
+    (s) =>
+      (s.sizeInInch || "").trim() === (inv.sizeInInch || "").trim() &&
+      (s.sizeInMm || "").trim() === (inv.sizeInMm || "").trim()
+  );
   columns.forEach((col) => {
     if (col.key === "itemName") {
       row[col.key] = inv.itemName || "";
+    } else if (col.key === "pcsWeight") {
+      row[col.key] = matchingSize?.pcsWeight != null ? String(matchingSize.pcsWeight) : "";
     } else {
       row[col.key] = inv[col.key] != null ? String(inv[col.key]) : "";
     }
@@ -101,35 +137,25 @@ const apiRowToTableRow = (inv, itemId, sizes) => {
   return row;
 };
 
-// Autocomplete input with portal-based dropdown (renders outside table overflow)
-const SuggestInput = ({
-  value,
-  suggestions,
-  onChange,
-  onSelect,
-  onBlur,
-  onKeyDown,
-}) => {
+// Autocomplete input — local state so typing never re-renders the parent table
+const SuggestInput = ({ value: initialValue, suggestions, onChange, onSelect, onBlur, onKeyDown }) => {
+  const [localValue, setLocalValue] = useState(initialValue ?? "");
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [dropdownPos, setDropdownPos] = useState(null);
   const inputRef = useRef(null);
 
-  const filtered = suggestions.filter((s) => {
-    const sStr = String(s.label).toLowerCase();
-    const vStr = String(value).toLowerCase();
-    return sStr.includes(vStr);
-  });
+  // Sync when parent resets the value (e.g. after a size selection)
+  useEffect(() => { setLocalValue(initialValue ?? ""); }, [initialValue]);
 
+  const filtered = suggestions.filter((s) =>
+    String(s.label).toLowerCase().includes(String(localValue).toLowerCase())
+  );
   const shouldShow = showSuggestions && filtered.length > 0;
 
   const updatePosition = useCallback(() => {
     if (inputRef.current) {
       const rect = inputRef.current.getBoundingClientRect();
-      setDropdownPos({
-        top: rect.bottom + 4,
-        left: rect.left,
-        width: Math.max(rect.width, 240),
-      });
+      setDropdownPos({ top: rect.bottom + 4, left: rect.left, width: Math.max(rect.width, 240) });
     }
   }, []);
 
@@ -139,19 +165,17 @@ const SuggestInput = ({
         ref={inputRef}
         autoFocus
         type="text"
-        value={value}
+        value={localValue}
         onChange={(e) => {
-          onChange(e.target.value);
+          setLocalValue(e.target.value);   // local only — zero parent re-renders
           setShowSuggestions(true);
           updatePosition();
         }}
-        onFocus={() => {
-          setShowSuggestions(true);
-          updatePosition();
-        }}
+        onFocus={() => { setShowSuggestions(true); updatePosition(); }}
         onBlur={() => {
           setTimeout(() => {
             setShowSuggestions(false);
+            onChange(localValue);          // commit to parent only on blur
             onBlur();
           }, 180);
         }}
@@ -196,6 +220,40 @@ const SuggestInput = ({
 };
 
 
+
+// Number input with local state — typing stays local, parent only updated on blur or SS change
+const NumberCellInput = React.memo(function NumberCellInput({ value: initialValue, colKey, rowIndex, onCommit, onSsChange, onBlur, onKeyDown }) {
+  const [localVal, setLocalVal] = useState(initialValue ?? "");
+  const isFocused = useRef(false);
+
+  // Sync when parent pushes a new value (e.g. SS auto-fill changes antiq),
+  // but never override what the user is actively typing in THIS cell.
+  useEffect(() => {
+    if (!isFocused.current) setLocalVal(initialValue ?? "");
+  }, [initialValue]);
+
+  return (
+    <input
+      autoFocus
+      type="number"
+      step="any"
+      value={localVal}
+      onFocus={() => { isFocused.current = true; }}
+      onChange={(e) => {
+        const v = e.target.value;
+        setLocalVal(v);                        // local only — zero parent re-renders
+        if (colKey === "ss") onSsChange(rowIndex, v); // SS: update derived fields immediately
+      }}
+      onBlur={() => {
+        isFocused.current = false;
+        onCommit(rowIndex, colKey, localVal);  // commit to tableData on blur
+        onBlur();
+      }}
+      onKeyDown={onKeyDown}
+      className="w-full rounded text-center text-sm focus:outline-none"
+    />
+  );
+});
 
 const TableDropdown = ({ value, options = [], placeholder = "Select...", onSelect, disabled = false }) => {
   const [open, setOpen] = useState(false);
@@ -295,6 +353,56 @@ const TableDropdown = ({ value, options = [], placeholder = "Select...", onSelec
   );
 };
 
+// Memoized row — only re-renders when its own row data or cell selection changes
+const MemoRow = React.memo(function MemoRow({ row, originalIndex, editingCol, selectedCol, renderCell, handleAddStockRow, handleCancelEditRow, handleEditRow, setDeleteDialog }) {
+  const rowBg = row._editing && !row._isNew && hasFinishData(row._backup || row)
+    ? "bg-yellow-50"
+    : row._isNew
+    ? "bg-gray-50/30"
+    : !row._editing && row._updatedAt && row._createdAt && row._updatedAt !== row._createdAt && hasFinishData(row)
+    ? "bg-yellow-50"
+    : "hover:bg-gray-50";
+
+  return (
+    <tr className={`border-b border-gray-200 ${rowBg}`}>
+      {columns.map((col, colIndex) => (
+        <React.Fragment key={`${col.key}-${originalIndex}`}>
+          {col.key === "stockStatus" && (
+            <td className="h-10 px-2 py-1 text-center w-[60px] border-r border-gray-200">
+              {!row._isNew && !row._editing && row._itemId && (
+                <button type="button" onClick={() => handleAddStockRow(row)} title="View stock details" className="p-1 text-gray-500 hover:bg-gray-100 rounded transition">
+                  <Eye className="w-4 h-4" />
+                </button>
+              )}
+            </td>
+          )}
+          {renderCell(row, originalIndex, col, colIndex, editingCol === colIndex, selectedCol === colIndex)}
+        </React.Fragment>
+      ))}
+      <td className="h-10 px-2 py-1 text-center w-[80px]">
+        <div className="flex items-center justify-center gap-1">
+          {row._editing ? (
+            !row._isNew && (
+              <button type="button" onClick={() => handleCancelEditRow(originalIndex)} title="Cancel edit" className="p-1 text-gray-500 hover:bg-gray-100 rounded transition">
+                <X className="w-4 h-4" />
+              </button>
+            )
+          ) : (
+            <>
+              <button type="button" onClick={() => handleEditRow(originalIndex)} title="Edit" className="p-1 text-blue-600 hover:bg-blue-50 rounded transition">
+                <Pencil className="w-4 h-4" />
+              </button>
+              <button type="button" onClick={() => setDeleteDialog({ open: true, rowIndex: originalIndex })} title="Delete" className="p-1 text-red-600 hover:bg-red-50 rounded transition">
+                <Trash2 className="w-4 h-4" />
+              </button>
+            </>
+          )}
+        </div>
+      </td>
+    </tr>
+  );
+});
+
 const Inventory = () => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -306,6 +414,12 @@ const Inventory = () => {
   const [tableData, setTableData] = useState([]);
   const [selectedCell, setSelectedCell] = useState(null);
   const [editingCell, setEditingCell] = useState(null);
+  const [formulaCell, setFormulaCell] = useState(null); // { rowIndex, key, label }
+  // Refs so callbacks can read current values without becoming unstable
+  const editingCellRef = useRef(null);
+  const selectedCellRef = useRef(null);
+  const _setEditingCell = useCallback((v) => { editingCellRef.current = v; setEditingCell(v); }, []);
+  const _setSelectedCell = useCallback((v) => { selectedCellRef.current = v; setSelectedCell(v); }, []);
 
   const [searchTerm, setSearchTerm] = useState("");
   const [stockFilter, setStockFilter] = useState("ALL");
@@ -336,6 +450,12 @@ const Inventory = () => {
 
   // Add Stock popup state
   const [stockDialogRow, setStockDialogRow] = useState(null);
+
+  // Import Excel (Stock Master) state
+  const [importFile, setImportFile] = useState(null);
+  const [importConfirmOpen, setImportConfirmOpen] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const importInputRef = useRef(null);
 
   useEffect(() => {
     loadAll();
@@ -371,80 +491,70 @@ const Inventory = () => {
         /* ignore — stock status will show as empty */
       }
 
-      // Fetch inventory for each item
+      // Fetch all inventory in parallel (one request per item simultaneously)
+      const stockBySize = new Map(allStockEntries.map((s) => [Number(s.sizeId), s]));
+      const invResults = await Promise.allSettled(
+        itemsData.map((item) =>
+          inventoryApi.getAllInventory(Number(item.id), undefined, undefined, undefined, undefined, 0, 1000)
+        )
+      );
+
       const allRows = [];
-      for (const item of itemsData) {
-        try {
-          const invResponse = await inventoryApi.getAllInventory(
-            Number(item.id), undefined, undefined, undefined, undefined, 0, 1000
-          );
-          const invData = invResponse.data?.data || invResponse.data || [];
-          const invList = Array.isArray(invData) ? invData : [];
-          const sizes = item.sizes || [];
+      itemsData.forEach((item, i) => {
+        const sizes = item.sizes || [];
+        const invList =
+          invResults[i].status === "fulfilled"
+            ? Array.isArray(invResults[i].value.data?.data)
+              ? invResults[i].value.data.data
+              : Array.isArray(invResults[i].value.data)
+              ? invResults[i].value.data
+              : []
+            : [];
 
-          // Show a row for every defined size, matched to inventory if it exists
-          for (const size of sizes) {
-            const inch = (size.sizeInInch || "").trim();
-            const mm = (size.sizeInMm || "").trim();
+        const invBySize = new Map(
+          invList.map((inv) => [`${(inv.sizeInInch || "").trim()}|${(inv.sizeInMm || "").trim()}`, inv])
+        );
 
-            const matchingInv = invList.find(
-              (inv) =>
-                (inv.sizeInInch || "").trim() === inch &&
-                (inv.sizeInMm || "").trim() === mm
-            );
+        for (const size of sizes) {
+          const inch = (size.sizeInInch || "").trim();
+          const mm = (size.sizeInMm || "").trim();
+          const matchingInv = invBySize.get(`${inch}|${mm}`);
 
-            let row;
-            if (matchingInv) {
-              row = apiRowToTableRow(matchingInv, item.id, sizes);
-            } else {
-              row = { _itemId: String(item.id), _inventoryId: null, _sizes: sizes, _isNew: false, _editing: false };
-              columns.forEach((col) => {
-                if (col.key === "itemName") row[col.key] = item.itemName || "";
-                else if (col.key === "sizeInInch") row[col.key] = size.sizeInInch || "";
-                else if (col.key === "sizeInMm") row[col.key] = size.sizeInMm || "";
-                else if (col.key === "dozenWeight") row[col.key] = size.dozenWeight != null ? String(size.dozenWeight) : "";
-                else row[col.key] = "";
-              });
-            }
-
-            // Compute stock status using size.id directly
-            if (size.id) {
-              const stockEntry = allStockEntries.find(
-                (st) => Number(st.sizeId) === Number(size.id)
-              );
-              if (stockEntry) {
-                const totalPc = parseFloat(stockEntry.totalPc) || 0;
-                const lowWarn = parseFloat(stockEntry.lowStockWarning) || 0;
-                if (totalPc <= 0) {
-                  row.stockStatus = "OUT_OF_STOCK";
-                } else if (lowWarn > 0 && totalPc <= lowWarn) {
-                  row.stockStatus = "LOW";
-                } else {
-                  row.stockStatus = "IN_STOCK";
-                }
-              }
-            }
-
-            allRows.push(row);
+          let row;
+          if (matchingInv) {
+            row = apiRowToTableRow(matchingInv, item.id, sizes);
+          } else {
+            row = { _itemId: String(item.id), _inventoryId: null, _sizes: sizes, _isNew: false, _editing: false };
+            columns.forEach((col) => {
+              if (col.key === "itemName") row[col.key] = item.itemName || "";
+              else if (col.key === "sizeInInch") row[col.key] = size.sizeInInch || "";
+              else if (col.key === "sizeInMm") row[col.key] = size.sizeInMm || "";
+              else if (col.key === "dozenWeight") row[col.key] = size.dozenWeight != null ? String(size.dozenWeight) : "";
+              else if (col.key === "pcsWeight") row[col.key] = size.pcsWeight != null ? String(size.pcsWeight) : "";
+              else row[col.key] = "";
+            });
           }
 
-          // Include any inventory records with no matching size (edge case)
-          for (const inv of invList) {
-            const invInch = (inv.sizeInInch || "").trim();
-            const invMm = (inv.sizeInMm || "").trim();
-            const hasMatchingSize = sizes.some(
-              (s) =>
-                (s.sizeInInch || "").trim() === invInch &&
-                (s.sizeInMm || "").trim() === invMm
-            );
-            if (!hasMatchingSize) {
-              allRows.push(apiRowToTableRow(inv, item.id, sizes));
+          if (size.id) {
+            const stockEntry = stockBySize.get(Number(size.id));
+            if (stockEntry) {
+              const totalPc = parseFloat(stockEntry.totalPc) || 0;
+              const lowWarn = parseFloat(stockEntry.lowStockWarning) || 0;
+              row.stockStatus = totalPc <= 0 ? "OUT_OF_STOCK" : lowWarn > 0 && totalPc <= lowWarn ? "LOW" : "IN_STOCK";
             }
           }
-        } catch (err) {
-          console.error(`Error fetching inventory for item ${item.id}:`, err);
+
+          allRows.push(row);
         }
-      }
+
+        // Edge case: inventory with no matching size
+        for (const inv of invList) {
+          const key = `${(inv.sizeInInch || "").trim()}|${(inv.sizeInMm || "").trim()}`;
+          if (!sizes.some((s) => `${(s.sizeInInch || "").trim()}|${(s.sizeInMm || "").trim()}` === key)) {
+            allRows.push(apiRowToTableRow(inv, item.id, sizes));
+          }
+        }
+      });
 
       // Add one empty row at the end for new entry
       allRows.push(createEmptyRow());
@@ -527,81 +637,101 @@ const Inventory = () => {
     }
   };
 
-  const handleSizeSuggestionSelect = (rowIndex, size) => {
+  const handleSizeSuggestionSelect = useCallback((rowIndex, size) => {
     setTableData((prev) =>
       prev.map((row, idx) => {
         if (idx !== rowIndex) return row;
-        return {
-          ...row,
-          sizeInInch: size.sizeInInch || "",
-          sizeInMm: size.sizeInMm || "",
-          dozenWeight: size.dozenWeight != null ? String(size.dozenWeight) : "",
-        };
+        return { ...row, sizeInInch: size.sizeInInch || "", sizeInMm: size.sizeInMm || "", dozenWeight: size.dozenWeight != null ? String(size.dozenWeight) : "", pcsWeight: size.pcsWeight != null ? String(size.pcsWeight) : "" };
       })
     );
-  };
+  }, []);
 
-  const updateCell = (rowIndex, key, value) => {
+  const handleSsChange = useCallback((rowIndex, ssValue) => {
+    setTableData((prev) =>
+      prev.map((row, idx) => {
+        if (idx !== rowIndex) return row;
+        const updated = { ...row, ss: ssValue };
+        const ssNum = parseFloat(ssValue);
+        if (!isNaN(ssNum) && ssValue !== "") {
+          Object.entries(SS_OFFSETS).forEach(([field, offset]) => {
+            updated[field] = String(Math.round((ssNum + offset) * 100) / 100);
+          });
+        }
+        return updated;
+      })
+    );
+  }, []);
+
+  const updateCell = useCallback((rowIndex, key, value) => {
     setTableData((prev) =>
       prev.map((row, idx) => (idx === rowIndex ? { ...row, [key]: value } : row))
     );
-  };
+  }, []);
 
-  const handleCellClick = (rowIndex, colIndex) => {
-    const row = tableData[rowIndex];
-    if (!row._editing) return;
-
+  const handleCellClick = useCallback((rowIndex, colIndex, rowEditing) => {
+    if (!rowEditing) return;
+    const col = columns[colIndex];
     const cellId = `${rowIndex}-${colIndex}`;
-    if (editingCell === cellId) return;
-    if (selectedCell === cellId) {
-      setEditingCell(cellId);
+    setFormulaCell({ rowIndex, key: col.key, label: col.label });
+    if (editingCellRef.current === cellId) return;
+    if (selectedCellRef.current === cellId) {
+      _setEditingCell(cellId);
       return;
     }
-    setSelectedCell(cellId);
-    setEditingCell(null);
-  };
+    _setSelectedCell(cellId);
+    _setEditingCell(null);
+  }, [_setEditingCell, _setSelectedCell]);
 
-  const handleCellBlur = (cellId) => {
-    setEditingCell(null);
-    setSelectedCell(cellId);
-  };
+  const handleCellDoubleClick = useCallback((rowIndex, colIndex) => {
+    const col = columns[colIndex];
+    if (!col || col.type === "readonly" || col.type === "status") return;
+    setTableData((prev) =>
+      prev.map((row, idx) =>
+        idx === rowIndex && !row._editing
+          ? { ...row, _editing: true, _backup: { ...row } }
+          : row
+      )
+    );
+    const cellId = `${rowIndex}-${colIndex}`;
+    _setEditingCell(cellId);
+    _setSelectedCell(cellId);
+    setFormulaCell({ rowIndex, key: col.key, label: col.label });
+  }, [_setEditingCell, _setSelectedCell]);
+
+  const handleCellBlur = useCallback((cellId) => {
+    _setEditingCell(null);
+    _setSelectedCell(cellId);
+  }, [_setEditingCell, _setSelectedCell]);
 
   const handleLastCellTab = () => {
     const nextRowIndex = tableData.length;
     setTableData((prev) => [...prev, createEmptyRow()]);
-    setSelectedCell(`${nextRowIndex}-0`);
-    setEditingCell(`${nextRowIndex}-0`);
+    _setSelectedCell(`${nextRowIndex}-0`);
+    _setEditingCell(`${nextRowIndex}-0`);
   };
 
-  // Start editing an existing row
-  const handleEditRow = (rowIndex) => {
+  const handleEditRow = useCallback((rowIndex) => {
     setTableData((prev) =>
       prev.map((row, idx) =>
         idx === rowIndex ? { ...row, _editing: true, _backup: { ...row } } : row
       )
     );
-  };
+  }, []);
 
-  // Cancel editing an existing row — restore backup
-  const handleCancelEditRow = (rowIndex) => {
+  const handleCancelEditRow = useCallback((rowIndex) => {
     setTableData((prev) =>
       prev.map((row, idx) => {
         if (idx !== rowIndex) return row;
-        if (row._isNew) {
-          return createEmptyRow();
-        }
+        if (row._isNew) return createEmptyRow();
         const backup = row._backup;
-        if (backup) {
-          const restored = { ...backup, _editing: false };
-          delete restored._backup;
-          return restored;
-        }
+        if (backup) { const restored = { ...backup, _editing: false }; delete restored._backup; return restored; }
         return { ...row, _editing: false };
       })
     );
-    setEditingCell(null);
-    setSelectedCell(null);
-  };
+    _setEditingCell(null);
+    _setSelectedCell(null);
+    setFormulaCell(null);
+  }, [_setEditingCell, _setSelectedCell]);
 
   // Build payload from a row
   const buildPayload = (row) => {
@@ -691,8 +821,8 @@ const Inventory = () => {
 
     await loadAll();
     setSaving(false);
-    setEditingCell(null);
-    setSelectedCell(null);
+    _setEditingCell(null);
+    _setSelectedCell(null);
   };
 
   // Delete a row
@@ -734,8 +864,8 @@ const Inventory = () => {
 
   const handleRefresh = () => {
     loadAll();
-    setEditingCell(null);
-    setSelectedCell(null);
+    _setEditingCell(null);
+    _setSelectedCell(null);
   };
 
   // ── Add Inventory Dialog handlers ─────────────────────────────────
@@ -851,59 +981,93 @@ const Inventory = () => {
     setStockDialogRow(row);
   };
 
-  const filteredRows = useMemo(() => {
-    return tableData
-      .map((row, originalIndex) => ({ ...row, _originalIndex: originalIndex }))
-      .filter((row) => {
-        if (row._isNew) return true;
-        const rowText = columns.map((c) => row[c.key] || "").join(" ").toLowerCase();
-        const matchesSearch = !searchTerm || rowText.includes(searchTerm.toLowerCase());
-        let matchesStock = true;
-        if      (stockFilter === "IN_STOCK")     matchesStock = row.stockStatus === "IN_STOCK";
-        else if (stockFilter === "LOW")          matchesStock = row.stockStatus === "LOW";
-        else if (stockFilter === "OUT_OF_STOCK") matchesStock = row.stockStatus === "OUT_OF_STOCK";
-        else if (stockFilter === "NO_ENTRY")     matchesStock = !row.stockStatus;
-        let matchesCategory = true;
-        if (categoryFilter) {
-          const item = items.find((i) => String(i.id) === String(row._itemId));
-          matchesCategory = item?.category?.id === categoryFilter.id || item?.categoryId === categoryFilter.id;
-        }
-        return matchesSearch && matchesStock && matchesCategory;
-      });
-  }, [searchTerm, tableData, stockFilter, categoryFilter, items]);
-
-  const getSuggestions = (row, colKey) => {
-    const sizes = row._sizes || [];
-    if (sizes.length === 0) return [];
-
-    const seen = new Set();
-    return sizes
-      .map((s) => {
-        let label = "";
-        let display = "";
-        if (colKey === "sizeInInch") {
-          label = s.sizeInInch || "";
-          display = `${s.sizeInInch}  (MM: ${s.sizeInMm || "-"}, Dz: ${s.dozenWeight ?? "-"})`;
-        } else if (colKey === "sizeInMm") {
-          label = s.sizeInMm || "";
-          display = `${s.sizeInMm}  (Inch: ${s.sizeInInch || "-"}, Dz: ${s.dozenWeight ?? "-"})`;
-        } else if (colKey === "dozenWeight") {
-          label = s.dozenWeight != null ? String(s.dozenWeight) : "";
-          display = `${s.dozenWeight ?? "-"}  (Inch: ${s.sizeInInch || "-"}, MM: ${s.sizeInMm || "-"})`;
-        }
-        return { label, display, size: s };
-      })
-      .filter((s) => {
-        if (!s.label || seen.has(s.label)) return false;
-        seen.add(s.label);
-        return true;
-      });
+  // ── Import Stock Master Excel handlers ─────────────────────────────
+  const handleImportFileSelect = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setImportFile(file);
+    setImportConfirmOpen(true);
   };
 
-  const renderCell = (row, rowIndex, col, colIndex) => {
-    const cellId = `${rowIndex}-${colIndex}`;
-    const isEditing = editingCell === cellId && row._editing;
-    const isSelected = selectedCell === cellId;
+  const handleConfirmImport = async () => {
+    if (!importFile || importing) return;
+    setImporting(true);
+    try {
+      const res = await itemBlueprintApi.importItemBlueprints(importFile);
+      const result = res.data || {};
+      toast.success(
+        result.message ||
+          `Imported ${result.itemsCreated ?? 0} items with ${result.sizesCreated ?? 0} sizes`
+      );
+      setImportConfirmOpen(false);
+      setImportFile(null);
+      if (importInputRef.current) importInputRef.current.value = "";
+      await loadAll();
+    } catch (error) {
+      console.error("Error importing stock master:", error);
+      toast.error(
+        error.response?.data?.message ||
+          error.response?.data?.detail ||
+          "Failed to import stock master excel"
+      );
+    } finally {
+      setImporting(false);
+    }
+  };
+
+  const handleCancelImport = () => {
+    setImportConfirmOpen(false);
+    setImportFile(null);
+    if (importInputRef.current) importInputRef.current.value = "";
+  };
+
+  // Only indices — row objects stay stable references from tableData (enables React.memo on rows)
+  const filteredIndices = useMemo(() => {
+    const term = searchTerm.toLowerCase();
+    const result = [];
+    for (let idx = 0; idx < tableData.length; idx++) {
+      const row = tableData[idx];
+      if (row._isNew) { result.push(idx); continue; }
+      if (term) {
+        const rowText = columns.map((c) => row[c.key] || "").join(" ").toLowerCase();
+        if (!rowText.includes(term)) continue;
+      }
+      if (stockFilter === "IN_STOCK" && row.stockStatus !== "IN_STOCK") continue;
+      else if (stockFilter === "LOW" && row.stockStatus !== "LOW") continue;
+      else if (stockFilter === "OUT_OF_STOCK" && row.stockStatus !== "OUT_OF_STOCK") continue;
+      else if (stockFilter === "NO_ENTRY" && row.stockStatus) continue;
+      if (categoryFilter) {
+        const item = items.find((i) => String(i.id) === String(row._itemId));
+        if (!item || (item?.category?.id !== categoryFilter.id && item?.categoryId !== categoryFilter.id)) continue;
+      }
+      result.push(idx);
+    }
+    return result;
+  }, [searchTerm, tableData, stockFilter, categoryFilter, items]);
+
+  // Pre-build suggestions per item id so getSuggestions doesn't recompute on every render
+  const suggestionsCache = useMemo(() => {
+    const cache = {};
+    for (const item of items) {
+      const sizes = item.sizes || [];
+      const build = (colKey) => {
+        const seen = new Set();
+        return sizes.map((s) => {
+          let label = "", display = "";
+          if (colKey === "sizeInInch") { label = s.sizeInInch || ""; display = `${s.sizeInInch}  (MM: ${s.sizeInMm || "-"}, Dz: ${s.dozenWeight ?? "-"})`; }
+          else if (colKey === "sizeInMm") { label = s.sizeInMm || ""; display = `${s.sizeInMm}  (Inch: ${s.sizeInInch || "-"}, Dz: ${s.dozenWeight ?? "-"})`; }
+          else if (colKey === "dozenWeight") { label = s.dozenWeight != null ? String(s.dozenWeight) : ""; display = `${s.dozenWeight ?? "-"}  (Inch: ${s.sizeInInch || "-"}, MM: ${s.sizeInMm || "-"})`; }
+          return { label, display, size: s };
+        }).filter((s) => { if (!s.label || seen.has(s.label)) return false; seen.add(s.label); return true; });
+      };
+      cache[item.id] = { sizeInInch: build("sizeInInch"), sizeInMm: build("sizeInMm"), dozenWeight: build("dozenWeight") };
+    }
+    return cache;
+  }, [items]);
+
+  const getSuggestions = (row, colKey) => suggestionsCache[row._itemId]?.[colKey] ?? [];
+
+  const renderCell = (row, rowIndex, col, colIndex, isEditing, isSelected) => {
     const isRowEditable = row._editing;
 
     // Item Name dropdown
@@ -914,7 +1078,8 @@ const Inventory = () => {
           className={`h-10 min-w-[140px] px-1 py-1 text-center text-sm text-gray-700 border-r border-gray-200 ${
             isSelected && isRowEditable ? "ring-2 ring-gray-400 ring-inset" : ""
           }`}
-          onClick={() => handleCellClick(rowIndex, colIndex)}
+          onClick={() => handleCellClick(rowIndex, colIndex, row._editing)}
+          onDoubleClick={() => handleCellDoubleClick(rowIndex, colIndex)}
         >
           {isRowEditable ? (
             <TableDropdown
@@ -943,7 +1108,8 @@ const Inventory = () => {
           className={`h-10 min-w-[120px] px-3 py-1 text-center text-sm text-gray-500 border-r border-gray-200 ${
             isSelected && isRowEditable ? "ring-2 ring-gray-400 ring-inset" : ""
           }`}
-          onClick={() => handleCellClick(rowIndex, colIndex)}
+          onClick={() => handleCellClick(rowIndex, colIndex, row._editing)}
+          onDoubleClick={() => handleCellDoubleClick(rowIndex, colIndex)}
         >
           {isEditing ? (
             <SuggestInput
@@ -952,7 +1118,7 @@ const Inventory = () => {
               inputType={col.key === "dozenWeight" ? "number" : "text"}
               onChange={(val) => updateCell(rowIndex, col.key, val)}
               onSelect={(s) => handleSizeSuggestionSelect(rowIndex, s.size)}
-              onBlur={() => handleCellBlur(cellId)}
+              onBlur={() => handleCellBlur(`${rowIndex}-${colIndex}`)}
               onKeyDown={(e) => {
                 if (e.key === "Enter") {
                   e.currentTarget.blur();
@@ -1011,6 +1177,20 @@ const Inventory = () => {
       );
     }
 
+    // Read-only cell (e.g. pcsWeight from size)
+    if (col.type === "readonly") {
+      return (
+        <td
+          key={col.key}
+          className="h-10 min-w-[84px] px-3 py-1 text-center text-sm border-r border-gray-200"
+        >
+          <span className={row[col.key] ? "text-gray-700" : "text-gray-300"}>
+            {fmtNum(row[col.key])}
+          </span>
+        </td>
+      );
+    }
+
     // Number input cells
     return (
       <td
@@ -1018,36 +1198,28 @@ const Inventory = () => {
         className={`h-10 min-w-[84px] px-3 py-1 text-center text-sm text-gray-500 border-r border-gray-200 ${
           isSelected && isRowEditable ? "ring-2 ring-gray-400 ring-inset" : ""
         }`}
-        onClick={() => handleCellClick(rowIndex, colIndex)}
+        onClick={() => handleCellClick(rowIndex, colIndex, row._editing)}
+        onDoubleClick={() => handleCellDoubleClick(rowIndex, colIndex)}
       >
         {isEditing ? (
-          <input
-            autoFocus
-            type="number"
-            step="any"
+          <NumberCellInput
             value={row[col.key]}
-            onChange={(e) => updateCell(rowIndex, col.key, e.target.value)}
-            onBlur={() => handleCellBlur(cellId)}
+            colKey={col.key}
+            rowIndex={rowIndex}
+            onCommit={updateCell}
+            onSsChange={handleSsChange}
+            onBlur={() => handleCellBlur(`${rowIndex}-${colIndex}`)}
             onKeyDown={(e) => {
-              if (e.key === "Enter") {
-                e.currentTarget.blur();
-                return;
-              }
-              if (
-                e.key === "Tab" &&
-                !e.shiftKey &&
-                rowIndex === tableData.length - 1 &&
-                colIndex === columns.length - 1
-              ) {
+              if (e.key === "Enter") { e.currentTarget.blur(); return; }
+              if (e.key === "Tab" && !e.shiftKey && rowIndex === tableData.length - 1 && colIndex === columns.length - 1) {
                 e.preventDefault();
                 handleLastCellTab();
               }
             }}
-            className="w-full rounded text-center text-sm focus:outline-none"
           />
         ) : (
           <span className={row[col.key] ? "text-gray-700" : "text-gray-300"}>
-            {row[col.key] || "-"}
+            {fmtNum(row[col.key])}
           </span>
         )}
       </td>
@@ -1085,6 +1257,20 @@ const Inventory = () => {
                   <Plus className="w-5 h-5" />
                   Add Inventory
                 </button>
+                <input
+                  ref={importInputRef}
+                  type="file"
+                  accept=".xlsx,.xls"
+                  onChange={handleImportFileSelect}
+                  className="hidden"
+                />
+                <PrimaryActionButton
+                  onClick={() => importInputRef.current?.click()}
+                  icon={Upload}
+                  className="border-gray-800 text-black px-4"
+                >
+                  Upload Excel
+                </PrimaryActionButton>
               </div>
             }
           />
@@ -1146,6 +1332,39 @@ const Inventory = () => {
             </div>
           )}
 
+          {/* Formula bar */}
+          <div className="flex items-stretch bg-white border border-gray-200 rounded-lg mb-2 overflow-hidden text-sm">
+            <div className="flex items-center px-3 bg-gray-50 border-r border-gray-200 min-w-[140px] text-xs font-medium text-gray-500 truncate">
+              {formulaCell?.label || ""}
+            </div>
+            <div className="flex items-center px-3 bg-gray-50 border-r border-gray-200 text-gray-400 font-mono text-xs select-none">
+              fx
+            </div>
+            <input
+              type="text"
+              value={formulaCell ? (tableData[formulaCell.rowIndex]?.[formulaCell.key] ?? "") : ""}
+              readOnly={!formulaCell || !tableData[formulaCell?.rowIndex]?._editing}
+              onChange={(e) => {
+                if (!formulaCell) return;
+                formulaCell.key === "ss"
+                  ? handleSsChange(formulaCell.rowIndex, e.target.value)
+                  : updateCell(formulaCell.rowIndex, formulaCell.key, e.target.value);
+              }}
+              onFocus={() => {
+                if (formulaCell && !tableData[formulaCell.rowIndex]?._editing) {
+                  handleEditRow(formulaCell.rowIndex);
+                  const colIdx = columns.findIndex((c) => c.key === formulaCell.key);
+                  const cellId = `${formulaCell.rowIndex}-${colIdx}`;
+                  _setEditingCell(cellId);
+                  _setSelectedCell(cellId);
+                }
+              }}
+              placeholder="Double-click a cell to edit…"
+              className="flex-1 px-3 py-2 text-sm focus:outline-none bg-white disabled:bg-gray-50 disabled:text-gray-400"
+              style={{ background: formulaCell && tableData[formulaCell?.rowIndex]?._editing ? "white" : "#f9fafb" }}
+            />
+          </div>
+
           {loading ? (
             <Loader text="Loading inventory..." />
           ) : (
@@ -1186,79 +1405,26 @@ const Inventory = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    {filteredRows.map((row) => {
-                      const originalIndex = row._originalIndex;
+                    {filteredIndices.map((originalIndex) => {
+                      const row = tableData[originalIndex];
+                      // Derive per-row cell state so unrelated rows skip re-render
+                      const editingCol = editingCell && editingCell.startsWith(`${originalIndex}-`)
+                        ? parseInt(editingCell.split("-")[1], 10) : null;
+                      const selectedCol = selectedCell && selectedCell.startsWith(`${originalIndex}-`)
+                        ? parseInt(selectedCell.split("-")[1], 10) : null;
                       return (
-                        <tr
+                        <MemoRow
                           key={`row-${originalIndex}`}
-                          className={`border-b border-gray-200 ${
-                            row._editing && !row._isNew
-                              ? "bg-yellow-50"
-                              : row._isNew
-                              ? "bg-gray-50/30"
-                              : row._updatedAt && row._createdAt && row._updatedAt !== row._createdAt
-                              ? "bg-yellow-50"
-                              : "hover:bg-gray-50"
-                          }`}
-                        >
-                                                    {columns.map((col, colIndex) => (
-                            <React.Fragment key={`${col.key}-${originalIndex}`}>
-                              {col.key === "stockStatus" && (
-                                <td className="h-10 px-2 py-1 text-center w-[60px] border-r border-gray-200">
-                                  {!row._isNew && !row._editing && row._itemId && (
-                                    <button
-                                      type="button"
-                                      onClick={() => handleAddStockRow(row)}
-                                      title="View stock details"
-                                      className="p-1 text-gray-500 hover:bg-gray-100 rounded transition"
-                                    >
-                                      <Eye className="w-4 h-4" />
-                                    </button>
-                                  )}
-                                </td>
-                              )}
-                              {renderCell(row, originalIndex, col, colIndex)}
-                            </React.Fragment>
-                          ))}
-                          {/* Actions column at the end */}
-                          <td className="h-10 px-2 py-1 text-center w-[80px]">
-                            <div className="flex items-center justify-center gap-1">
-                              {row._editing ? (
-                                !row._isNew && (
-                                  <button
-                                    type="button"
-                                    onClick={() => handleCancelEditRow(originalIndex)}
-                                    title="Cancel edit"
-                                    className="p-1 text-gray-500 hover:bg-gray-100 rounded transition"
-                                  >
-                                    <X className="w-4 h-4" />
-                                  </button>
-                                )
-                              ) : (
-                                <>
-                                  <button
-                                    type="button"
-                                    onClick={() => handleEditRow(originalIndex)}
-                                    title="Edit"
-                                    className="p-1 text-blue-600 hover:bg-blue-50 rounded transition"
-                                  >
-                                    <Pencil className="w-4 h-4" />
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() =>
-                                      setDeleteDialog({ open: true, rowIndex: originalIndex })
-                                    }
-                                    title="Delete"
-                                    className="p-1 text-red-600 hover:bg-red-50 rounded transition"
-                                  >
-                                    <Trash2 className="w-4 h-4" />
-                                  </button>
-                                </>
-                              )}
-                            </div>
-                          </td>
-                        </tr>
+                          row={row}
+                          originalIndex={originalIndex}
+                          editingCol={editingCol}
+                          selectedCol={selectedCol}
+                          renderCell={renderCell}
+                          handleAddStockRow={handleAddStockRow}
+                          handleCancelEditRow={handleCancelEditRow}
+                          handleEditRow={handleEditRow}
+                          setDeleteDialog={setDeleteDialog}
+                        />
                       );
                     })}
                   </tbody>
@@ -1267,7 +1433,7 @@ const Inventory = () => {
             </div>
           )}
 
-          {filteredRows.length === 0 && !loading && (
+          {filteredIndices.length === 0 && !loading && (
             <p className="mt-2 text-xs text-gray-500">No matching rows.</p>
           )}
 
@@ -1738,6 +1904,20 @@ const Inventory = () => {
         onConfirm={handleDeleteRow}
         onCancel={() => setDeleteDialog({ open: false, rowIndex: null })}
         isDangerous
+      />
+
+      {/* Import Stock Master Excel confirmation */}
+      <ConfirmationDialog
+        isOpen={importConfirmOpen}
+        title="Import Stock Master Excel"
+        message={
+          `Import "${importFile?.name || "the selected file"}" to add new items and sizes. ` +
+          `Existing items and sizes will not be modified or deleted. ` +
+          `Plating / finish price fields will be left empty for you to fill in afterwards.`
+        }
+        confirmText={importing ? "Importing..." : "Import"}
+        onConfirm={handleConfirmImport}
+        onCancel={handleCancelImport}
       />
 
       <AddStockDialog

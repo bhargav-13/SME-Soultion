@@ -146,6 +146,43 @@ paths:
         '500':
           $ref: '#/components/responses/InternalServerError'
 
+  # -------------------- IMPORT (BULK REPLACE FROM EXCEL) --------------------
+  /api/v1/item-blueprints/import:
+    post:
+      operationId: importItemBlueprints
+      tags:
+        - Item
+      summary: >
+        Wipe all existing items, sizes, inventory and stock data, then re-import
+        items, sizes and packing details from a Stock Master Excel file. Finish
+        / plating price fields are left empty for the client to fill in.
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [ file ]
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        '200':
+          description: Import completed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ImportResult'
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
   # -------------------- SIZE (GET ONLY) --------------------
   /api/v1/item-blueprints/{itemId}/sizes:
     get:
@@ -550,6 +587,10 @@ components:
           type: number
           format: double
           example: 0.650
+        pcsWeight:
+          type: number
+          format: double
+          example: 0.0542
 
     # -------- Size (read-only) --------
     Size:
@@ -563,6 +604,9 @@ components:
         sizeInMm:
           type: string
         dozenWeight:
+          type: number
+          format: double
+        pcsWeight:
           type: number
           format: double
 
@@ -596,7 +640,7 @@ components:
           format: double
           example: 21.667
 
-        sssatinlacq:
+        ss:
           type: number
           format: double
           example: 210
@@ -609,12 +653,17 @@ components:
         sidegold:
           type: number
           format: double
-          example: 230
+          example: 222
+
+        sartinlacq:
+          type: number
+          format: double
+          example: 210
 
         zblack:
           type: number
           format: double
-          example: 330
+          example: 315
 
         grblack:
           type: number
@@ -684,7 +733,7 @@ components:
           type: number
           format: double
 
-        sssatinlacq:
+        ss:
           type: number
           format: double
           example: 210
@@ -697,12 +746,17 @@ components:
         sidegold:
           type: number
           format: double
-          example: 230
+          example: 222
+
+        sartinlacq:
+          type: number
+          format: double
+          example: 210
 
         zblack:
           type: number
           format: double
-          example: 330
+          example: 315
 
         grblack:
           type: number
@@ -746,10 +800,20 @@ components:
 
         createdAt:
           type: string
-          format: date
+          format: date-time
         updatedAt:
           type: string
-          format: date
+          format: date-time
+
+    ImportResult:
+      type: object
+      properties:
+        itemsCreated:
+          type: integer
+        sizesCreated:
+          type: integer
+        message:
+          type: string
 
     PaginatedResultInventory:
       type: object
@@ -782,6 +846,13 @@ components:
           type: object
 
   responses:
+    BadRequestError:
+      description: Bad request
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
     UnauthorizedError:
       description: Unauthorized
       content:
