@@ -1,29 +1,26 @@
 import React from "react";
 
-const splitHeaderLabel = (label, maxChars = 8) => {
-  const tokens = String(label || "")
-    .replace(/\//g, " / ")
-    .trim()
-    .split(/\s+/)
-    .filter((token) => token !== "/");
+const splitHeaderLabel = (label, maxChars = 14) => {
+  // Attach "/" to the preceding word so "Box / Pcs" → tokens ["Box /", "Pcs"]
+  // This keeps the slash visible and prevents it starting a new line.
+  const raw = String(label || "").trim().split(/\s+/);
+  const tokens = [];
+  for (let i = 0; i < raw.length; i++) {
+    if (raw[i] === "/" && tokens.length > 0) {
+      tokens[tokens.length - 1] += " /";
+    } else {
+      tokens.push(raw[i]);
+    }
+  }
 
   const lines = [];
   let current = "";
-
   tokens.forEach((token) => {
-    if (!current) {
-      current = token;
-      return;
-    }
+    if (!current) { current = token; return; }
     const next = `${current} ${token}`;
-    if (next.length <= maxChars) {
-      current = next;
-    } else {
-      lines.push(current);
-      current = token;
-    }
+    if (next.length <= maxChars) { current = next; }
+    else { lines.push(current); current = token; }
   });
-
   if (current) lines.push(current);
   return lines.length ? lines : [String(label || "")];
 };

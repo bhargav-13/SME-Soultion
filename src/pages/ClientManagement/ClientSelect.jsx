@@ -6,6 +6,7 @@ import StatsCard from "../../components/StatsCard";
 import ClientFilterBar from "../../components/Client/ClientFilterBar";
 import ClientListDialog from "../../components/Client/ClientListDialog";
 import ClientDetailsDialog from "../../components/Client/ClientDetailsDialog";
+import ClientImportDialog from "../../components/Client/ClientImportDialog";
 import EditableClientTable from "../../components/Client/EditableClientTable";
 import { CLIENT_TABLE_COLUMNS } from "../../Data/clientmanagementdata";
 import PrimaryActionButton from "../../components/PrimaryActionButton";
@@ -20,51 +21,78 @@ const COL = {
   SIZE_INCH:    1,   // read-only  (size.sizeInInch)
   SIZE_MM:      2,   // read-only  (size.sizeInMm)
   DOZ:          3,   // read-only  (size.dozenWeight)
-  PCS_PER_BOX:  4,   // editable
-  BOX_PER_CTN:  5,   // editable
-  PCS_PER_CTN:  6,   // editable
-  CTN_WEIGHT:   7,   // editable
-  SSSATINLACQ:  8,   // editable
-  ANTIQ:        9,   // editable
-  SIDEGOLD:    10,   // editable
-  ZBLACK:      11,   // editable
-  GRBLACK:     12,   // editable
-  MATTSS:      13,   // editable
-  MATTANTIQ:   14,   // editable
-  PVDROSE:     15,   // editable
-  PVDGOLD:     16,   // editable
-  PVDBLACK:    17,   // editable
-  ROSEGOLD:    18,   // editable
-  CLEARLACQ:   19,   // editable
+  PCS_WEIGHT:   4,   // read-only  (size.pcsWeight)
+  PCS_PER_BOX:  5,   // editable
+  BOX_PER_CTN:  6,   // editable
+  PCS_PER_CTN:  7,   // editable
+  CTN_WEIGHT:   8,   // editable
+  SSSATINLACQ:  9,   // editable  (S.S.)
+  ANTIQ:       10,   // editable
+  SIDEGOLD:    11,   // editable
+  SARTINLACQ:  12,   // editable  (Sartin Lacqur)
+  ZBLACK:      13,   // editable
+  GRBLACK:     14,   // editable
+  MATTSS:      15,   // editable
+  MATTANTIQ:   16,   // editable
+  PVDROSE:     17,   // editable
+  PVDGOLD:     18,   // editable
+  PVDBLACK:    19,   // editable
+  ROSEGOLD:    20,   // editable
+  CLEARLACQ:   21,   // editable
 };
 
 // Columns the user cannot change
-const READ_ONLY_COLS = [COL.ITEM_NAME, COL.SIZE_INCH, COL.SIZE_MM, COL.DOZ];
+const READ_ONLY_COLS = [COL.ITEM_NAME, COL.SIZE_INCH, COL.SIZE_MM, COL.DOZ, COL.PCS_WEIGHT];
+
+// Same offsets as stock master — auto-fill finish fields when SS is typed
+const SS_OFFSETS = {
+  [COL.ANTIQ]:      10,
+  [COL.SIDEGOLD]:   12,
+  [COL.SARTINLACQ]:  0,
+  [COL.ZBLACK]:    105,
+  [COL.GRBLACK]:    60,
+  [COL.MATTSS]:     30,
+  [COL.MATTANTIQ]:  60,
+  [COL.PVDROSE]:   400,
+  [COL.PVDGOLD]:   400,
+  [COL.PVDBLACK]:  400,
+  [COL.ROSEGOLD]:  400,
+  [COL.CLEARLACQ]: 400,
+};
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Map a ClientInventory API object → flat string[] row (20 columns)
 // ─────────────────────────────────────────────────────────────────────────────
+const fmtNum = (v) => {
+  if (v == null) return "";
+  const n = parseFloat(v);
+  if (isNaN(n)) return "";
+  return String(Math.round(n * 1000) / 1000);
+};
+
 const mapInventoryToRow = (item) => [
-  item.size?.item?.name    ?? "",
-  item.size?.sizeInInch    ?? "",
-  item.size?.sizeInMm      ?? "",
-  item.size?.dozenWeight  != null ? String(item.size.dozenWeight)  : "",
-  item.pcsPerBox          != null ? String(item.pcsPerBox)          : "",
-  item.boxPerCarton       != null ? String(item.boxPerCarton)       : "",
-  item.pcsPerCarton       != null ? String(item.pcsPerCarton)       : "",
-  item.cartonWeight       != null ? String(item.cartonWeight)       : "",
-  item.sssatinlacq        != null ? String(item.sssatinlacq)        : "",
-  item.antiq              != null ? String(item.antiq)              : "",
-  item.sidegold           != null ? String(item.sidegold)           : "",
-  item.zblack             != null ? String(item.zblack)             : "",
-  item.grblack            != null ? String(item.grblack)            : "",
-  item.mattss             != null ? String(item.mattss)             : "",
-  item.mattantiq          != null ? String(item.mattantiq)          : "",
-  item.pvdrose            != null ? String(item.pvdrose)            : "",
-  item.pvdgold            != null ? String(item.pvdgold)            : "",
-  item.pvdblack           != null ? String(item.pvdblack)           : "",
-  item.rosegold           != null ? String(item.rosegold)           : "",
-  item.clearlacq          != null ? String(item.clearlacq)          : "",
+  item.size?.item?.name ?? "",
+  item.size?.sizeInInch ?? "",
+  item.size?.sizeInMm   ?? "",
+  fmtNum(item.size?.dozenWeight),
+  fmtNum(item.size?.pcsWeight),
+  item.pcsPerBox    != null ? String(item.pcsPerBox)    : "",
+  item.boxPerCarton != null ? String(item.boxPerCarton) : "",
+  item.pcsPerCarton != null ? String(item.pcsPerCarton) : "",
+  fmtNum(item.cartonWeight),
+  fmtNum(item.sssatinlacq),
+  fmtNum(item.antiq),
+  fmtNum(item.sidegold),
+  fmtNum(item.sartinlacq),
+  fmtNum(item.zblack),
+  fmtNum(item.grblack),
+  fmtNum(item.mattss),
+  fmtNum(item.mattantiq),
+  fmtNum(item.pvdrose),
+  fmtNum(item.pvdgold),
+  fmtNum(item.pvdblack),
+  fmtNum(item.rosegold),
+  fmtNum(item.clearlacq),
 ];
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -89,6 +117,7 @@ const rowToPayload = (row, sizeId) => ({
   sssatinlacq:  toNum(row[COL.SSSATINLACQ]),
   antiq:        toNum(row[COL.ANTIQ]),
   sidegold:     toNum(row[COL.SIDEGOLD]),
+  sartinlacq:   toNum(row[COL.SARTINLACQ]),
   zblack:       toNum(row[COL.ZBLACK]),
   grblack:      toNum(row[COL.GRBLACK]),
   mattss:       toNum(row[COL.MATTSS]),
@@ -130,6 +159,7 @@ const ClientSelect = () => {
   const [typeFilter, setTypeFilter] = useState("");
   const [isClientListOpen, setIsClientListOpen] = useState(false);
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
+  const [isImportOpen, setIsImportOpen] = useState(false);
   const [clientDialogMode, setClientDialogMode] = useState("table");
   const [showInlineTable, setShowInlineTable] = useState(false);
   const [inlineSelectedCell, setInlineSelectedCell] = useState(null);
@@ -158,18 +188,11 @@ const ClientSelect = () => {
     if (!clientId) return;
     setInventoryLoading(true);
     try {
-      const res = await clientInventoryApi.getInventoryByClient(
-        clientId,
-        undefined, // sizeId
-        undefined, // search
-        0,         // page
-        200        // size – fetch all at once
-      );
-      const payload = res.data;
-      const items = payload?.data ?? [];
+      const res = await clientInventoryApi.getInventoryByClient(clientId);
+      const items = Array.isArray(res.data) ? res.data : (res.data?.data ?? []);
       setApiItems(items);
       setInventoryRows(items.map(mapInventoryToRow));
-      setTotalItems(payload?.totalElements ?? items.length);
+      setTotalItems(items.length);
       setDirtyRows(new Set()); // reset dirty tracking after every fetch
     } catch {
       toast.error("Failed to load inventory for this client");
@@ -291,14 +314,22 @@ const ClientSelect = () => {
 
   const handleCellChange = (rowIndex, colIndex, value) => {
     const sourceIndex = filteredRowEntries[rowIndex]?.sourceIndex ?? rowIndex;
-    // Mark this source row as dirty
     setDirtyRows((prev) => new Set(prev).add(sourceIndex));
     setInventoryRows((prev) =>
-      prev.map((row, rIdx) =>
-        rIdx === sourceIndex
-          ? row.map((cell, cIdx) => (cIdx === colIndex ? value : cell))
-          : row
-      )
+      prev.map((row, rIdx) => {
+        if (rIdx !== sourceIndex) return row;
+        const updated = row.map((cell, cIdx) => (cIdx === colIndex ? value : cell));
+        // Auto-fill all finish fields when SS is typed (same as stock master)
+        if (colIndex === COL.SSSATINLACQ) {
+          const ssNum = parseFloat(value);
+          if (!isNaN(ssNum)) {
+            Object.entries(SS_OFFSETS).forEach(([col, offset]) => {
+              updated[Number(col)] = String(Math.round((ssNum + offset) * 1000) / 1000);
+            });
+          }
+        }
+        return updated;
+      })
     );
   };
 
@@ -369,6 +400,13 @@ const ClientSelect = () => {
     setSelectedCell(null);
   };
 
+  const handleImportDone = useCallback((importedParty) => {
+    // If the imported party is the currently selected one, refresh the table
+    if (selectedClient?.id === importedParty.id) {
+      fetchInventory(importedParty.id);
+    }
+  }, [selectedClient, fetchInventory]);
+
   const selectedClientName = selectedClient?.name ?? "";
 
   return (
@@ -379,9 +417,22 @@ const ClientSelect = () => {
             title="Client Management"
             description="Customize the price & Packing List"
             action={
-              <PrimaryActionButton onClick={openClientDialogForDetails}>
-                View Client wise Item
-              </PrimaryActionButton>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsImportOpen(true)}
+                  className="flex items-center gap-1.5 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg text-sm hover:bg-gray-50 transition"
+                >
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
+                      d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5m0 0l5-5m-5 5V4" />
+                  </svg>
+                  Import
+                </button>
+                <PrimaryActionButton onClick={openClientDialogForDetails}>
+                  View Client wise Item
+                </PrimaryActionButton>
+              </div>
             }
           />
         </div>
@@ -465,6 +516,13 @@ const ClientSelect = () => {
         onView={handleViewClientItems}
         viewLabel={clientDialogMode === "details" ? "View" : "Continue"}
         onClose={() => setIsClientListOpen(false)}
+      />
+
+      <ClientImportDialog
+        isOpen={isImportOpen}
+        parties={parties}
+        onClose={() => setIsImportOpen(false)}
+        onImported={handleImportDone}
       />
 
       <ClientDetailsDialog

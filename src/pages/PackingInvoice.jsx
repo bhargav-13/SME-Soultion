@@ -79,12 +79,13 @@ const getColumnWidthClass = (key) => {
   return "min-w-[72px]";
 };
 
-const splitHeaderLabel = (label, maxChars = 8) => {
-  const tokens = String(label || "")
-    .replace(/\//g, " / ")
-    .trim()
-    .split(/\s+/)
-    .filter((token) => token !== "/");
+const splitHeaderLabel = (label, maxChars = 14) => {
+  const raw = String(label || "").trim().split(/\s+/);
+  const tokens = [];
+  for (let i = 0; i < raw.length; i++) {
+    if (raw[i] === "/" && tokens.length > 0) { tokens[tokens.length - 1] += " /"; }
+    else { tokens.push(raw[i]); }
+  }
 
   const lines = [];
   let current = "";

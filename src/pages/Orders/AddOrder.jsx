@@ -300,9 +300,10 @@ const AddOrder = () => {
 
     try {
       const res = await clientInventoryApi.getInventoryByClient(
-        selectedParty.id, size.id, undefined, 0, 1
+        selectedParty.id, size.id
       );
-      const m = res.data?.data?.[0] ?? null;
+      const items = Array.isArray(res.data) ? res.data : (res.data?.data ?? []);
+      const m = items[0] ?? null;
       const rawPcPerBox      = m?.pcsPerBox    != null ? String(m.pcsPerBox)    : "";
       const rawBoxPerCartoon = m?.boxPerCarton != null ? String(m.boxPerCarton) : "";
       const derived = computeDerived(
