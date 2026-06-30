@@ -7,10 +7,13 @@ import ClientFilterBar from "../../components/Client/ClientFilterBar";
 import ClientListDialog from "../../components/Client/ClientListDialog";
 import ClientDetailsDialog from "../../components/Client/ClientDetailsDialog";
 import ClientImportDialog from "../../components/Client/ClientImportDialog";
+import ClientAddItemDialog from "../../components/Client/ClientAddItemDialog";
+import PricingFormulaDialog from "../../components/Client/PricingFormulaDialog";
 import EditableClientTable from "../../components/Client/EditableClientTable";
 import { CLIENT_TABLE_COLUMNS } from "../../Data/clientmanagementdata";
 import PrimaryActionButton from "../../components/PrimaryActionButton";
 import { clientInventoryApi, partyApi } from "../../services/apiService";
+import { resolvePricingRules, applyFinish, fallbackRules } from "../../services/pricingRulesApi";
 import toast from "react-hot-toast";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -44,20 +47,20 @@ const COL = {
 // Columns the user cannot change
 const READ_ONLY_COLS = [COL.ITEM_NAME, COL.SIZE_INCH, COL.SIZE_MM, COL.DOZ, COL.PCS_WEIGHT];
 
-// Same offsets as stock master — auto-fill finish fields when SS is typed
-const SS_OFFSETS = {
-  [COL.ANTIQ]:      10,
-  [COL.SIDEGOLD]:   12,
-  [COL.SARTINLACQ]:  0,
-  [COL.ZBLACK]:    105,
-  [COL.GRBLACK]:    60,
-  [COL.MATTSS]:     30,
-  [COL.MATTANTIQ]:  60,
-  [COL.PVDROSE]:   400,
-  [COL.PVDGOLD]:   400,
-  [COL.PVDBLACK]:  400,
-  [COL.ROSEGOLD]:  400,
-  [COL.CLEARLACQ]: 400,
+// Maps a resolved finish key → its table column index, so dynamic formulas can fill the row
+const FINISH_COL = {
+  antiq:      COL.ANTIQ,
+  sidegold:   COL.SIDEGOLD,
+  sartinlacq: COL.SARTINLACQ,
+  zblack:     COL.ZBLACK,
+  grblack:    COL.GRBLACK,
+  mattss:     COL.MATTSS,
+  mattantiq:  COL.MATTANTIQ,
+  pvdrose:    COL.PVDROSE,
+  pvdgold:    COL.PVDGOLD,
+  pvdblack:   COL.PVDBLACK,
+  rosegold:   COL.ROSEGOLD,
+  clearlacq:  COL.CLEARLACQ,
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -160,6 +163,10 @@ const ClientSelect = () => {
   const [isClientListOpen, setIsClientListOpen] = useState(false);
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const [isImportOpen, setIsImportOpen] = useState(false);
+  const [isAddOpen, setIsAddOpen] = useState(false);
+  const [isFormulaOpen, setIsFormulaOpen] = useState(false);
+  // Resolved finish formulas for the selected client (finishKey → { multiplier, offset })
+  const [ssRules, setSsRules] = useState(fallbackRules());
   const [clientDialogMode, setClientDialogMode] = useState("table");
   const [showInlineTable, setShowInlineTable] = useState(false);
   const [inlineSelectedCell, setInlineSelectedCell] = useState(null);
@@ -205,15 +212,23 @@ const ClientSelect = () => {
     }
   }, []);
 
+  // ── Load resolved finish formulas for the selected client ─────
+  const loadRules = useCallback(async (clientId) => {
+    const resolved = await resolvePricingRules(clientId, null);
+    setSsRules(resolved);
+  }, []);
+
   useEffect(() => {
     if (selectedClient?.id) {
       fetchInventory(selectedClient.id);
+      loadRules(selectedClient.id);
     } else {
       setApiItems([]);
       setInventoryRows([]);
       setTotalItems(0);
+      setSsRules(fallbackRules());
     }
-  }, [selectedClient, fetchInventory]);
+  }, [selectedClient, fetchInventory, loadRules]);
 
   // ── Pre-selected client from navigation state ─────────────────
   useEffect(() => {
@@ -319,12 +334,13 @@ const ClientSelect = () => {
       prev.map((row, rIdx) => {
         if (rIdx !== sourceIndex) return row;
         const updated = row.map((cell, cIdx) => (cIdx === colIndex ? value : cell));
-        // Auto-fill all finish fields when SS is typed (same as stock master)
+        // Auto-fill all finish fields when SS is typed, using the client's resolved formulas
         if (colIndex === COL.SSSATINLACQ) {
           const ssNum = parseFloat(value);
           if (!isNaN(ssNum)) {
-            Object.entries(SS_OFFSETS).forEach(([col, offset]) => {
-              updated[Number(col)] = String(Math.round((ssNum + offset) * 1000) / 1000);
+            Object.entries(FINISH_COL).forEach(([finishKey, col]) => {
+              const result = applyFinish(ssNum, ssRules[finishKey]);
+              if (result != null) updated[col] = String(result);
             });
           }
         }
@@ -429,6 +445,39 @@ const ClientSelect = () => {
                   </svg>
                   Import
                 </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!selectedClient?.id) {
+                      toast.error("Select a client first");
+                      return;
+                    }
+                    setIsAddOpen(true);
+                  }}
+                  className="flex items-center gap-1.5 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg text-sm hover:bg-gray-50 transition"
+                >
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                  </svg>
+                  Add Item
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!selectedClient?.id) {
+                      toast.error("Select a client first");
+                      return;
+                    }
+                    setIsFormulaOpen(true);
+                  }}
+                  className="flex items-center gap-1.5 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg text-sm hover:bg-gray-50 transition"
+                >
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
+                      d="M9 7h6m-6 4h6m-3 4h3M5 3h14a2 2 0 012 2v14a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2z" />
+                  </svg>
+                  Formula
+                </button>
                 <PrimaryActionButton onClick={openClientDialogForDetails}>
                   View Client wise Item
                 </PrimaryActionButton>
@@ -477,6 +526,7 @@ const ClientSelect = () => {
                   onCellBlur={handleInlineCellBlur}
                   onLastCellTab={handleInlineLastCellTab}
                   modifiedRowIndices={modifiedRowIndices}
+                  collapsibleFrom={COL.SSSATINLACQ}
                 />
                 <div className="mt-4">
                   <div className="flex items-center justify-center gap-3">
@@ -523,6 +573,23 @@ const ClientSelect = () => {
         parties={parties}
         onClose={() => setIsImportOpen(false)}
         onImported={handleImportDone}
+      />
+
+      <ClientAddItemDialog
+        isOpen={isAddOpen}
+        clientId={selectedClient?.id}
+        clientName={selectedClientName}
+        ssRules={ssRules}
+        onClose={() => setIsAddOpen(false)}
+        onAdded={() => selectedClient?.id && fetchInventory(selectedClient.id)}
+      />
+
+      <PricingFormulaDialog
+        isOpen={isFormulaOpen}
+        clientId={selectedClient?.id ?? null}
+        scopeLabel={selectedClientName}
+        onClose={() => setIsFormulaOpen(false)}
+        onSaved={() => selectedClient?.id && loadRules(selectedClient.id)}
       />
 
       <ClientDetailsDialog

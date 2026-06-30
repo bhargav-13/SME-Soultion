@@ -45,7 +45,10 @@ const CartDrawer = ({ isOpen, onClose, cart, onRemove, onSubmit, submitting }) =
                     </p>
                     <p className="text-xs text-gray-500">Plating: {item.plating}</p>
                     <p className="text-xs text-gray-700 mt-1 font-medium">
-                      Qty: {item.qtyPc} pc{item.qtyKg ? ` / ${item.qtyKg} kg` : ""}
+                      Qty: {item.orderUnit && item.orderUnit !== "Pcs"
+                        ? `${item.orderQty} ${item.orderUnit} (${item.qtyPc} pc)`
+                        : `${item.qtyPc} pc`}
+                      {item.qtyKg ? ` / ${item.qtyKg} kg` : ""}
                     </p>
                   </div>
                   <button

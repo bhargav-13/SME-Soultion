@@ -33,13 +33,55 @@ const SelectField = ({ value, onChange, options, getLabel = (o) => o, getValue =
   </div>
 );
 
+const UNIT_PCS = "Pcs";
+const UNIT_BOX = "Box";
+const UNIT_CARTON = "Carton";
+
+// Preferred order shown in the unit dropdown: Carton first, then Box, then Pcs.
+const UNIT_ORDER = [UNIT_CARTON, UNIT_BOX, UNIT_PCS];
+
+// Units available for a size — Pcs always; Box/Carton only when their packing is defined.
+const unitsForSize = (size) => {
+  const pcsPerBox = size?.pcsPerBox || 0;
+  const pcsPerCarton = size?.pcsPerCarton || 0;
+  return UNIT_ORDER.filter(
+    (u) =>
+      u === UNIT_PCS ||
+      (u === UNIT_BOX && pcsPerBox > 0) ||
+      (u === UNIT_CARTON && pcsPerCarton > 0)
+  );
+};
+
 const ProductSelector = ({ item, onAdd }) => {
   const [sizeId, setSizeId] = useState(item.sizes[0]?.id || "");
   const [plating, setPlating] = useState(item.platings[0] || "");
-  const [qtyPc, setQtyPc] = useState("");
+  const [qty, setQty] = useState("");
+
+  const selectedSize = item.sizes.find((s) => String(s.id) === String(sizeId));
+  const pcsPerBox = selectedSize?.pcsPerBox || 0;
+  const pcsPerCarton = selectedSize?.pcsPerCarton || 0;
+
+  const unitOptions = unitsForSize(selectedSize);
+  // Default to the first available unit (Carton > Box > Pcs).
+  const [unit, setUnit] = useState(unitOptions[0] || UNIT_PCS);
+
+  const computeQtyPc = (enteredQty, selectedUnit) => {
+    const n = Number(enteredQty) || 0;
+    if (selectedUnit === UNIT_BOX) return n * pcsPerBox;
+    if (selectedUnit === UNIT_CARTON) return n * pcsPerCarton;
+    return n;
+  };
+
+  const handleSizeChange = (newSizeId) => {
+    setSizeId(newSizeId);
+    const newSize = item.sizes.find((s) => String(s.id) === String(newSizeId));
+    const avail = unitsForSize(newSize);
+    // Keep the chosen unit if still valid, else fall back to the best available.
+    if (!avail.includes(unit)) setUnit(avail[0] || UNIT_PCS);
+  };
 
   const handleAdd = () => {
-    const qty = Number(qtyPc);
+    const enteredQty = Number(qty);
     if (!sizeId) {
       toast.error("Please select a size");
       return;
@@ -48,31 +90,35 @@ const ProductSelector = ({ item, onAdd }) => {
       toast.error("Please select a plating/finish");
       return;
     }
-    if (!qty || qty <= 0) {
+    if (!enteredQty || enteredQty <= 0) {
       toast.error("Please enter a valid quantity");
       return;
     }
 
-    const size = item.sizes.find((s) => String(s.id) === String(sizeId));
+    const qtyPc = computeQtyPc(enteredQty, unit);
     onAdd({
       itemId: item.id,
-      sizeId: size?.id,
+      sizeId: selectedSize?.id,
       itemName: item.itemName,
       category: item.category,
-      sizeInInch: size?.sizeInInch || "",
-      sizeInMm: size?.sizeInMm || "",
+      sizeInInch: selectedSize?.sizeInInch || "",
+      sizeInMm: selectedSize?.sizeInMm || "",
       plating,
-      qtyPc: qty,
+      qtyPc,
+      orderUnit: unit,
+      orderQty: enteredQty,
     });
-    setQtyPc("");
+    setQty("");
   };
+
+  const previewPc = computeQtyPc(qty, unit);
 
   return (
     <div className="mt-3 space-y-2 border-t border-gray-100 pt-3">
       <div className="grid grid-cols-2 gap-2">
         <SelectField
           value={sizeId}
-          onChange={(e) => setSizeId(e.target.value)}
+          onChange={(e) => handleSizeChange(e.target.value)}
           options={item.sizes}
           getValue={(s) => s.id}
           getLabel={(s) => `${s.sizeInInch}${s.sizeInMm && s.sizeInMm !== "—" ? ` (${s.sizeInMm})` : ""}`}
@@ -84,13 +130,22 @@ const ProductSelector = ({ item, onAdd }) => {
         />
       </div>
       <div className="flex gap-2">
+        {unitOptions.length > 1 && (
+          <div className="w-28 shrink-0">
+            <SelectField
+              value={unit}
+              onChange={(e) => setUnit(e.target.value)}
+              options={unitOptions}
+            />
+          </div>
+        )}
         <input
           type="number"
           min="1"
-          placeholder="Qty (Pc)"
-          value={qtyPc}
-          onChange={(e) => setQtyPc(e.target.value)}
-          className="text-sm border border-gray-300 rounded-lg px-2 py-1.5 w-full focus:ring-2 focus:ring-gray-900 focus:border-transparent outline-none"
+          placeholder={`Qty (${unit})`}
+          value={qty}
+          onChange={(e) => setQty(e.target.value)}
+          className="text-sm border border-gray-300 rounded-lg px-2 py-1.5 w-full min-w-0 focus:ring-2 focus:ring-gray-900 focus:border-transparent outline-none"
         />
         <button
           onClick={handleAdd}
@@ -100,6 +155,9 @@ const ProductSelector = ({ item, onAdd }) => {
           Add
         </button>
       </div>
+      {unit !== UNIT_PCS && previewPc > 0 && (
+        <p className="text-xs text-gray-500">= {previewPc.toLocaleString()} pcs</p>
+      )}
     </div>
   );
 };

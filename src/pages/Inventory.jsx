@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import ReactDOM from "react-dom";
 import { useNavigate, useLocation } from "react-router-dom";
-import { Plus, Pencil, Trash2, X, Eye, Search, Check, ChevronDown, Upload } from "lucide-react";
+import { Plus, Pencil, Trash2, X, Eye, Search, Check, ChevronDown, Upload, ChevronsLeft, ChevronsRight } from "lucide-react";
 import SidebarLayout from "../components/SidebarLayout";
 import StatsCard from "../components/StatsCard";
 import PageHeader from "../components/PageHeader";
@@ -10,6 +10,8 @@ import ConfirmationDialog from "../components/ConfirmationDialog";
 import BillDropdown from "../components/Bills/BillDropdown";
 import { itemBlueprintApi, sizeApi, inventoryApi, axiosInstance, categoryApi, itemApi } from "../services/apiService";
 import AddStockDialog from "../components/Inventory/AddStockDialog";
+import PricingFormulaDialog from "../components/Client/PricingFormulaDialog";
+import { resolvePricingRules, applyFinish, fallbackRules } from "../services/pricingRulesApi";
 import toast from "react-hot-toast";
 import Loader from "../components/Loader";
 
@@ -86,21 +88,9 @@ const fmtNum = (val) => {
   return String(Math.round(n * 1000) / 1000);
 };
 
-// Offsets applied to all finish fields when SS changes (from Stock Master Excel row 2)
-const SS_OFFSETS = {
-  antiq:     10,
-  sidegold:  12,
-  sartinlacq: 0,
-  zblack:   105,
-  grblack:   60,
-  mattss:    30,
-  mattantiq: 60,
-  pvdrose:  400,
-  pvdgold:  400,
-  pvdblack: 400,
-  rosegold: 400,
-  clearlacq:400,
-};
+// Finish fields auto-filled from S.S. (all finishes except the S.S. input itself).
+// Values come from the resolved global pricing formulas.
+const DERIVED_FINISH_KEYS = FINISH_KEYS.filter((k) => k !== "ss");
 
 const createEmptyRow = () => {
   const row = { _itemId: "", _inventoryId: null, _sizes: [], _isNew: true, _editing: true };
@@ -355,7 +345,7 @@ const TableDropdown = ({ value, options = [], placeholder = "Select...", onSelec
 };
 
 // Memoized row — only re-renders when its own row data or cell selection changes
-const MemoRow = React.memo(function MemoRow({ row, originalIndex, editingCol, selectedCol, renderCell, handleAddStockRow, handleCancelEditRow, handleEditRow, setDeleteDialog }) {
+const MemoRow = React.memo(function MemoRow({ row, originalIndex, editingCol, selectedCol, renderCell, handleAddStockRow, handleCancelEditRow, handleEditRow, setDeleteDialog, finishExpanded }) {
   const rowBg = row._editing && !row._isNew && hasFinishData(row._backup || row)
     ? "bg-yellow-50"
     : row._isNew
@@ -366,20 +356,25 @@ const MemoRow = React.memo(function MemoRow({ row, originalIndex, editingCol, se
 
   return (
     <tr className={`border-b border-gray-200 ${rowBg}`}>
-      {columns.map((col, colIndex) => (
-        <React.Fragment key={`${col.key}-${originalIndex}`}>
-          {col.key === "stockStatus" && (
-            <td className="h-10 px-2 py-1 text-center w-[60px] border-r border-gray-200">
-              {!row._isNew && !row._editing && row._itemId && (
-                <button type="button" onClick={() => handleAddStockRow(row)} title="View stock details" className="p-1 text-gray-500 hover:bg-gray-100 rounded transition">
-                  <Eye className="w-4 h-4" />
-                </button>
-              )}
-            </td>
-          )}
-          {renderCell(row, originalIndex, col, colIndex, editingCol === colIndex, selectedCol === colIndex)}
-        </React.Fragment>
-      ))}
+      {columns.map((col, colIndex) => {
+        if (!finishExpanded && FINISH_KEYS.includes(col.key)) return null;
+        return (
+          <React.Fragment key={`${col.key}-${originalIndex}`}>
+            {col.key === "stockStatus" && (
+              <td className="h-10 px-2 py-1 text-center w-[60px] border-r border-gray-200">
+                {!row._isNew && !row._editing && row._itemId && (
+                  <button type="button" onClick={() => handleAddStockRow(row)} title="View stock details" className="p-1 text-gray-500 hover:bg-gray-100 rounded transition">
+                    <Eye className="w-4 h-4" />
+                  </button>
+                )}
+              </td>
+            )}
+            {col.key === "ss" && <td className="h-10 px-1 py-1 border-r border-gray-200" />}
+            {renderCell(row, originalIndex, col, colIndex, editingCol === colIndex, selectedCol === colIndex)}
+          </React.Fragment>
+        );
+      })}
+      {!finishExpanded && <td className="h-10 px-1 py-1 border-r border-gray-200" />}
       <td className="h-10 px-2 py-1 text-center w-[80px]">
         <div className="flex items-center justify-center gap-1">
           {row._editing ? (
@@ -452,15 +447,28 @@ const Inventory = () => {
   // Add Stock popup state
   const [stockDialogRow, setStockDialogRow] = useState(null);
 
+  // Finish columns collapse/expand
+  const [finishExpanded, setFinishExpanded] = useState(false);
+
   // Import Excel (Stock Master) state
   const [importFile, setImportFile] = useState(null);
   const [importConfirmOpen, setImportConfirmOpen] = useState(false);
   const [importing, setImporting] = useState(false);
   const importInputRef = useRef(null);
 
+  // Global finish-price formulas (used to auto-fill finishes when S.S. changes).
+  // Kept in a ref so the memoized handleSsChange always reads the latest without re-binding.
+  const [isFormulaOpen, setIsFormulaOpen] = useState(false);
+  const ssRulesRef = useRef(fallbackRules());
+
+  const loadRules = useCallback(async () => {
+    ssRulesRef.current = await resolvePricingRules(null, null);
+  }, []);
+
   useEffect(() => {
     loadAll();
     loadCategories();
+    loadRules();
     if (location.state?.categoryId) {
       setCategoryFilter({ id: location.state.categoryId, name: location.state.categoryName });
     }
@@ -654,8 +662,9 @@ const Inventory = () => {
         const updated = { ...row, ss: ssValue };
         const ssNum = parseFloat(ssValue);
         if (!isNaN(ssNum) && ssValue !== "") {
-          Object.entries(SS_OFFSETS).forEach(([field, offset]) => {
-            updated[field] = String(Math.round((ssNum + offset) * 100) / 100);
+          DERIVED_FINISH_KEYS.forEach((field) => {
+            const result = applyFinish(ssNum, ssRulesRef.current[field]);
+            if (result != null) updated[field] = String(result);
           });
         }
         return updated;
@@ -1280,6 +1289,13 @@ const Inventory = () => {
                 >
                   Upload Excel
                 </PrimaryActionButton>
+                <PrimaryActionButton
+                  onClick={() => setIsFormulaOpen(true)}
+                  icon={Check}
+                  className="border-gray-800 text-black px-4"
+                >
+                  Formula
+                </PrimaryActionButton>
               </div>
             }
           />
@@ -1382,28 +1398,55 @@ const Inventory = () => {
                 <table className="w-max min-w-full table-auto">
                   <thead>
                     <tr className="bg-gray-100 border-b border-gray-200">
-                      {columns.map((col) => (
-                        <React.Fragment key={col.key}>
-                          {col.key === "stockStatus" && (
-                            <th className="sticky top-0 z-10 whitespace-normal px-3 py-3 text-center text-sm font-[550] text-gray-900 bg-gray-100 min-w-[70px] border-r border-gray-200">
+                      {columns.map((col) => {
+                        if (!finishExpanded && FINISH_KEYS.includes(col.key)) return null;
+                        return (
+                          <React.Fragment key={col.key}>
+                            {col.key === "stockStatus" && (
+                              <th className="sticky top-0 z-10 whitespace-normal px-3 py-3 text-center text-sm font-[550] text-gray-900 bg-gray-100 min-w-[70px] border-r border-gray-200">
+                                <span className="inline-flex flex-col items-center leading-tight">
+                                  {splitHeaderLabel("View").map((line, idx) => (
+                                    <span key={`view-${idx}`}>{line}</span>
+                                  ))}
+                                </span>
+                              </th>
+                            )}
+                            {col.key === "ss" && (
+                              <th className="sticky top-0 z-10 px-1 py-3 bg-gray-100 border-r border-gray-200 min-w-[36px]">
+                                <button
+                                  type="button"
+                                  onClick={() => setFinishExpanded((v) => !v)}
+                                  title="Collapse finish columns"
+                                  className="p-1 rounded hover:bg-gray-200 transition text-gray-600"
+                                >
+                                  <ChevronsLeft className="w-4 h-4" />
+                                </button>
+                              </th>
+                            )}
+                            <th
+                              className="sticky top-0 z-10 whitespace-normal px-3 py-3 text-center text-sm font-[550] text-gray-900 border-r border-gray-200 bg-gray-100"
+                            >
                               <span className="inline-flex flex-col items-center leading-tight">
-                                {splitHeaderLabel("View").map((line, idx) => (
-                                  <span key={`view-${idx}`}>{line}</span>
+                                {splitHeaderLabel(col.label).map((line, idx) => (
+                                  <span key={`${col.key}-${idx}`}>{line}</span>
                                 ))}
                               </span>
                             </th>
-                          )}
-                          <th
-                            className="sticky top-0 z-10 whitespace-normal px-3 py-3 text-center text-sm font-[550] text-gray-900 border-r border-gray-200 bg-gray-100"
+                          </React.Fragment>
+                        );
+                      })}
+                      {!finishExpanded && (
+                        <th className="sticky top-0 z-10 px-1 py-3 bg-gray-100 border-r border-gray-200 min-w-[36px]">
+                          <button
+                            type="button"
+                            onClick={() => setFinishExpanded(true)}
+                            title="Expand finish columns"
+                            className="p-1 rounded hover:bg-gray-200 transition text-gray-600"
                           >
-                            <span className="inline-flex flex-col items-center leading-tight">
-                              {splitHeaderLabel(col.label).map((line, idx) => (
-                                <span key={`${col.key}-${idx}`}>{line}</span>
-                              ))}
-                            </span>
-                          </th>
-                        </React.Fragment>
-                      ))}
+                            <ChevronsRight className="w-4 h-4" />
+                          </button>
+                        </th>
+                      )}
                       <th className="sticky top-0 z-10 whitespace-normal px-3 py-3 text-center text-sm font-[550] text-gray-900 bg-gray-100 min-w-[86px]">
                         <span className="inline-flex flex-col items-center leading-tight">
                           {splitHeaderLabel("Actions").map((line, idx) => (
@@ -1433,6 +1476,7 @@ const Inventory = () => {
                           handleCancelEditRow={handleCancelEditRow}
                           handleEditRow={handleEditRow}
                           setDeleteDialog={setDeleteDialog}
+                          finishExpanded={finishExpanded}
                         />
                       );
                     })}
@@ -1934,6 +1978,14 @@ const Inventory = () => {
         onClose={() => setStockDialogRow(null)}
         row={stockDialogRow}
         onSaved={() => loadAll()}
+      />
+
+      <PricingFormulaDialog
+        isOpen={isFormulaOpen}
+        clientId={null}
+        scopeLabel="Global default"
+        onClose={() => setIsFormulaOpen(false)}
+        onSaved={loadRules}
       />
     </SidebarLayout>
   );
