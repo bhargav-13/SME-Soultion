@@ -280,8 +280,8 @@ const ClientAddItemDialog = ({ isOpen, clientId, clientName, ssRules, onClose, o
                 ))}
               </div>
               <p className="mt-1.5 text-[11px] text-gray-400">
-                Editing S.S. auto-fills the finish prices. A row appears in the list only when a price
-                differs from the base stock.
+                Editing S.S. auto-fills the finish prices. The item is added to this client's list
+                whether or not the prices differ from base stock.
               </p>
             </div>
           </>

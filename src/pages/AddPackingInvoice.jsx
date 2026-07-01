@@ -42,24 +42,39 @@ const columns = [
   { key: "loss", label: "Loss", type: "auto" },
 ];
 
+// Finish labels match the Stock Master / Client Management columns exactly.
 const FINISH_KEY_TO_LABEL = {
-  sssatinlacq: "S.S & Sartin Lacq",
-  antiq: "ANTQ",
+  sssatinlacq: "S.S.",
+  antiq: "Antq.",
   sidegold: "Side Gold",
+  sartinlacq: "Sartin Lacqur",
   zblack: "Z Black",
-  grblack: "GR Black",
-  mattss: "Matt SS",
-  mattantiq: "Matt ANTQ",
-  pvdrose: "PVD Rose",
+  grblack: "Gr. Black",
+  mattss: "Matt S.S.",
+  mattantiq: "Matt Antq.",
+  pvdrose: "PVD Rose Gold",
   pvdgold: "PVD Gold",
   pvdblack: "PVD Black",
   rosegold: "Rose Gold",
-  clearlacq: "Clear Lacq.",
+  clearlacq: "Clear Lacqur",
 };
 
 const FINISH_LABEL_TO_KEY = Object.fromEntries(
   Object.entries(FINISH_KEY_TO_LABEL).map(([k, v]) => [v, k]),
 );
+
+// Finish labels drift across screens (e.g. "Z-Black." vs "Z Black", "Matt S.S" vs "Matt SS"),
+// so match them by a normalized form (lowercase, letters/digits only) instead of exact string.
+const normFinish = (s) => String(s || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+const FINISH_NORM_TO_KEY = {
+  ...Object.fromEntries(Object.entries(FINISH_KEY_TO_LABEL).map(([k, v]) => [normFinish(v), k])),
+  // Legacy labels still stored on older orders / other screens.
+  sssartinlacq: "sssatinlacq", // old "S.S & Sartin Lacq"
+  pvdrose: "pvdrose",          // old "PVD Rose" (now "PVD Rose Gold")
+  clearlacq: "clearlacq",      // old "Clear Lacq." (now "Clear Lacqur")
+};
+const resolveFinishKey = (label) =>
+  FINISH_LABEL_TO_KEY[label] ?? FINISH_NORM_TO_KEY[normFinish(label)];
 
 const createRow = () => ({
   _partyId: null,
@@ -318,7 +333,7 @@ const AddPackingInvoice = () => {
       const inventory = Array.isArray(data) ? data[0] : data;
       setForm((prev) => {
         if (!inventory) return prev;
-        const finishKey = FINISH_LABEL_TO_KEY[prev.finish];
+        const finishKey = resolveFinishKey(prev.finish);
         const labourValue =
           finishKey && inventory
             ? (inventory[finishKey] ?? prev.labour)
@@ -470,7 +485,7 @@ const AddPackingInvoice = () => {
 
   const handleFinishSelect = (finishLabel) => {
     setForm((prev) => {
-      const finishKey = FINISH_LABEL_TO_KEY[finishLabel];
+      const finishKey = resolveFinishKey(finishLabel);
       const labourValue =
         finishKey && prev._clientInventory
           ? (prev._clientInventory[finishKey] ?? "")
