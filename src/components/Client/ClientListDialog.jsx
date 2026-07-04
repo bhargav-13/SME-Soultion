@@ -49,13 +49,20 @@ const ClientListDialog = ({
                   key={clientId}
                   type="button"
                   onClick={() => onSelectClient(client)}
-                  className={`h-10 px-3 rounded-md border text-left text-sm transition flex items-center justify-between ${
+                  className={`min-h-[40px] px-3 py-1.5 rounded-md border text-left text-sm transition flex items-center justify-between ${
                     isActive
                       ? "border-gray-900 bg-gray-100 text-black"
                       : "border-gray-300 text-gray-700 hover:border-gray-500"
                   }`}
                 >
-                  <span className="truncate">{clientName}</span>
+                  <span className="min-w-0 flex flex-col">
+                    <span className="truncate">{clientName}</span>
+                    {client.groupName ? (
+                      <span className="truncate text-[11px] text-gray-400">
+                        Group: {client.groupName}
+                      </span>
+                    ) : null}
+                  </span>
                   {isActive ? (
                     <span className="w-5 h-5 rounded-full border border-gray-900 flex items-center justify-center ml-2 shrink-0">
                       <span className="w-2 h-2 rounded-full bg-gray-900" />
