@@ -112,55 +112,73 @@ const ProductSelector = ({ item, onAdd }) => {
   };
 
   const previewPc = computeQtyPc(qty, unit);
+  const hasUnitChoice = unitOptions.length > 1;
 
   return (
-    <div className="mt-3 space-y-2 border-t border-gray-100 pt-3">
-      <div className="grid grid-cols-2 gap-2">
-        <SelectField
-          value={sizeId}
-          onChange={(e) => handleSizeChange(e.target.value)}
-          options={item.sizes}
-          getValue={(s) => s.id}
-          getLabel={(s) => `${s.sizeInInch}${s.sizeInMm && s.sizeInMm !== "—" ? ` (${s.sizeInMm})` : ""}`}
-        />
-        <SelectField
-          value={plating}
-          onChange={(e) => setPlating(e.target.value)}
-          options={item.platings}
-        />
-      </div>
-      <div className="flex gap-2">
-        {unitOptions.length > 1 && (
-          <div className="w-28 shrink-0">
+    <div className="mt-4 space-y-3 border-t border-gray-100 pt-4">
+      <div className="grid grid-cols-2 gap-x-3 gap-y-2.5">
+        <Field label="Size">
+          <SelectField
+            value={sizeId}
+            onChange={(e) => handleSizeChange(e.target.value)}
+            options={item.sizes}
+            getValue={(s) => s.id}
+            getLabel={(s) => `${s.sizeInInch}${s.sizeInMm && s.sizeInMm !== "—" ? ` (${s.sizeInMm})` : ""}`}
+          />
+        </Field>
+        <Field label="Finish">
+          <SelectField
+            value={plating}
+            onChange={(e) => setPlating(e.target.value)}
+            options={item.platings}
+          />
+        </Field>
+        {hasUnitChoice && (
+          <Field label="Unit">
             <SelectField
               value={unit}
               onChange={(e) => setUnit(e.target.value)}
               options={unitOptions}
             />
-          </div>
+          </Field>
         )}
-        <input
-          type="number"
-          min="1"
-          placeholder={`Qty (${unit})`}
-          value={qty}
-          onChange={(e) => setQty(e.target.value)}
-          className="text-sm border border-gray-300 rounded-lg px-2 py-1.5 w-full min-w-0 focus:ring-2 focus:ring-gray-900 focus:border-transparent outline-none"
-        />
+        <Field label="Quantity" className={hasUnitChoice ? "" : "col-span-2"}>
+          <input
+            type="number"
+            min="1"
+            placeholder="0"
+            value={qty}
+            onChange={(e) => setQty(e.target.value)}
+            className="w-full text-sm border border-gray-300 rounded-lg px-2.5 py-1.5 focus:ring-2 focus:ring-gray-900 focus:border-transparent outline-none"
+          />
+        </Field>
+      </div>
+
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-xs text-gray-500 truncate">
+          {unit !== UNIT_PCS && previewPc > 0 ? `= ${previewPc.toLocaleString()} pcs` : " "}
+        </span>
         <button
           onClick={handleAdd}
-          className="shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 bg-gray-900 text-white text-sm font-medium rounded-lg hover:bg-gray-800 transition"
+          className="shrink-0 inline-flex items-center gap-1.5 px-4 py-2 bg-gray-900 text-white text-sm font-medium rounded-lg hover:bg-gray-800 active:scale-[0.98] transition"
         >
           <Plus className="w-4 h-4" />
           Add
         </button>
       </div>
-      {unit !== UNIT_PCS && previewPc > 0 && (
-        <p className="text-xs text-gray-500">= {previewPc.toLocaleString()} pcs</p>
-      )}
     </div>
   );
 };
+
+// A labeled form control used inside the product card's selector grid.
+const Field = ({ label, className = "", children }) => (
+  <div className={className}>
+    <label className="block text-[11px] font-medium uppercase tracking-wide text-gray-400 mb-1">
+      {label}
+    </label>
+    {children}
+  </div>
+);
 
 const ProductCatalog = () => {
   const { user } = useAuth();
@@ -311,12 +329,14 @@ const ProductCatalog = () => {
             {filteredItems.map((item) => (
               <div
                 key={item.id}
-                className="bg-white rounded-lg border border-gray-200 p-4 flex flex-col"
+                className="bg-white rounded-xl border border-gray-200 p-4 flex flex-col hover:shadow-md hover:border-gray-300 transition"
               >
-                <span className="self-start mb-2 px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-700">
-                  {item.category}
-                </span>
-                <h3 className="text-sm font-semibold text-gray-900">{item.itemName}</h3>
+                {item.category && (
+                  <span className="self-start mb-2 px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600">
+                    {item.category}
+                  </span>
+                )}
+                <h3 className="text-base font-semibold text-gray-900 leading-snug">{item.itemName}</h3>
                 <p className="text-xs text-gray-500 mt-1">
                   {item.sizes.length} size{item.sizes.length === 1 ? "" : "s"} ·{" "}
                   {item.platings.length} finish{item.platings.length === 1 ? "" : "es"}

@@ -21,6 +21,7 @@ import Navbar from "./navbar";
 import logo from "../assets/logo.png";
 import { useAuth } from "../context/AuthContext";
 import { clientPortalAdminApi } from "../services/apiService";
+import CompanySwitcher from "./ClientPortal/CompanySwitcher";
 
 const SIDEBAR_STATE_KEY = "sidebar:isOpen";
 
@@ -253,6 +254,7 @@ const SidebarLayout = ({ children }) => {
 
           {/* Sidebar Links */}
           <nav className="px-3 py-4 space-y-2 pe-20">
+            {isClient && <CompanySwitcher />}
             {(isClient ? clientLinks : links).map((link) => (
               <div key={link.to}>
                 {link.submenu ? (

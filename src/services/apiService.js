@@ -60,6 +60,20 @@ const getAccessToken = () => {
 };
 
 /**
+ * The company/party a group login is currently acting as. Sent as the X-Party-Id header on
+ * client-portal requests so the backend scopes the catalog/orders to that company.
+ */
+export const SELECTED_PARTY_KEY = 'selected_party_id';
+export const getSelectedPartyId = () => localStorage.getItem(SELECTED_PARTY_KEY);
+export const setSelectedPartyId = (partyId) => {
+    if (partyId == null || partyId === '') {
+        localStorage.removeItem(SELECTED_PARTY_KEY);
+    } else {
+        localStorage.setItem(SELECTED_PARTY_KEY, String(partyId));
+    }
+};
+
+/**
  * Create axios instance with interceptors
  */
 const createAxiosInstance = () => {
@@ -73,6 +87,12 @@ const createAxiosInstance = () => {
             const token = getAccessToken();
             if (token) {
                 config.headers.Authorization = `Bearer ${token}`;
+            }
+            // For client-portal calls, tell the backend which company/party the client is
+            // currently acting as (group logins can act as several). Ignored by other endpoints.
+            const selectedPartyId = localStorage.getItem(SELECTED_PARTY_KEY);
+            if (selectedPartyId && config.url && config.url.includes('/client-portal/')) {
+                config.headers['X-Party-Id'] = selectedPartyId;
             }
             return config;
         },
@@ -138,6 +158,36 @@ const createAxiosInstance = () => {
 
 // Create shared axios instance
 const axiosInstance = createAxiosInstance();
+
+/**
+ * Client-portal: companies the authenticated client can act as (their single party, or all the
+ * companies of their group). Used to render the company switcher.
+ */
+const clientPortalCompaniesApi = {
+    getMyCompanies: () => axiosInstance.get('/api/v1/client-portal/me/companies'),
+};
+
+/**
+ * Admin: party group management (one shared login across several member companies).
+ */
+const partyGroupApi = {
+    getAll: () => axiosInstance.get('/api/v1/client-portal/admin/party-groups'),
+    create: (payload) =>
+        axiosInstance.post('/api/v1/client-portal/admin/party-groups', payload),
+    setParties: (groupId, partyIds) =>
+        axiosInstance.put(`/api/v1/client-portal/admin/party-groups/${groupId}/parties`, {
+            partyIds,
+        }),
+    // Assign a single party to a group (or remove it when groupId is null/undefined).
+    assignParty: (partyId, groupId) =>
+        axiosInstance.put(`/api/v1/client-portal/admin/parties/${partyId}/group`, {
+            groupId: groupId ?? null,
+        }),
+    resetCredentials: (groupId) =>
+        axiosInstance.post(
+            `/api/v1/client-portal/admin/party-groups/${groupId}/reset-credentials`
+        ),
+};
 
 /**
  * Create API configuration with custom axios instance
@@ -328,6 +378,8 @@ export {
     clientPortalAdminApi,
     clientPortalClientApi,
     clientPortalInvoicesApi,
+    clientPortalCompaniesApi,
+    partyGroupApi,
 };
 
 // Export a default object with all APIs

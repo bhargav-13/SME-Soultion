@@ -1,5 +1,5 @@
 import React, { createContext, useState, useContext, useEffect } from 'react';
-import { authApi, updateApiClients } from '../services/apiService';
+import { authApi, updateApiClients, setSelectedPartyId } from '../services/apiService';
 import config from '../config/config';
 import toast from 'react-hot-toast';
 
@@ -81,6 +81,9 @@ export const AuthProvider = ({ children }) => {
         localStorage.setItem(config.REFRESH_TOKEN_KEY, refreshToken);
       }
 
+      // Clear any company selection left by a previous session; the switcher re-establishes it.
+      setSelectedPartyId(null);
+
       // Create user object (role is decoded from the JWT claims)
       const userData = {
         email: username,
@@ -118,6 +121,7 @@ export const AuthProvider = ({ children }) => {
     localStorage.removeItem(config.ACCESS_TOKEN_KEY);
     localStorage.removeItem(config.REFRESH_TOKEN_KEY);
     localStorage.removeItem(config.USER_KEY);
+    setSelectedPartyId(null);
     setUser(null);
     setIsAuthenticated(false);
     toast.success('Logged out successfully');

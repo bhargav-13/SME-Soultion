@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
-import { useNavigate, useLocation } from "react-router-dom";
-import { Plus, ChevronRight, X } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { Plus, ChevronRight, X, Users } from "lucide-react";
 import SidebarLayout from "../../../components/SidebarLayout";
 import ConfirmationDialog from "../../../components/ConfirmationDialog";
 import StatsCard from "../../../components/StatsCard";
@@ -8,7 +8,9 @@ import PageHeader from "../../../components/PageHeader";
 import PrimaryActionButton from "../../../components/PrimaryActionButton";
 import PartiesTable from "../../../components/Party/PartiesTable";
 import EditPartyDialog from "../../../components/Party/EditPartyDialog";
-import { partyApi } from "../../../services/apiService";
+import GroupLoginsModal from "../../../components/Party/GroupLoginsModal";
+import { NEW_GROUP } from "../../../components/Party/GroupPicker";
+import { partyApi, partyGroupApi } from "../../../services/apiService";
 import toast from 'react-hot-toast';
 
 const mapPartyTypeToLabel = (partyType) => {
@@ -37,8 +39,9 @@ const mapPartyTypeToApi = (value) => {
 
 const PartyMaster = () => {
   const navigate = useNavigate();
-  const location = useLocation();
   const [parties, setParties] = useState([]);
+  const [groups, setGroups] = useState([]);
+  const [groupModalOpen, setGroupModalOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [typeFilter, setTypeFilter] = useState("");
@@ -61,14 +64,24 @@ const PartyMaster = () => {
   // Fetch parties data on component mount
   useEffect(() => {
     fetchParties();
+    fetchGroups();
   }, []);
+
+  const fetchGroups = async () => {
+    try {
+      const res = await partyGroupApi.getAll();
+      setGroups(res.data || []);
+    } catch {
+      // Non-fatal — grouping just won't be available.
+    }
+  };
 
   const fetchParties = async () => {
     try {
       setLoading(true);
       const response = await partyApi.getAllParties();
       const partiesData = response.data;
-      
+
       // Transform API data to match component expectations
       const transformedParties = partiesData.map(party => ({
         id: party.id,
@@ -79,6 +92,8 @@ const PartyMaster = () => {
         gstin: party.gst,
         type: mapPartyTypeToLabel(party.partyType),
         partyType: party.partyType,
+        groupId: party.groupId ?? "",
+        groupName: party.groupName || "",
       }));
       
       setParties(transformedParties);
@@ -129,6 +144,30 @@ const PartyMaster = () => {
     });
   };
 
+  /**
+   * Turn a group choice ("", an existing group id, or NEW_GROUP) into a concrete group id,
+   * creating the group first when needed. Returns null for "no group".
+   */
+  const resolveGroupId = async (choice, name) => {
+    if (choice === "" || choice == null) return null;
+    if (choice === NEW_GROUP) {
+      if (!name.trim()) {
+        toast.error("Enter a name for the new group");
+        throw new Error("missing group name");
+      }
+      const res = await partyGroupApi.create({ name: name.trim() });
+      await fetchGroups();
+      if (res.data?.username && res.data?.initialPassword) {
+        toast.success(
+          `Group login created — ${res.data.username} / ${res.data.initialPassword}`,
+          { duration: 8000 }
+        );
+      }
+      return res.data.id;
+    }
+    return Number(choice);
+  };
+
   const handleSaveEdit = async (formData) => {
     try {
       const updateData = {
@@ -138,17 +177,23 @@ const PartyMaster = () => {
         gst: formData.gstin,
         partyType: mapPartyTypeToApi(formData.partyType || formData.type),
       };
-      
+
       await partyApi.updateParty(editDialog.data.id, updateData);
-      
+
+      // Apply group membership change (create new group if requested; null removes from group).
+      const groupId = await resolveGroupId(formData.groupChoice, formData.newGroupName || "");
+      await partyGroupApi.assignParty(editDialog.data.id, groupId);
+
       // Refresh the list
       await fetchParties();
-      
+
       setEditDialog({ isOpen: false, data: null });
       toast.success("Party updated successfully!");
     } catch (error) {
       console.error("Error updating party:", error);
-      toast.error(error.response?.data?.message || 'Failed to update party');
+      if (error?.message !== "missing group name") {
+        toast.error(error.response?.data?.message || 'Failed to update party');
+      }
     }
   };
 
@@ -187,12 +232,21 @@ const PartyMaster = () => {
             title="Party Master"
             description="Centralised management of customers and vendors with GST, contact, and role details."
             action={
-              <PrimaryActionButton
-                onClick={() => navigate("/masters/party/add")}
-                icon={Plus}
-              >
-                Add Party
-              </PrimaryActionButton>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setGroupModalOpen(true)}
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-gray-300 text-sm font-medium text-gray-700 hover:bg-gray-50 transition"
+                >
+                  <Users className="w-4 h-4" /> Group Logins
+                </button>
+                <PrimaryActionButton
+                  onClick={() => navigate("/masters/party/add")}
+                  icon={Plus}
+                >
+                  Add Party
+                </PrimaryActionButton>
+              </div>
             }
           />
         </div>
@@ -222,6 +276,17 @@ const PartyMaster = () => {
           onClose={() => setEditDialog({ isOpen: false, data: null })}
           onSave={handleSaveEdit}
           initialData={editDialog.data}
+          groups={groups}
+        />
+
+        {/* Group Logins management */}
+        <GroupLoginsModal
+          isOpen={groupModalOpen}
+          onClose={() => setGroupModalOpen(false)}
+          onChanged={() => {
+            fetchGroups();
+            fetchParties();
+          }}
         />
 
         {/* Message Alert */}

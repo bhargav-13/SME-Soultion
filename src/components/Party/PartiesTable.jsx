@@ -45,6 +45,9 @@ const PartiesTable = ({
                 Email
               </th>
               <th className="px-6 py-4 text-center text-sm font-[550] text-black">
+                Group
+              </th>
+              <th className="px-6 py-4 text-center text-sm font-[550] text-black">
                 Action
               </th>
             </tr>
@@ -70,6 +73,15 @@ const PartiesTable = ({
                 </td>
                 <td className="px-6 py-4 text-sm text-gray-500 text-center">
                   {party.email}
+                </td>
+                <td className="px-6 py-4 text-sm text-center">
+                  {party.groupName ? (
+                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs bg-gray-100 text-gray-700">
+                      {party.groupName}
+                    </span>
+                  ) : (
+                    <span className="text-gray-300">—</span>
+                  )}
                 </td>
                 <td className="px-6 py-4 text-sm flex items-center justify-center gap-3">
                   <button

@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from "react";
-import { X } from "lucide-react";
+import { X, Users } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import SidebarLayout from "../../../components/SidebarLayout";
 import ConfirmationDialog from "../../../components/ConfirmationDialog";
 import PartiesTable from "../../../components/Party/PartiesTable";
 import EditPartyDialog from "../../../components/Party/EditPartyDialog";
+import GroupPicker, { NEW_GROUP } from "../../../components/Party/GroupPicker";
+import GroupLoginsModal from "../../../components/Party/GroupLoginsModal";
 import PageHeader from "../../../components/PageHeader";
-import { partyApi } from "../../../services/apiService";
+import { partyApi, partyGroupApi } from "../../../services/apiService";
 import toast from "react-hot-toast";
 
 const AddParty = () => {
@@ -20,6 +22,10 @@ const AddParty = () => {
   });
 
   const [parties, setParties] = useState([]);
+  const [groups, setGroups] = useState([]);
+  const [groupChoice, setGroupChoice] = useState(""); // "" | groupId | NEW_GROUP
+  const [newGroupName, setNewGroupName] = useState("");
+  const [groupModalOpen, setGroupModalOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [typeFilter, setTypeFilter] = useState("");
@@ -42,7 +48,17 @@ const AddParty = () => {
 
   useEffect(() => {
     fetchParties();
+    fetchGroups();
   }, []);
+
+  const fetchGroups = async () => {
+    try {
+      const res = await partyGroupApi.getAll();
+      setGroups(res.data || []);
+    } catch {
+      // Non-fatal — grouping just won't be available.
+    }
+  };
 
   const fetchParties = async () => {
     try {
@@ -58,6 +74,8 @@ const AddParty = () => {
         contact: party.contactNo,
         gstin: party.gst,
         type: party.partyType,
+        groupId: party.groupId ?? "",
+        groupName: party.groupName || "",
       }));
 
       setParties(transformedParties);
@@ -67,6 +85,30 @@ const AddParty = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  /**
+   * Turn a group choice ("", an existing group id, or NEW_GROUP) into a concrete group id,
+   * creating the group first when needed. Returns null for "no group".
+   */
+  const resolveGroupId = async (choice, name) => {
+    if (choice === "" || choice == null) return null;
+    if (choice === NEW_GROUP) {
+      if (!name.trim()) {
+        toast.error("Enter a name for the new group");
+        throw new Error("missing group name");
+      }
+      const res = await partyGroupApi.create({ name: name.trim() });
+      await fetchGroups();
+      if (res.data?.username && res.data?.initialPassword) {
+        toast.success(
+          `Group login created — ${res.data.username} / ${res.data.initialPassword}`,
+          { duration: 8000 }
+        );
+      }
+      return res.data.id;
+    }
+    return Number(choice);
   };
 
   const handleChange = (e) => {
@@ -98,7 +140,13 @@ const AddParty = () => {
         partyType: formData.partyType,
       };
 
-      await partyApi.createParty(createData);
+      const created = await partyApi.createParty(createData);
+
+      // Assign to a group if one was chosen (creating a new group first when needed).
+      const groupId = await resolveGroupId(groupChoice, newGroupName);
+      if (groupId != null && created.data?.id) {
+        await partyGroupApi.assignParty(created.data.id, groupId);
+      }
 
       toast.success("Party added successfully!");
       setFormData({
@@ -108,11 +156,15 @@ const AddParty = () => {
         gstNumber: "",
         partyType: "",
       });
+      setGroupChoice("");
+      setNewGroupName("");
 
       await fetchParties();
     } catch (error) {
       console.error("Error adding party:", error);
-      toast.error(error.response?.data?.message || "Failed to add party");
+      if (error?.message !== "missing group name") {
+        toast.error(error.response?.data?.message || "Failed to add party");
+      }
     } finally {
       setLoading(false);
     }
@@ -147,13 +199,19 @@ const AddParty = () => {
       };
 
       await partyApi.updateParty(editDialog.data.id, updateData);
-      await fetchParties();
 
+      // Apply group membership change (create new group if requested; null removes from group).
+      const groupId = await resolveGroupId(formData.groupChoice, formData.newGroupName || "");
+      await partyGroupApi.assignParty(editDialog.data.id, groupId);
+
+      await fetchParties();
       setEditDialog({ isOpen: false, data: null });
       toast.success("Party updated successfully!");
     } catch (error) {
       console.error("Error updating party:", error);
-      toast.error(error.response?.data?.message || "Failed to update party");
+      if (error?.message !== "missing group name") {
+        toast.error(error.response?.data?.message || "Failed to update party");
+      }
     }
   };
 
@@ -202,14 +260,23 @@ const AddParty = () => {
             title="Add New Party"
             description="Add and manage customer or vendor information for smooth purchase and sales operations."
             action={
-              <button
-                type="button"
-                onClick={() => navigate("/masters/party")}
-                className="inline-flex items-center justify-center w-9 h-9 rounded-full border border-gray-300 text-gray-600 hover:text-gray-900 hover:border-gray-400 hover:bg-gray-50 transition cursor-pointer"
-                aria-label="Close and go back to invoices"
-              >
-                <X className="w-4 h-4" />
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setGroupModalOpen(true)}
+                  className="inline-flex items-center gap-2 px-3 h-9 rounded-lg border border-gray-300 text-sm text-gray-700 hover:bg-gray-50 transition"
+                >
+                  <Users className="w-4 h-4" /> Group Logins
+                </button>
+                <button
+                  type="button"
+                  onClick={() => navigate("/masters/party")}
+                  className="inline-flex items-center justify-center w-9 h-9 rounded-full border border-gray-300 text-gray-600 hover:text-gray-900 hover:border-gray-400 hover:bg-gray-50 transition cursor-pointer"
+                  aria-label="Close and go back to invoices"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
             }
           />
         </div>
@@ -340,6 +407,17 @@ const AddParty = () => {
             )}
           </div>
 
+          {/* Group (shared login across companies) */}
+          <div className="mb-8">
+            <GroupPicker
+              groups={groups}
+              value={groupChoice}
+              onChange={setGroupChoice}
+              newName={newGroupName}
+              onNewNameChange={setNewGroupName}
+            />
+          </div>
+
           {/* Action Buttons */}
           <div className="flex gap-4 justify-center">
             <button
@@ -377,6 +455,17 @@ const AddParty = () => {
           onClose={() => setEditDialog({ isOpen: false, data: null })}
           onSave={handleSaveEdit}
           initialData={editDialog.data}
+          groups={groups}
+        />
+
+        {/* Group Logins management */}
+        <GroupLoginsModal
+          isOpen={groupModalOpen}
+          onClose={() => setGroupModalOpen(false)}
+          onChanged={() => {
+            fetchGroups();
+            fetchParties();
+          }}
         />
 
         {/* Confirmation Dialog */}

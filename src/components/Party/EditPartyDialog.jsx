@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { X } from "lucide-react";
+import GroupPicker from "./GroupPicker";
 
-const EditPartyDialog = ({ isOpen, onClose, onSave, initialData = null }) => {
+const EditPartyDialog = ({ isOpen, onClose, onSave, initialData = null, groups = [] }) => {
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -9,12 +10,14 @@ const EditPartyDialog = ({ isOpen, onClose, onSave, initialData = null }) => {
     gstin: "",
     partyType: "",
   });
+  const [groupChoice, setGroupChoice] = useState("");
+  const [newGroupName, setNewGroupName] = useState("");
   const [isTypeOpen, setIsTypeOpen] = useState(false);
   const PARTY_TYPES = [
     { label: "Customer", value: "CUSTOMER" },
     { label: "Vendor", value: "VENDOR"},
     { label: "Both", value: "BOTH" },
-  ]; 
+  ];
 
   useEffect(() => {
     if (initialData) {
@@ -25,6 +28,8 @@ const EditPartyDialog = ({ isOpen, onClose, onSave, initialData = null }) => {
         gstin: initialData.gstin || "",
         partyType: initialData.partyType || initialData.type || "",
       });
+      setGroupChoice(initialData.groupId ? String(initialData.groupId) : "");
+      setNewGroupName("");
     }
     setIsTypeOpen(false);
   }, [initialData, isOpen]);
@@ -42,7 +47,7 @@ const EditPartyDialog = ({ isOpen, onClose, onSave, initialData = null }) => {
       alert("Please fill in party name");
       return;
     }
-    onSave(formData);
+    onSave({ ...formData, groupChoice, newGroupName });
     setIsTypeOpen(false);
   };
 
@@ -185,6 +190,15 @@ const EditPartyDialog = ({ isOpen, onClose, onSave, initialData = null }) => {
               </div>
             )}
           </div>
+
+          {/* Group */}
+          <GroupPicker
+            groups={groups}
+            value={groupChoice}
+            onChange={setGroupChoice}
+            newName={newGroupName}
+            onNewNameChange={setNewGroupName}
+          />
         </div>
 
         {/* Action Buttons */}
