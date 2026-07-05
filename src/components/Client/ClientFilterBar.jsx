@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Search } from "lucide-react";
+import DebouncedSearchInput from "../DebouncedSearchInput";
 
 const ClientFilterBar = ({
   leftLabel = "Select Client",
@@ -25,16 +25,13 @@ const ClientFilterBar = ({
         {leftLabel}
       </button>
 
-      <div className="flex-1 relative">
-        <Search className="absolute left-3 top-4 w-5 h-5 text-gray-400" />
-        <input
-          type="text"
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          placeholder="Search"
-          className="w-full pl-10 pr-4 py-3 border bg-white border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-500"
-        />
-      </div>
+      <DebouncedSearchInput
+        value={searchQuery}
+        onDebouncedChange={setSearchQuery}
+        placeholder="Search"
+        wrapperClassName="flex-1"
+        className="w-full pl-10 pr-4 py-3 border bg-white border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-500"
+      />
 
       <div className="relative w-28">
         <button

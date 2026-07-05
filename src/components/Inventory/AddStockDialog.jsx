@@ -9,6 +9,12 @@ const readonlyCls =
   "w-full px-4 py-2 border border-gray-300 rounded-lg bg-gray-50 text-black cursor-not-allowed outline-none placeholder:text-sm placeholder:text-gray-500";
 const labelCls = "block font-medium text-black mb-2";
 
+// Round a numeric value to at most 3 decimals (e.g. 0.0791666… -> 0.079) for display.
+const round3 = (v) => {
+  const n = parseFloat(v);
+  return isNaN(n) ? "" : String(Math.round(n * 1000) / 1000);
+};
+
 const AddStockDialog = ({ open, onClose, row, onSaved }) => {
   const [itemKg, setItemKg] = useState("");
   const [weightPerPc, setWeightPerPc] = useState("");
@@ -24,8 +30,10 @@ const AddStockDialog = ({ open, onClose, row, onSaved }) => {
   useEffect(() => {
     if (!open || !row) return;
     setItemKg("");
-    setWeightPerPc("");
-    setWeightUnit("");
+    // Pre-fill Weight/Pc. from the size's PCS Weight (shown in the table), rounded to 3 decimals;
+    // a saved stock entry's own weightPerPc, if any, overrides this once loaded below.
+    setWeightPerPc(row.pcsWeight != null && row.pcsWeight !== "" ? round3(row.pcsWeight) : "");
+    setWeightUnit(row.pcsWeight != null && row.pcsWeight !== "" ? "Kg" : "");
     setTotalPc("");
     setStockDozenWeight("");
     setLowStockWarning("");
@@ -58,7 +66,7 @@ const AddStockDialog = ({ open, onClose, row, onSaved }) => {
           if (matched) {
             if (matched.itemKg != null) setItemKg(String(matched.itemKg));
             if (matched.weightPerPc != null)
-              setWeightPerPc(String(matched.weightPerPc));
+              setWeightPerPc(round3(matched.weightPerPc));
             if (matched.totalPc != null) setTotalPc(String(matched.totalPc));
             if (matched.dozenWeight != null)
               setStockDozenWeight(String(matched.dozenWeight));

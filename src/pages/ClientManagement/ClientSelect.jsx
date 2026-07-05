@@ -1,5 +1,6 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useDeferredValue, useEffect, useMemo, useState } from "react";
 import { useLocation } from "react-router-dom";
+import { normalizeSearch } from "../../utils/search";
 import SidebarLayout from "../../components/SidebarLayout";
 import PageHeader from "../../components/PageHeader";
 import StatsCard from "../../components/StatsCard";
@@ -46,6 +47,9 @@ const COL = {
 
 // Columns the user cannot change
 const READ_ONLY_COLS = [COL.ITEM_NAME, COL.SIZE_INCH, COL.SIZE_MM, COL.DOZ, COL.PCS_WEIGHT];
+
+// Columns that get an Excel-style header value filter (Item Name, Size Inch, Size MM).
+const FILTERABLE_COLS = [COL.ITEM_NAME, COL.SIZE_INCH, COL.SIZE_MM];
 
 // Maps a resolved finish key → its table column index, so dynamic formulas can fill the row
 const FINISH_COL = {
@@ -238,20 +242,53 @@ const ClientSelect = () => {
     setShowInlineTable(true);
   }, [preSelectedClient]);
 
+  // ── Excel-style per-column value filters: { [colIndex]: Set<value> } ──
+  const [columnFilters, setColumnFilters] = useState({});
+  const handleColumnFilterChange = useCallback((colIndex, sel) => {
+    setColumnFilters((prev) => {
+      const next = { ...prev };
+      if (sel == null) delete next[colIndex];
+      else next[colIndex] = sel;
+      return next;
+    });
+  }, []);
+
+  const columnDistinctValues = useMemo(() => {
+    const sets = {};
+    FILTERABLE_COLS.forEach((c) => (sets[c] = new Set()));
+    for (const row of inventoryRows) {
+      FILTERABLE_COLS.forEach((c) => sets[c].add(row[c] != null ? String(row[c]) : ""));
+    }
+    const out = {};
+    FILTERABLE_COLS.forEach((c) => {
+      out[c] = Array.from(sets[c]).sort((a, b) =>
+        a.localeCompare(b, undefined, { numeric: true })
+      );
+    });
+    return out;
+  }, [inventoryRows]);
+
   // ── Filter rows ───────────────────────────────────────────────
+  // Deferred query keeps typing responsive while the (large) table re-filters.
+  const deferredSearch = useDeferredValue(tableSearchQuery);
   const filteredRowEntries = useMemo(() => {
+    const term = normalizeSearch(deferredSearch); // space-insensitive (e.g. "3.1*1.1")
+    const type = (typeFilter || "").toLowerCase();
+    const activeCols = Object.keys(columnFilters);
     return inventoryRows
       .map((row, sourceIndex) => ({ row, sourceIndex }))
       .filter(({ row }) => {
-        const rowText = row.join(" ").toLowerCase();
-        const matchesSearch =
-          !tableSearchQuery ||
-          rowText.includes(tableSearchQuery.toLowerCase());
-        const matchesType =
-          !typeFilter || rowText.includes(typeFilter.toLowerCase());
-        return matchesSearch && matchesType;
+        const rowLower = row.join(" ").toLowerCase();
+        const matchesSearch = !term || normalizeSearch(rowLower).includes(term);
+        const matchesType = !type || rowLower.includes(type);
+        if (!matchesSearch || !matchesType) return false;
+        for (const c of activeCols) {
+          const v = row[c] != null ? String(row[c]) : "";
+          if (!columnFilters[c].has(v)) return false;
+        }
+        return true;
       });
-  }, [inventoryRows, tableSearchQuery, typeFilter]);
+  }, [inventoryRows, deferredSearch, typeFilter, columnFilters]);
 
   const filteredRows = useMemo(
     () => filteredRowEntries.map(({ row }) => row),
@@ -514,6 +551,10 @@ const ClientSelect = () => {
                   columns={CLIENT_TABLE_COLUMNS}
                   rows={filteredRows}
                   readOnlyCols={READ_ONLY_COLS}
+                  filterableCols={FILTERABLE_COLS}
+                  columnDistinctValues={columnDistinctValues}
+                  columnFilters={columnFilters}
+                  onColumnFilterChange={handleColumnFilterChange}
                   colWidths={{
                     0: 'min-w-[160px]',  // Item Name
                     1: 'min-w-[180px]',  // Size (Inch)

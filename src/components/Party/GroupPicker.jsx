@@ -17,7 +17,7 @@ const GroupPicker = ({ groups = [], value, onChange, newName, onNewNameChange })
       onChange={(e) => onChange(e.target.value)}
       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-500 focus:border-transparent outline-none text-sm bg-white"
     >
-      <option value="">No group (own login)</option>
+      <option value="">No group</option>
       {groups.map((g) => (
         <option key={g.id} value={String(g.id)}>
           {g.name}

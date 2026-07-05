@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
+import React, { useState, useEffect, useMemo, useRef, useCallback, useDeferredValue } from "react";
+import { normalizeSearch } from "../utils/search";
 import ReactDOM from "react-dom";
 import { useNavigate, useLocation } from "react-router-dom";
 import { Plus, Pencil, Trash2, X, Eye, Search, Check, ChevronDown, Upload, ChevronsLeft, ChevronsRight } from "lucide-react";
@@ -10,6 +11,11 @@ import ConfirmationDialog from "../components/ConfirmationDialog";
 import BillDropdown from "../components/Bills/BillDropdown";
 import { itemBlueprintApi, sizeApi, inventoryApi, axiosInstance, categoryApi, itemApi } from "../services/apiService";
 import AddStockDialog from "../components/Inventory/AddStockDialog";
+import DebouncedSearchInput from "../components/DebouncedSearchInput";
+import ColumnFilter from "../components/ColumnFilter";
+
+// Columns that get an Excel-style header value filter (Doz./item name, Size Inch, Size MM).
+const FILTERABLE_KEYS = ["itemName", "sizeInInch", "sizeInMm"];
 import PricingFormulaDialog from "../components/Client/PricingFormulaDialog";
 import { resolvePricingRules, applyFinish, fallbackRules } from "../services/pricingRulesApi";
 import toast from "react-hot-toast";
@@ -418,6 +424,18 @@ const Inventory = () => {
   const _setSelectedCell = useCallback((v) => { selectedCellRef.current = v; setSelectedCell(v); }, []);
 
   const [searchTerm, setSearchTerm] = useState("");
+  // Deferred copy keeps typing responsive; the (expensive) table filter runs against this.
+  const deferredSearchTerm = useDeferredValue(searchTerm);
+  // Excel-style per-column value filters: { [colKey]: Set<value> } (absent key = no filter).
+  const [columnFilters, setColumnFilters] = useState({});
+  const setColFilter = useCallback((key, sel) => {
+    setColumnFilters((prev) => {
+      const next = { ...prev };
+      if (sel == null) delete next[key];
+      else next[key] = sel;
+      return next;
+    });
+  }, []);
   const [stockFilter, setStockFilter] = useState("ALL");
 
   const [addItemDialog, setAddItemDialog] = useState(false);
@@ -1039,17 +1057,44 @@ const Inventory = () => {
     if (importInputRef.current) importInputRef.current.value = "";
   };
 
+  // Distinct values per filterable column, for the Excel-style header dropdowns.
+  const columnDistinctValues = useMemo(() => {
+    const sets = {};
+    FILTERABLE_KEYS.forEach((k) => (sets[k] = new Set()));
+    for (const row of tableData) {
+      if (row._isNew) continue;
+      FILTERABLE_KEYS.forEach((k) => sets[k].add(row[k] != null ? String(row[k]) : ""));
+    }
+    const out = {};
+    FILTERABLE_KEYS.forEach((k) => {
+      out[k] = Array.from(sets[k]).sort((a, b) =>
+        a.localeCompare(b, undefined, { numeric: true })
+      );
+    });
+    return out;
+  }, [tableData]);
+
   // Only indices — row objects stay stable references from tableData (enables React.memo on rows)
   const filteredIndices = useMemo(() => {
-    const term = searchTerm.toLowerCase();
+    // Space-insensitive matching (e.g. "3.1*1.1" matches "3.1 * 1.1").
+    const term = normalizeSearch(deferredSearchTerm);
+    const activeFilterKeys = Object.keys(columnFilters);
     const result = [];
     for (let idx = 0; idx < tableData.length; idx++) {
       const row = tableData[idx];
       if (row._isNew) { result.push(idx); continue; }
       if (term) {
-        const rowText = columns.map((c) => row[c.key] || "").join(" ").toLowerCase();
+        const rowText = normalizeSearch(columns.map((c) => row[c.key] || "").join(" "));
         if (!rowText.includes(term)) continue;
       }
+      // Excel-style column value filters
+      let passColFilters = true;
+      for (const key of activeFilterKeys) {
+        const sel = columnFilters[key];
+        const v = row[key] != null ? String(row[key]) : "";
+        if (!sel.has(v)) { passColFilters = false; break; }
+      }
+      if (!passColFilters) continue;
       if (stockFilter === "IN_STOCK" && row.stockStatus !== "IN_STOCK") continue;
       else if (stockFilter === "LOW" && row.stockStatus !== "LOW") continue;
       else if (stockFilter === "OUT_OF_STOCK" && row.stockStatus !== "OUT_OF_STOCK") continue;
@@ -1061,7 +1106,7 @@ const Inventory = () => {
       result.push(idx);
     }
     return result;
-  }, [searchTerm, tableData, stockFilter, categoryFilter, items]);
+  }, [deferredSearchTerm, tableData, stockFilter, categoryFilter, items, columnFilters]);
 
   // Pre-build suggestions per item id so getSuggestions doesn't recompute on every render
   const suggestionsCache = useMemo(() => {
@@ -1305,17 +1350,14 @@ const Inventory = () => {
           </div>
 
           <div className="mt-3 mb-6 flex flex-wrap items-center gap-3">
-            {/* Search */}
-            <div className="flex-1 relative min-w-[200px]">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-              <input
-                type="text"
-                placeholder="Search..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-9 pr-4 py-2.5 border border-gray-300 bg-white rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-400 text-sm"
-              />
-            </div>
+            {/* Search — isolated + debounced so typing stays instant on this large table */}
+            <DebouncedSearchInput
+              value={searchTerm}
+              onDebouncedChange={setSearchTerm}
+              placeholder="Search..."
+              wrapperClassName="flex-1 min-w-[200px]"
+              className="w-full pl-9 pr-4 py-2.5 border border-gray-300 bg-white rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-400 text-sm"
+            />
             {/* Stock status radio tabs */}
             <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1">
               {[
@@ -1426,11 +1468,20 @@ const Inventory = () => {
                             <th
                               className="sticky top-0 z-10 whitespace-normal px-3 py-3 text-center text-sm font-[550] text-gray-900 border-r border-gray-200 bg-gray-100"
                             >
-                              <span className="inline-flex flex-col items-center leading-tight">
-                                {splitHeaderLabel(col.label).map((line, idx) => (
-                                  <span key={`${col.key}-${idx}`}>{line}</span>
-                                ))}
-                              </span>
+                              <div className="inline-flex items-center justify-center gap-0.5">
+                                <span className="inline-flex flex-col items-center leading-tight">
+                                  {splitHeaderLabel(col.label).map((line, idx) => (
+                                    <span key={`${col.key}-${idx}`}>{line}</span>
+                                  ))}
+                                </span>
+                                {FILTERABLE_KEYS.includes(col.key) && (
+                                  <ColumnFilter
+                                    options={columnDistinctValues[col.key] || []}
+                                    selected={columnFilters[col.key] ?? null}
+                                    onChange={(sel) => setColFilter(col.key, sel)}
+                                  />
+                                )}
+                              </div>
                             </th>
                           </React.Fragment>
                         );

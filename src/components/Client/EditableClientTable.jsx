@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { ChevronsLeft, ChevronsRight } from "lucide-react";
+import ColumnFilter from "../ColumnFilter";
 
 const splitHeaderLabel = (label, maxChars = 14) => {
   // Attach "/" to the preceding word so "Box / Pcs" → tokens ["Box /", "Pcs"]
@@ -47,7 +48,12 @@ const EditableClientTable = ({
   scrollHeightClass = "max-h-[560px]",
   modifiedRowIndices = new Set(),
   collapsibleFrom = -1,
+  filterableCols = [],
+  columnDistinctValues = {},
+  columnFilters = {},
+  onColumnFilterChange,
 }) => {
+  const filterableSet = new Set(filterableCols);
   const readOnlySet = new Set(readOnlyCols);
   const hasCollapsible = collapsibleFrom >= 0 && collapsibleFrom < columns.length;
   const [expanded, setExpanded] = useState(false);
@@ -80,11 +86,20 @@ const EditableClientTable = ({
                         readOnlySet.has(colIndex) ? "text-gray-400" : "text-gray-900"
                       }`}
                     >
-                      <span className="inline-flex flex-col items-center leading-tight">
-                        {splitHeaderLabel(col).map((line, idx) => (
-                          <span key={`${col}-${idx}`}>{line}</span>
-                        ))}
-                      </span>
+                      <div className="inline-flex items-center justify-center gap-0.5">
+                        <span className="inline-flex flex-col items-center leading-tight">
+                          {splitHeaderLabel(col).map((line, idx) => (
+                            <span key={`${col}-${idx}`}>{line}</span>
+                          ))}
+                        </span>
+                        {filterableSet.has(colIndex) && onColumnFilterChange && (
+                          <ColumnFilter
+                            options={columnDistinctValues[colIndex] || []}
+                            selected={columnFilters[colIndex] ?? null}
+                            onChange={(sel) => onColumnFilterChange(colIndex, sel)}
+                          />
+                        )}
+                      </div>
                     </th>
                   </React.Fragment>
                 );
