@@ -12,25 +12,14 @@ import {
 } from "../services/apiService";
 import toast from "react-hot-toast";
 import Loader from "../components/Loader";
+import { FINISHES } from "../constants/finishes";
 
-const FINISH_FIELDS = [
-  { key: "sssatinlacq", label: "S.S & Satin Lacq" },
-  { key: "antiq",       label: "ANTQ" },
-  { key: "sidegold",    label: "Side Gold" },
-  { key: "zblack",      label: "Z-Black" },
-  { key: "grblack",     label: "Gr. Black" },
-  { key: "mattss",      label: "Matt S.S" },
-  { key: "mattantiq",   label: "Matt ANTQ" },
-  { key: "pvdrose",     label: "PVD Rose" },
-  { key: "pvdgold",     label: "PVD Gold" },
-  { key: "pvdblack",    label: "PVD Black" },
-  { key: "rosegold",    label: "Rose Gold" },
-  { key: "clearlacq",   label: "Clear Lacq." },
-];
+// Canonical finish price fields — keys/labels match the backend inventory columns.
+const FINISH_FIELDS = FINISHES;
 
 const DEFAULT_PACKING = {
   pcsPerBox: "", boxPerCarton: "", pcsPerCarton: "", cartonWeight: "",
-  sssatinlacq: "", antiq: "", sidegold: "", zblack: "", grblack: "",
+  ss: "", antiq: "", sidegold: "", sartinlacq: "", zblack: "", grblack: "",
   mattss: "", mattantiq: "", pvdrose: "", pvdgold: "", pvdblack: "",
   rosegold: "", clearlacq: "",
 };
@@ -150,7 +139,7 @@ const AddInventoryPage = () => {
     // Pre-fill Packing fields from the row's existing values
     const PACKING_KEYS = [
       "pcsPerBox","boxPerCarton","pcsPerCarton","cartonWeight",
-      "sssatinlacq","antiq","sidegold","zblack","grblack",
+      "ss","antiq","sidegold","sartinlacq","zblack","grblack",
       "mattss","mattantiq","pvdrose","pvdgold","pvdblack","rosegold","clearlacq",
     ];
     const packingFromState = {};

@@ -965,6 +965,22 @@ components:
           type: string
         sizeInMm:
           type: string
+        itemName:
+          type: string
+        category:
+          type: string
+        pcsWeight:
+          type: number
+          format: double
+        pcsPerBox:
+          type: number
+          format: double
+        boxPerCarton:
+          type: number
+          format: double
+        pcsPerCarton:
+          type: number
+          format: double
 
     # ---- OrderDispatch ----
     NewOrderDispatch:
@@ -1046,7 +1062,7 @@ components:
         - partyId
         - sizeId
         - jobDate
-        - qtyPc
+        - grossKg
       type: object
       properties:
         partyId:
@@ -1066,6 +1082,10 @@ components:
         qtyKg:
           type: number
           format: double
+        pcsWeight:
+          type: number
+          format: double
+          description: 1-pc weight used for this job work (fetched from item, editable)
         finish:
           type: string
         elementCount:
@@ -1073,7 +1093,18 @@ components:
           format: double
         elementType:
           $ref: '#/components/schemas/ElementType'
+        petiWeightKg:
+          type: number
+          format: double
+          description: Tare weight of a single Peti/Drum (kg)
+        grossKg:
+          type: number
+          format: double
+          description: Total weighed gross kg for this shipment
         stickerQty:
+          type: number
+          format: double
+        ratePerKg:
           type: number
           format: double
         status:
@@ -1117,7 +1148,22 @@ components:
           format: double
         elementType:
           $ref: '#/components/schemas/ElementType'
+        petiWeightKg:
+          type: number
+          format: double
+        grossKg:
+          type: number
+          format: double
         stickerQty:
+          type: number
+          format: double
+        totalCarton:
+          type: number
+          format: double
+        ratePerKg:
+          type: number
+          format: double
+        totalRate:
           type: number
           format: double
         status:
@@ -1158,6 +1204,22 @@ components:
           type: string
         sizeInMm:
           type: string
+        itemName:
+          type: string
+        category:
+          type: string
+        pcsWeight:
+          type: number
+          format: double
+        pcsPerBox:
+          type: number
+          format: double
+        boxPerCarton:
+          type: number
+          format: double
+        pcsPerCarton:
+          type: number
+          format: double
 
     PaginatedResultJobWork:
       type: object
@@ -1198,12 +1260,21 @@ components:
     # ---- Job Work Return ----
     NewJobWorkReturn:
       required:
-        - returnKg
+        - grossKg
       type: object
       properties:
+        petiWeightKg:
+          type: number
+          format: double
+          description: Tare weight of a single Peti/Drum (kg) for this return
+        grossKg:
+          type: number
+          format: double
+          description: Total weighed gross kg for this return
         returnKg:
           type: number
           format: double
+          description: Auto-computed net kg (grossKg - returnElementCount * petiWeightKg)
         ghati:
           type: number
           format: double
@@ -1215,13 +1286,19 @@ components:
         jobReturnDate:
           type: string
           format: date
-    
+
     JobWorkReturn:
       type: object
       properties:
         id:
           type: integer
           format: int64
+        petiWeightKg:
+          type: number
+          format: double
+        grossKg:
+          type: number
+          format: double
         returnKg:
           type: number
           format: double

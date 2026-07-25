@@ -8,25 +8,15 @@ import {
   itemBlueprintApi,
   sizeApi,
   clientInventoryApi,
+  inventoryApi,
   itemApi,
   axiosInstance,
 } from "../../services/apiService";
+import { FINISH_LABELS } from "../../constants/finishes";
 
 // ─── Finish / Plating options ─────────────────────────────────────────────
-const FINISH_OPTIONS = [
-  "S.S & Sartin Lacq",
-  "ANTQ",
-  "Side Gold",
-  "Z-Black.",
-  "Gr. Black.",
-  "Matt S.S",
-  "Matt ANTQ",
-  "PVD Rose",
-  "PVD Gold",
-  "PVD Black",
-  "Rose Gold",
-  "Clear Lacq.",
-];
+// Canonical list shared with the Stock Master finish columns and Job Work.
+const FINISH_OPTIONS = FINISH_LABELS;
 
 // ─── Empty item row ────────────────────────────────────────────────────────
 const createEmptyItem = () => ({
@@ -64,17 +54,20 @@ const computeStockStatus = (totalPc, lowWarn, orderedQty) => {
 // boxes   = ceil(qtyPc / pcPerBox_rate)
 // cartons = ceil(boxes / boxPerCartoon_rate)
 // qtyKg   = (dozenWeight / 12) × qtyPc
+// Qty Kg only needs qty + dozenWeight — it must not be wiped out just because
+// the pieces-per-box rate happens to be missing (that used to zero out qtyKg too).
 const computeDerived = (qtyPc, rawPcPerBox, rawBoxPerCartoon, dozenWeight) => {
   const qty     = parseFloat(qtyPc)            || 0;
   const pcRate  = parseFloat(rawPcPerBox)       || 0;
   const boxRate = parseFloat(rawBoxPerCartoon)  || 0;
   const dozWt   = parseFloat(dozenWeight)       || 0;
 
-  if (!qty || !pcRate) return { pcPerBox: "", boxPerCartoon: "", qtyKg: "" };
+  const kg = qty && dozWt ? ((dozWt / 12) * qty).toFixed(3) : "";
+
+  if (!qty || !pcRate) return { pcPerBox: "", boxPerCartoon: "", qtyKg: kg };
 
   const boxes   = Math.ceil(qty / pcRate);
   const cartons = boxRate ? Math.ceil(boxes / boxRate) : "";
-  const kg      = dozWt ? ((dozWt / 12) * qty).toFixed(3) : "";
 
   return {
     pcPerBox:      String(boxes),
@@ -285,27 +278,45 @@ const AddOrder = () => {
     }
   }, [updateItem]);
 
-  // Step 2: size selected → auto-fill from client inventory
-  const handleSelectSize = useCallback(async (index, size, currentQtyPc = "") => {
+  // Step 2: size selected → auto-fill from client inventory, falling back to the
+  // main Item Master inventory (same data Masters > Item manages) when the
+  // client has no size-specific override — otherwise most orders end up with
+  // blank Qty Kg / Pc-Box / Box-Cartoon / Sticker Qty since client_inventory
+  // overrides are rarely set up.
+  const handleSelectSize = useCallback(async (index, size, currentQtyPc = "", blueprintId) => {
     updateItem(index, {
       selectedSize: size,
       clientInventoryLoading: true,
       pcPerBox: "", boxPerCartoon: "", pcPerCartoon: "", qtyKg: "",
     });
 
-    if (!selectedParty?.id) {
-      updateItem(index, { clientInventoryLoading: false });
-      return;
-    }
-
     try {
-      const res = await clientInventoryApi.getInventoryByClient(
-        selectedParty.id, size.id
-      );
-      const items = Array.isArray(res.data) ? res.data : (res.data?.data ?? []);
-      const m = items[0] ?? null;
-      const rawPcPerBox      = m?.pcsPerBox    != null ? String(m.pcsPerBox)    : "";
-      const rawBoxPerCartoon = m?.boxPerCarton != null ? String(m.boxPerCarton) : "";
+      const [clientRes, masterRes] = await Promise.allSettled([
+        selectedParty?.id
+          ? clientInventoryApi.getInventoryByClient(selectedParty.id, size.id)
+          : Promise.resolve(null),
+        blueprintId
+          ? inventoryApi.getAllInventory(blueprintId, undefined, size.sizeInInch, size.sizeInMm)
+          : Promise.resolve(null),
+      ]);
+
+      const extractList = (res) => {
+        if (res.status !== "fulfilled" || !res.value) return [];
+        const data = res.value.data;
+        return Array.isArray(data) ? data : (data?.data ?? []);
+      };
+      const clientEntry = extractList(clientRes)[0] ?? null;
+      const masterEntry = extractList(masterRes)[0] ?? null;
+
+      const pick = (field) =>
+        clientEntry?.[field] != null
+          ? String(clientEntry[field])
+          : masterEntry?.[field] != null
+            ? String(masterEntry[field])
+            : "";
+
+      const rawPcPerBox      = pick("pcsPerBox");
+      const rawBoxPerCartoon = pick("boxPerCarton");
       const derived = computeDerived(
         currentQtyPc,
         rawPcPerBox,
@@ -325,7 +336,7 @@ const AddOrder = () => {
         clientInventoryLoading: false,
         rawPcPerBox,
         rawBoxPerCartoon,
-        pcPerCartoon: m?.pcsPerCarton != null ? String(m.pcsPerCarton) : "",
+        pcPerCartoon: pick("pcsPerCarton"),
         ...derived,
         stickerQty: derived.pcPerBox,
         stockStatus,
@@ -491,7 +502,7 @@ const AddOrder = () => {
                       }))}
                       disabled={!item.selectedItem || item.sizesLoading}
                       loading={item.sizesLoading}
-                      onSelect={(opt) => handleSelectSize(index, opt.raw, item.qtyPc)}
+                      onSelect={(opt) => handleSelectSize(index, opt.raw, item.qtyPc, item.selectedItem?.id)}
                     />
                     {item.selectedSize && (
                       <span className={`mt-1.5 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${

@@ -35,11 +35,18 @@ const flattenOrders = (apiData) => {
         size:         [item.itemSize?.sizeInInch, item.itemSize?.sizeInMm ? `(${item.itemSize.sizeInMm})` : ""].filter(Boolean).join(" ") || "—",
         plating:      item.plating      ?? "_",
         qtyPc:        item.qtyPc        ?? "—",
-        qtyKg:        item.qtyKg        ?? "—",
-        boxPc:        item.pcPerBox     ?? "—",
-        cartoon:      item.boxPerCartoon ?? "—",
-        pcCartoon:    item.pcPerCartoon  ?? "—",
-        stickerQty:   item.stickerQty   ?? "—",
+        // Fall back to the item's own master data (weight/pc, pcs-per-box, etc.) whenever the
+        // order item itself never captured these — otherwise most rows show "—" even though the
+        // Item Master already has everything needed to compute them.
+        qtyKg:        item.qtyKg ?? (item.qtyPc != null && item.itemSize?.pcsWeight != null
+                        ? Number((item.qtyPc * item.itemSize.pcsWeight).toFixed(3))
+                        : "—"),
+        boxPc:        item.pcPerBox      ?? item.itemSize?.pcsPerBox    ?? "—",
+        cartoon:      item.boxPerCartoon ?? item.itemSize?.boxPerCarton ?? "—",
+        pcCartoon:    item.pcPerCartoon  ?? item.itemSize?.pcsPerCarton ?? "—",
+        stickerQty:   item.stickerQty ?? (item.qtyPc != null && item.itemSize?.pcsPerBox
+                        ? Math.ceil(item.qtyPc / item.itemSize.pcsPerBox)
+                        : "—"),
         dispatchDate: item.lastDispatchDate ?? null,
         dispatchPcs:  item.totalDispatchedPc != null
           ? item.totalDispatchedPc
@@ -307,6 +314,12 @@ const OrderManagement = () => {
 
   const handleMoveToJobWorkSave = () => {
     if (!moveToJobWorkRow) return;
+    if (selectedMoveType === "MANUAL") {
+      // Manual job work is not tied to this order — open the blank manual form.
+      navigate("/job-work/move", { state: { mode: "create", jobWorkMode: "MANUAL" } });
+      setMoveToJobWorkRow(null);
+      return;
+    }
     const selectedLabel = selectedMoveType === "INHOUSE" ? "In-House" : "Outside";
     navigate("/job-work/move", {
       state: {
@@ -424,7 +437,7 @@ const OrderManagement = () => {
     }
   };
 
-  const renderMoveOption = (value, label) => {
+  const renderMoveOption = (value, label, description) => {
     const isSelected = selectedMoveType === value;
 
     return (
@@ -432,20 +445,23 @@ const OrderManagement = () => {
         type="button"
         onClick={() => setSelectedMoveType(value)}
         aria-pressed={isSelected}
-        className={`w-full rounded-md border px-4 py-3 text-sm transition flex items-center gap-3 text-left ${
+        className={`w-full rounded-xl border p-4 transition flex items-start gap-3 text-left ${
           isSelected
-            ? "border-gray-900 bg-gray-50 text-gray-900 ring-1 ring-gray-900"
-            : "border-gray-300 bg-white text-gray-700 hover:border-gray-400 hover:bg-gray-50"
+            ? "border-gray-900 bg-gray-50 ring-1 ring-gray-900 shadow-sm"
+            : "border-gray-200 bg-white hover:border-gray-400 hover:bg-gray-50"
         }`}
       >
         <span
-          className={`flex h-5 w-5 items-center justify-center rounded-full border ${
-            isSelected ? "border-gray-900" : "border-gray-400"
+          className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 ${
+            isSelected ? "border-gray-900" : "border-gray-300"
           }`}
         >
-          {isSelected ? <span className="h-2.5 w-2.5 rounded-full bg-black" /> : null}
+          {isSelected ? <span className="h-2.5 w-2.5 rounded-full bg-gray-900" /> : null}
         </span>
-        <span className="font-medium">{label}</span>
+        <span className="flex flex-col">
+          <span className={`text-sm font-semibold ${isSelected ? "text-gray-900" : "text-gray-800"}`}>{label}</span>
+          <span className="text-xs text-gray-500 mt-0.5">{description}</span>
+        </span>
       </button>
     );
   };
@@ -987,27 +1003,31 @@ const OrderManagement = () => {
       )}
 
       {moveToJobWorkRow && (
-        <div className="fixed inset-0 z-50 bg-black/30 flex items-center justify-center p-4">
-          <div className="w-full max-w-md rounded-lg border border-gray-200 bg-white p-5">
-            <h3 className="text-base font-medium text-gray-900 text-center">Move to Job Work</h3>
-            <div className="mt-5 space-y-3">
-              {renderMoveOption("OUTSIDE", "Outside Job Work")}
-              {renderMoveOption("INHOUSE", "In-House Job Work")}
+        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
+          <div className="w-full max-w-md rounded-2xl border border-gray-200 bg-white shadow-xl overflow-hidden">
+            <div className="px-6 pt-5 pb-4 border-b border-gray-100">
+              <h3 className="text-lg font-semibold text-gray-900">Move to Job Work</h3>
+              <p className="text-sm text-gray-500 mt-0.5">Choose how this item goes for finishing.</p>
             </div>
-            <div className="mt-6 flex items-center justify-center gap-3">
-              <button
-                type="button"
-                onClick={handleMoveToJobWorkSave}
-                className="px-8 py-2 bg-gray-900 text-white rounded-md hover:bg-gray-800 transition text-sm"
-              >
-                Save
-              </button>
+            <div className="px-6 py-5 space-y-3">
+              {renderMoveOption("OUTSIDE", "Out-Side Job Work", "Sent to an outside vendor you select.")}
+              {renderMoveOption("INHOUSE", "In-Side Job Work", "Finished in-house — party auto-filled from the order.")}
+              {renderMoveOption("MANUAL", "Manual Job Work", "Not tied to this order — enter party & item yourself.")}
+            </div>
+            <div className="px-6 py-4 bg-gray-50 border-t border-gray-100 flex items-center justify-end gap-3">
               <button
                 type="button"
                 onClick={() => setMoveToJobWorkRow(null)}
-                className="px-8 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 transition text-sm"
+                className="px-5 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-white transition text-sm font-medium"
               >
                 Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleMoveToJobWorkSave}
+                className="px-6 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition text-sm font-medium"
+              >
+                Continue
               </button>
             </div>
           </div>

@@ -8,6 +8,7 @@ import {
   RefreshCw,
   ChevronLeft,
   Download,
+  Plus,
 } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 import SidebarLayout from "../components/SidebarLayout";
@@ -53,16 +54,15 @@ const JobWorkCardItem = ({ jw, onStatusChange, onTypeChange, onReturnRecord, onE
     : "â€”";
 
   const round3 = (n) => Math.round(n * 1000) / 1000;
-  const totalReturnKg = round3(returns.reduce((sum, r) => sum + (r.returnKg || 0), 0));
+  // ret.returnKg is already the net kg (backend computes it from grossKg - element*petiWeight)
+  const totalReturnNetKg = round3(returns.reduce((sum, r) => sum + (r.returnKg || 0), 0));
   const totalGhati = round3(returns.reduce((sum, r) => sum + (r.ghati || 0), 0));
-  const totalReturnWithGhati = round3(totalReturnKg + totalGhati);
-  const totalNetKg = round3(Math.max(0, totalReturnKg - totalGhati));
+  const totalReturnWithGhati = round3(totalReturnNetKg + totalGhati);
   const sentKg = jw.qtyKg || 0;
   const remainingKg = round3(Math.max(0, sentKg - totalReturnWithGhati));
   const isFullyReturned = sentKg > 0 && totalReturnWithGhati >= sentKg;
   const isCompleted = jw.status === "COMPLETE";
   const processLabel = /sartin/i.test(String(jw.finish || "")) ? "Sartin" : "Emrey";
-  const sentNetKg = jw.netKg != null ? jw.netKg : jw.qtyKg;
 
   return (
     <div className="border border-gray-200 rounded-xl bg-white p-4 shadow-sm">
@@ -79,11 +79,15 @@ const JobWorkCardItem = ({ jw, onStatusChange, onTypeChange, onReturnRecord, onE
             </button>
           </div>
           <div className="flex flex-wrap items-center gap-2 mt-1 text-sm text-gray-500">
-            <span>{jw.party?.name || "â€”"}</span>
+            <span>{jw.party?.name || "-"}</span>
+            {jw.size?.category && (
+              <>
+                <span className="w-1 h-1 rounded-full bg-gray-400 inline-block" />
+                <span>{jw.size.itemName ? `${jw.size.itemName} - ` : ""}{jw.size.category}</span>
+              </>
+            )}
             <span className="w-1 h-1 rounded-full bg-gray-400 inline-block" />
             <span>Finish: <span className="font-bold text-black">{fmt(jw.finish)}</span></span>
-            <span className="w-1 h-1 rounded-full bg-gray-400 inline-block" />
-            <span>Sticker Qty: <span className="font-bold text-black">{fmt(jw.stickerQty)}</span></span>
           </div>
         </div>
         <div className="text-right text-sm text-gray-500 flex-shrink-0">
@@ -112,16 +116,27 @@ const JobWorkCardItem = ({ jw, onStatusChange, onTypeChange, onReturnRecord, onE
             </button>
           </div>
           <div className="grid grid-cols-5 text-xs text-gray-400 mb-1">
-            <span>Sizes</span><span className="text-center">Element</span><span className="text-center">Process</span><span className="text-center">Kg.</span><span className="text-right">Net</span>
+            <span>Size</span><span className="text-center">Peti</span><span className="text-center">Process</span><span className="text-center">Gross Kg</span><span className="text-right">Net Kg</span>
           </div>
           <div className="grid grid-cols-5 text-sm text-gray-700">
             <span className="font-bold">{sizeLabel}</span>
             <span className="text-center font-bold">{elementLabel}</span>
             <span className="text-center font-bold">{processLabel}</span>
-            <span className="text-center font-bold">{fmt(jw.qtyKg)} Kg</span>
-            <span className="text-right font-bold">{fmt(sentNetKg)} Kg</span>
+            <span className="text-center font-bold">{fmt(jw.grossKg)} Kg</span>
+            <span className="text-right font-bold">{fmt(jw.qtyKg)} Kg</span>
           </div>
-          <div className="mt-2 text-xs text-gray-500">Qty Pc: <span className="font-bold text-black">{fmt(jw.qtyPc)}</span></div>
+          <div className="grid grid-cols-3 text-xs text-gray-400 mt-3 mb-1">
+            <span>Total Pcs</span><span className="text-center">Sticker Qty</span><span className="text-right">Total Carton</span>
+          </div>
+          <div className="grid grid-cols-3 text-sm text-gray-700">
+            <span className="font-bold">{fmt(jw.qtyPc)}</span>
+            <span className="text-center font-bold">{fmt(jw.stickerQty)}</span>
+            <span className="text-right font-bold">{fmt(jw.totalCarton)}</span>
+          </div>
+          <div className="mt-2 pt-2 border-t border-dashed border-gray-300 flex items-center justify-between text-xs text-gray-500">
+            <span>Rate/Kg: <span className="font-bold text-black">{fmt(jw.ratePerKg)}</span></span>
+            <span>Total Rate: <span className="font-bold text-black">{fmt(jw.totalRate)}</span></span>
+          </div>
         </div>
 
         {/* Return panel */}
@@ -184,16 +199,16 @@ const JobWorkCardItem = ({ jw, onStatusChange, onTypeChange, onReturnRecord, onE
                         </div>
                       </div>
                       <div className="grid grid-cols-4 text-xs text-gray-400 mb-0.5">
-                        <span>Element</span><span className="text-center">Return Kg.</span><span className="text-center">Net Kg</span><span className="text-right">Ghati</span>
+                        <span>Peti</span><span className="text-center">Gross Kg</span><span className="text-center">Net Kg</span><span className="text-right">Ghati</span>
                       </div>
                       <div className="grid grid-cols-4 text-sm text-gray-700">
                         <span className="font-bold">
                           {ret.returnElementCount != null
                             ? `${ret.returnElementCount} ${ret.elementType === "DRUM" ? "Drum" : "Peti"}`
-                            : "â€”"}
+                            : "-"}
                         </span>
+                        <span className="text-center font-bold">{fmt(ret.grossKg)} Kg</span>
                         <span className="text-center font-bold">{fmt(ret.returnKg)} Kg</span>
-                        <span className="text-center font-bold">{round3(Math.max(0, (ret.returnKg || 0) - (ret.ghati || 0)))} Kg</span>
                         <span className="text-right font-bold">{fmt(ret.ghati)}</span>
                       </div>
                     </div>
@@ -203,13 +218,12 @@ const JobWorkCardItem = ({ jw, onStatusChange, onTypeChange, onReturnRecord, onE
 
               {/* Summary totals (always visible) */}
               <div className="border-t border-dashed border-gray-300 pt-2">
-                <div className="grid grid-cols-3 text-xs text-gray-400 mb-0.5">
-                  <span>Total Return</span><span className="text-center">Total Net</span><span className="text-right">Total Ghati</span>
+                <div className="grid grid-cols-2 text-xs text-gray-400 mb-0.5">
+                  <span>Total Net Returned</span><span className="text-right">Total Ghati</span>
                 </div>
-                <div className="grid grid-cols-3 text-sm text-gray-700">
-                  <span className="font-bold">{totalReturnKg ? `${totalReturnKg} Kg` : "â€”"}</span>
-                  <span className="text-center font-bold">{totalNetKg ? `${totalNetKg} Kg` : "â€”"}</span>
-                  <span className="text-right font-bold">{totalGhati || "â€”"}</span>
+                <div className="grid grid-cols-2 text-sm text-gray-700">
+                  <span className="font-bold">{totalReturnNetKg ? `${totalReturnNetKg} Kg` : "-"}</span>
+                  <span className="text-right font-bold">{totalGhati || "-"}</span>
                 </div>
               </div>
 
@@ -493,14 +507,24 @@ const JobWork = () => {
             filterOptions={["IN_HOUSE", "JOB_WORK"]}
             filterPlaceholder="Type"
             extraButton={
-              <button
-                type="button"
-                onClick={() => setStatementOpen(true)}
-                className="inline-flex items-center gap-2 px-4 py-3 border border-gray-300 rounded-lg bg-white text-sm text-gray-700 hover:bg-gray-50 transition whitespace-nowrap"
-              >
-                <Download className="w-4 h-4" />
-                Download Statement
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => navigate("/job-work/move", { state: { mode: "create", jobWorkMode: "MANUAL" } })}
+                  className="inline-flex items-center gap-2 px-4 py-3 rounded-lg bg-gray-900 text-sm text-white hover:bg-gray-800 transition whitespace-nowrap"
+                >
+                  <Plus className="w-4 h-4" />
+                  Add Job Work
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setStatementOpen(true)}
+                  className="inline-flex items-center gap-2 px-4 py-3 border border-gray-300 rounded-lg bg-white text-sm text-gray-700 hover:bg-gray-50 transition whitespace-nowrap"
+                >
+                  <Download className="w-4 h-4" />
+                  Download Statement
+                </button>
+              </div>
             }
           />
         </div>

@@ -18,6 +18,7 @@ import ColumnFilter from "../components/ColumnFilter";
 const FILTERABLE_KEYS = ["itemName", "sizeInInch", "sizeInMm"];
 import PricingFormulaDialog from "../components/Client/PricingFormulaDialog";
 import { resolvePricingRules, applyFinish, fallbackRules } from "../services/pricingRulesApi";
+import { FINISHES } from "../constants/finishes";
 import toast from "react-hot-toast";
 import Loader from "../components/Loader";
 
@@ -449,6 +450,7 @@ const Inventory = () => {
   const [viewItemSearch, setViewItemSearch]       = useState("");
   const [editingItemId, setEditingItemId]         = useState(null);
   const [editingItemName, setEditingItemName]     = useState("");
+  const [editingItemCategoryId, setEditingItemCategoryId] = useState("");
   const [itemActionLoading, setItemActionLoading] = useState(false);
   const [deleteItemTarget, setDeleteItemTarget]   = useState(null); // {id, name}
 
@@ -985,7 +987,7 @@ const Inventory = () => {
       if (dozenVal !== null) payload.dozenWeight = dozenVal;
       const invNumericFields = [
         "pcsPerBox", "boxPerCarton", "pcsPerCarton", "cartonWeight",
-        "sssatinlacq", "antiq", "sidegold", "zblack", "grblack",
+        "ss", "antiq", "sidegold", "sartinlacq", "zblack", "grblack",
         "mattss", "mattantiq", "pvdrose", "pvdgold", "pvdblack",
         "rosegold", "clearlacq",
       ];
@@ -1588,18 +1590,8 @@ const Inventory = () => {
           { key: "boxPerCarton", label: "Box/Carton" },
           { key: "pcsPerCarton", label: "Pcs/Carton" },
           { key: "cartonWeight", label: "Carton Wt." },
-          { key: "sssatinlacq", label: "S.S & Satin Lacq" },
-          { key: "antiq", label: "ANTQ" },
-          { key: "sidegold", label: "Side Gold" },
-          { key: "zblack", label: "Z-Black" },
-          { key: "grblack", label: "Gr. Black" },
-          { key: "mattss", label: "Matt S.S" },
-          { key: "mattantiq", label: "Matt ANTQ" },
-          { key: "pvdrose", label: "PVD Rose" },
-          { key: "pvdgold", label: "PVD Gold" },
-          { key: "pvdblack", label: "PVD Black" },
-          { key: "rosegold", label: "Rose Gold" },
-          { key: "clearlacq", label: "Clear Lacq." },
+          // Finish price columns — canonical keys/labels that match the backend inventory columns.
+          ...FINISHES,
         ];
         return (
           <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50">
@@ -1878,30 +1870,30 @@ const Inventory = () => {
                                 type="text"
                                 value={editingItemName}
                                 onChange={e => setEditingItemName(e.target.value)}
-                                onKeyDown={async e => {
-                                  if (e.key === "Enter") {
-                                    e.preventDefault();
-                                    if (!editingItemName.trim()) return;
-                                    setItemActionLoading(true);
-                                    try {
-                                      await axiosInstance.put(`/api/v1/item-blueprints/${item.id}`, { itemName: editingItemName.trim() });
-                                      toast.success("Item updated");
-                                      setEditingItemId(null);
-                                      await loadAll();
-                                    } catch { toast.error("Failed to update"); }
-                                    finally { setItemActionLoading(false); }
-                                  }
-                                  if (e.key === "Escape") setEditingItemId(null);
-                                }}
+                                onKeyDown={e => { if (e.key === "Escape") setEditingItemId(null); }}
+                                placeholder="Item name"
                                 className="w-full text-sm px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-gray-400 bg-white"
+                              />
+                              <BillDropdown
+                                value={editingItemCategoryId}
+                                placeholder="Select category…"
+                                options={categories.map((cat) => ({ value: String(cat.id), label: cat.name }))}
+                                onSelect={(option) => setEditingItemCategoryId(String(option.value))}
+                                labelClassName="hidden"
+                                buttonClassName="w-full border border-gray-300 rounded px-2 py-1 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-gray-400 flex items-center justify-between"
+                                optionListClassName="absolute z-20 mt-1 w-full max-h-40 overflow-y-auto bg-white border border-gray-200 rounded-lg shadow-lg text-sm"
                               />
                               <div className="flex gap-1.5 justify-end">
                                 <button type="button"
                                   onClick={async () => {
-                                    if (!editingItemName.trim()) return;
+                                    if (!editingItemName.trim()) { toast.error("Item name is required"); return; }
+                                    if (!editingItemCategoryId) { toast.error("Please select a category"); return; }
                                     setItemActionLoading(true);
                                     try {
-                                      await axiosInstance.put(`/api/v1/item-blueprints/${item.id}`, { itemName: editingItemName.trim() });
+                                      await axiosInstance.put(`/api/v1/item-blueprints/${item.id}`, {
+                                        itemName: editingItemName.trim(),
+                                        categoryId: Number(editingItemCategoryId),
+                                      });
                                       toast.success("Item updated");
                                       setEditingItemId(null);
                                       await loadAll();
@@ -1921,13 +1913,19 @@ const Inventory = () => {
                             <div className="border border-gray-200 rounded-lg px-3 py-2.5 text-sm text-gray-700 bg-white hover:border-gray-300 hover:shadow-sm transition min-h-[44px] flex items-center justify-between gap-1 cursor-default">
                               <div className="flex flex-col min-w-0">
                                 <span className="truncate font-medium">{item.itemName || `Item #${item.id}`}</span>
-                                {item.category?.name && (
+                                {item.category?.name ? (
                                   <span className="text-xs text-gray-400 truncate">{item.category.name}</span>
+                                ) : (
+                                  <span className="text-xs text-amber-600 truncate">No category</span>
                                 )}
                               </div>
                               <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
                                 <button type="button" title="Edit"
-                                  onClick={() => { setEditingItemId(item.id); setEditingItemName(item.itemName || ""); }}
+                                  onClick={() => {
+                                    setEditingItemId(item.id);
+                                    setEditingItemName(item.itemName || "");
+                                    setEditingItemCategoryId(item.category?.id ? String(item.category.id) : "");
+                                  }}
                                   className="p-1 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded transition"
                                 >
                                   <Pencil className="w-3 h-3" />

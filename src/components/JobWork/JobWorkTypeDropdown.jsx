@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { ChevronDown } from "lucide-react";
 
 const TYPE_OPTIONS = ["JOB_WORK", "INHOUSE", "OUTSIDE"];
-const TYPE_LABEL = { JOB_WORK: "Job Work", INHOUSE: "In-House", OUTSIDE: "Outside" };
+const TYPE_LABEL = { JOB_WORK: "Job Work", INHOUSE: "In-Side", OUTSIDE: "Out-Side" };
 
 const JobWorkTypeDropdown = ({ value, onChange }) => {
   const [open, setOpen] = useState(false);

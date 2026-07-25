@@ -1,11 +1,17 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { ChevronDown, X } from "lucide-react";
+import { ChevronLeft, ChevronDown, X, Building2, Home, PencilLine, Package, Scale, Sparkles } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 import SidebarLayout from "../components/SidebarLayout";
-import PageHeader from "../components/PageHeader";
 import toast from "react-hot-toast";
-import { jobWorkApi, partyApi } from "../services/apiService";
+import { jobWorkApi, orderApi, partyApi, itemBlueprintApi, inventoryApi, axiosInstance } from "../services/apiService";
 import { upsertOrderJobOverride } from "../utils/orderJobWorkSync";
+import { FINISH_LABELS } from "../constants/finishes";
+
+const JOB_MODES = [
+  { value: "OUTSIDE", label: "Out-Side", hint: "Sent to a vendor", icon: Building2 },
+  { value: "INHOUSE", label: "In-Side", hint: "Party from order", icon: Home },
+  { value: "MANUAL", label: "Manual", hint: "Enter it yourself", icon: PencilLine },
+];
 
 const getNow = () => {
   const d = new Date();
@@ -20,8 +26,44 @@ const EMPTY_FORM = {
   chithiNo: "",
   time: "",
   date: "",
+};
+
+const EMPTY_ITEM_CONTEXT = {
   sizeId: "",
-  stickerQty: "",
+  itemName: "",
+  category: "",
+  sizeLabel: "",
+  finish: "",
+  pcsWeight: null,
+  pcsPerBox: null,
+  boxPerCarton: null,
+  orderQtyPc: null,
+  orderStickerQty: null,
+};
+
+const EMPTY_CALC = {
+  grossKg: "",
+  elementCount: "",
+  elementType: "PETI",
+  petiWeightKg: "",
+  pcsWeight: "", // fetched from the item, editable per the excel ("1 pcs weight: manual - changeable")
+  ratePerKg: "",
+};
+
+const ELEMENT_TYPE_OPTIONS = ["PETI", "DRUM"];
+const ELEMENT_TYPE_LABEL = { PETI: "Peti", DRUM: "Drum" };
+const FORM_LABEL_CLASS = "block text-md font-medium text-black mb-2";
+const FORM_INPUT_CLASS =
+  "w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-500 outline-none placeholder:text-sm placeholder:text-gray-400";
+const READONLY_INPUT_CLASS =
+  "w-full px-4 py-2 border border-gray-200 rounded-lg bg-gray-50 text-gray-700 outline-none cursor-not-allowed";
+const FORM_SELECT_CLASS =
+  "w-full h-10 px-3 border border-gray-300 rounded-lg bg-white text-sm flex items-center justify-between focus:ring-2 focus:ring-gray-500 outline-none";
+
+const round3 = (n) => Math.round(n * 1000) / 1000;
+const parseNumber = (value) => {
+  const parsed = Number.parseFloat(value);
+  return Number.isFinite(parsed) ? parsed : null;
 };
 
 const normalizeDateForInput = (dateValue) => {
@@ -38,95 +80,63 @@ const normalizeDateForInput = (dateValue) => {
   return "";
 };
 
-const normalizeDateForCard = (dateValue) => {
-  if (!dateValue) return "";
-  if (/^\d{2}-\d{2}-\d{4}$/.test(dateValue)) return dateValue;
-  if (/^\d{4}-\d{2}-\d{2}$/.test(dateValue)) {
-    const [year, month, day] = dateValue.split("-");
-    return `${day}-${month}-${year}`;
-  }
-  return dateValue;
+/**
+ * Mirrors the backend's excel-based calculation so the user sees the numbers before saving.
+ * Direction (client's excel): weigh the shipment (gross) → net → pieces → stickers → cartons.
+ *   Net Kg     = grossKg − Peti count × 1-Peti tare
+ *   Total Pcs  = Net Kg / 1-pc weight        (1-pc weight fetched from item, editable)
+ *   Stickers   = Total Pcs / pcsPerBox       (one sticker per box)
+ *   Cartons    = Stickers / boxPerCarton
+ *   Total Rate = Net Kg × Rate/Kg
+ */
+const computeDerived = (calc, itemContext) => {
+  const grossKg = parseNumber(calc.grossKg) ?? 0;
+  const elementCount = parseNumber(calc.elementCount) ?? 0;
+  const petiWeightKg = parseNumber(calc.petiWeightKg) ?? 0;
+  const netKg = Math.max(0, round3(grossKg - elementCount * petiWeightKg));
+
+  const pcsWeight = parseNumber(calc.pcsWeight); // editable, prefilled from item
+  const totalPcs = pcsWeight && pcsWeight > 0 ? netKg / pcsWeight : null;
+
+  const pcsPerBox = itemContext.pcsPerBox; // from item/client master
+  const stickerQty = totalPcs != null && pcsPerBox && pcsPerBox > 0 ? totalPcs / pcsPerBox : null;
+
+  const boxPerCarton = itemContext.boxPerCarton; // from item/client master
+  const totalCarton = stickerQty != null && boxPerCarton && boxPerCarton > 0 ? stickerQty / boxPerCarton : null;
+
+  const ratePerKg = parseNumber(calc.ratePerKg);
+  const totalRate = ratePerKg != null ? netKg * ratePerKg : null;
+
+  return { netKg, totalPcs, stickerQty, totalCarton, totalRate };
 };
 
-const extractElementParts = (value) => {
-  const raw = String(value || "").trim();
-  if (!raw) return { element: "", elementType: "Peti" };
-  if (/[pP]$/.test(raw))
-    return { element: raw.slice(0, -1), elementType: "Peti" };
-  return { element: raw, elementType: "Wooden Peti" };
-};
-
-const ELEMENT_TYPE_OPTIONS = ["Peti", "Wooden Peti", "Bag", "Heavy Peti"];
-const FORM_LABEL_CLASS = "block text-md font-medium text-black mb-2";
-const FORM_INPUT_CLASS =
-  "w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-500 outline-none placeholder:text-sm placeholder:text-gray-400";
-const FORM_SELECT_CLASS =
-  "w-full h-10 px-3 border border-gray-300 rounded-lg bg-white text-sm flex items-center justify-between focus:ring-2 focus:ring-gray-500 outline-none";
-
-const round3 = (n) => Math.round(n * 1000) / 1000;
-const parseNumber = (value) => {
-  const parsed = Number.parseFloat(value);
-  return Number.isFinite(parsed) ? parsed : null;
-};
-const calcTotalAmount = (qtyKg, ratePerKg) => {
-  const qty = parseNumber(qtyKg);
-  const rate = parseNumber(ratePerKg);
-  if (qty === null || rate === null) return "";
-  return String(Math.round(qty * rate));
-};
-
-const calcNetWeight = (qtyPc, element, elementWeightGm) => {
-  const unitKg = parseNumber(qtyPc);
-  const count = parseNumber(element);
-  const gmWeight = parseNumber(elementWeightGm);
-  if (unitKg === null || count === null || gmWeight === null || count <= 0) return "";
-  const net = round3(count * (unitKg - gmWeight / 1000));
-  return net > 0 ? String(net) : "";
-};
-
-const createItemRow = (seed = {}) => ({
-  itemName: "",
-  size: "",
-  qtyPc: "",
-  qtyKg: "",
-  unitType: "Kgs",
-  finish: "",
-  element: "",
-  elementType: "Peti",
-  elementWeightGm: "900",
-  processEmery: false,
-  processSartin: false,
-  ratePerKg: "",
-  totalAmount: "",
-  ...seed,
-});
+const fmt = (n, digits = 2) => (n == null || Number.isNaN(n) ? "—" : n.toFixed(digits));
 
 const MoveToJobWork = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const [formData, setFormData] = useState(() => ({ ...EMPTY_FORM, ...getNow() }));
-  const [items, setItems] = useState([createItemRow()]);
-  const [openElementTypeIndex, setOpenElementTypeIndex] = useState(null);
+  const [itemContext, setItemContext] = useState(EMPTY_ITEM_CONTEXT);
+  const [calc, setCalc] = useState(EMPTY_CALC);
+  const [existingStatus, setExistingStatus] = useState("PENDING");
+  const [loadingContext, setLoadingContext] = useState(false);
+  const [contextError, setContextError] = useState("");
+  const [openElementType, setOpenElementType] = useState(false);
   const [saving, setSaving] = useState(false);
   const [parties, setParties] = useState([]);
   const [isPartyOpen, setIsPartyOpen] = useState(false);
   const [partySearch, setPartySearch] = useState("");
   const partyRef = useRef(null);
-  const addItem = () => setItems((prev) => [...prev, createItemRow()]);
-  const removeItem = (idx) => setItems((prev) => (prev.length === 1 ? prev : prev.filter((_, i) => i !== idx)));
-  const updateItem = (idx, patch) =>
-    setItems((prev) => prev.map((row, i) => (i === idx ? { ...row, ...patch } : row)));
 
-  const updateItemWithAutoCalc = (idx, patch) =>
-    setItems((prev) =>
-      prev.map((row, i) => {
-        if (i !== idx) return row;
-        const next = { ...row, ...patch };
-        next.qtyKg = calcNetWeight(next.qtyPc, next.element, next.elementWeightGm);
-        next.totalAmount = calcTotalAmount(next.qtyKg, next.ratePerKg);
-        return next;
-      })
-    );
+  // Manual mode: pick the item + size straight from the item master.
+  const [blueprints, setBlueprints] = useState([]);
+  const [manualBlueprintId, setManualBlueprintId] = useState("");
+  const [manualSizeId, setManualSizeId] = useState("");
+  const [openManualItem, setOpenManualItem] = useState(false);
+  const [openManualSize, setOpenManualSize] = useState(false);
+  const [openFinish, setOpenFinish] = useState(false);
+
+  const updateCalc = (patch) => setCalc((prev) => ({ ...prev, ...patch }));
 
   // Close party dropdown on outside click
   useEffect(() => {
@@ -141,11 +151,25 @@ const MoveToJobWork = () => {
   }, [isPartyOpen]);
 
   const mode = location.state?.mode === "edit" ? "edit" : "create";
-  const editJob = location.state?.job || null;
   const sourceOrderRow = location.state?.prefillOrderRow || null;
-  // jobWorkId / orderItemId passed from new JobWork.jsx edit flow
-  const editJobWorkId  = location.state?.jobWorkId   || null;
+  const editJobWorkId = location.state?.jobWorkId || null;
   const editOrderItemId = location.state?.orderItemId || null;
+  const manualMode = location.state?.jobWorkMode === "MANUAL";
+
+  const [jobWorkType, setJobWorkType] = useState(() => {
+    if (manualMode) return "MANUAL";
+    const raw = String(sourceOrderRow?.jobWork || "").toLowerCase().replace(/[\s-]/g, "");
+    if (raw === "outside") return "OUTSIDE";
+    if (raw === "inhouse") return "INHOUSE";
+    return "OUTSIDE";
+  });
+
+  const isManual = jobWorkType === "MANUAL";
+  // Item details are typed by the user in Manual mode; read-only (from the order) otherwise.
+  const itemEditable = isManual;
+
+  const jobWorkTypeLabel =
+    jobWorkType === "INHOUSE" ? "In-Side" : isManual ? "Manual" : "Out-Side";
 
   // Fetch parties for dropdown
   useEffect(() => {
@@ -162,578 +186,712 @@ const MoveToJobWork = () => {
     fetchParties();
   }, []);
 
+  // Fetch item-master blueprints for Manual-mode item picking.
+  useEffect(() => {
+    const fetchBlueprints = async () => {
+      try {
+        const res = await itemBlueprintApi.getAllItems();
+        const list = Array.isArray(res.data) ? res.data : res.data?.data || [];
+        setBlueprints(list);
+      } catch {
+        // silent — manual item picker will just be empty
+      }
+    };
+    fetchBlueprints();
+  }, []);
+
   const vendorParties = useMemo(
     () => parties.filter((p) => p.partyType === "VENDOR" || p.partyType === "BOTH"),
     [parties]
   );
 
+  const selectableParties = isManual ? parties : vendorParties;
+
   const filteredParties = useMemo(() => {
     const q = partySearch.trim().toLowerCase();
-    if (!q) return vendorParties;
-    return vendorParties.filter(p => (p.name || "").toLowerCase().includes(q));
-  }, [vendorParties, partySearch]);
+    if (!q) return selectableParties;
+    return selectableParties.filter((p) => (p.name || "").toLowerCase().includes(q));
+  }, [selectableParties, partySearch]);
 
-  const inHouseStatus = useMemo(() => {
-    if (mode === "edit") return editJob?.inHouseStatus || "In-House";
-    const raw = String(sourceOrderRow?.jobWork || "")
-      .toLowerCase()
-      .replace(/[\s-]/g, "");
-    if (raw === "outside") return "Outside";
-    if (raw === "inhouse") return "In-House";
-    return "Job Work";
-  }, [mode, editJob, sourceOrderRow]);
+  const manualSizes = useMemo(() => {
+    const bp = blueprints.find((b) => String(b.id) === String(manualBlueprintId));
+    return bp?.sizes || [];
+  }, [blueprints, manualBlueprintId]);
 
-  // Fetch job work data from API when editing by ID
+  // In Manual mode, selecting an item-master size fills the item context + editable 1-pc weight.
+  const selectManualSize = (size, bp) => {
+    setManualSizeId(String(size.id));
+    setItemContext((prev) => ({
+      ...prev,
+      sizeId: size.id,
+      itemName: bp?.itemName || "",
+      category: bp?.category?.name || "",
+      sizeLabel: [size.sizeInInch, size.sizeInMm ? `(${size.sizeInMm})` : null].filter(Boolean).join(" "),
+      pcsWeight: size.pcsWeight ?? null,
+      pcsPerBox: size.inventory?.pcsPerBox ?? null,
+      boxPerCarton: size.inventory?.boxPerCarton ?? null,
+    }));
+    setCalc((prev) => ({ ...prev, pcsWeight: size.pcsWeight != null ? String(size.pcsWeight) : "" }));
+  };
+
+  const buildChithiNo = () => {
+    const now = new Date();
+    const mm = String(now.getMonth() + 1).padStart(2, "0");
+    const yyyy = now.getFullYear();
+    const prefix = jobWorkType === "INHOUSE" ? "I/H" : "I/O";
+    return `${prefix} JWRK/01-${mm}-${yyyy}`;
+  };
+
+  const applySizeContext = (size) => ({
+    sizeId: size?.id ?? "",
+    itemName: size?.itemName || "",
+    category: size?.category || "",
+    sizeLabel: [size?.sizeInInch, size?.sizeInMm ? `(${size.sizeInMm})` : null].filter(Boolean).join(" "),
+    pcsWeight: size?.pcsWeight ?? null,
+    pcsPerBox: size?.pcsPerBox ?? null,
+    boxPerCarton: size?.boxPerCarton ?? null,
+    orderQtyPc: null,
+    orderStickerQty: null,
+  });
+
+  /**
+   * Resolve item/category/pcsWeight/packaging for a size directly from the item-master
+   * (blueprint + inventory) endpoints. Keeps the flow working even when the order-item's
+   * embedded size only carries {id, sizeInInch, sizeInMm}. Any field the size already
+   * carries wins, so an enriched backend response is left untouched.
+   */
+  const enrichSizeContext = async (size, finish) => {
+    const base = { ...applySizeContext(size), finish: finish || "" };
+    if (base.itemName && base.pcsWeight != null && base.pcsPerBox != null) return base;
+
+    try {
+      const bpRes = await itemBlueprintApi.getAllItems();
+      const blueprints = Array.isArray(bpRes.data) ? bpRes.data : bpRes.data?.data || [];
+      let matchedBp = null;
+      let matchedSize = null;
+      for (const bp of blueprints) {
+        const found = (bp.sizes || []).find(
+          (s) =>
+            (size?.id != null && Number(s.id) === Number(size.id)) ||
+            (s.sizeInInch === size?.sizeInInch && s.sizeInMm === size?.sizeInMm)
+        );
+        if (found) {
+          matchedBp = bp;
+          matchedSize = found;
+          break;
+        }
+      }
+      if (matchedBp) {
+        base.itemName = base.itemName || matchedBp.itemName || "";
+        base.category = base.category || matchedBp.category?.name || "";
+        base.pcsWeight = base.pcsWeight ?? matchedSize?.pcsWeight ?? null;
+
+        if (base.pcsPerBox == null || base.boxPerCarton == null) {
+          try {
+            const invRes = await inventoryApi.getAllInventory(
+              Number(matchedBp.id),
+              undefined,
+              size?.sizeInInch || matchedSize?.sizeInInch,
+              size?.sizeInMm || matchedSize?.sizeInMm
+            );
+            const invList = invRes.data?.data || invRes.data?.content || invRes.data || [];
+            const inv = Array.isArray(invList) ? invList[0] : invList;
+            if (inv) {
+              base.pcsPerBox = base.pcsPerBox ?? inv.pcsPerBox ?? null;
+              base.boxPerCarton = base.boxPerCarton ?? inv.boxPerCarton ?? null;
+            }
+          } catch {
+            // inventory optional — sticker/carton stay blank if unavailable
+          }
+        }
+      }
+    } catch {
+      // blueprint lookup optional — fall back to whatever the size embedded
+    }
+    return base;
+  };
+
+  // Load item + job-work context: either an existing job work (edit) or the source order item (create)
   useEffect(() => {
-    const buildChithiNo = () => {
-      const now = new Date();
-      const mm = String(now.getMonth() + 1).padStart(2, "0");
-      const yyyy = now.getFullYear();
-      const prefix = inHouseStatus === "Outside" ? "I/O" : "I/H";
-      return `${prefix} JWRK/01-${mm}-${yyyy}`;
+    let cancelled = false;
+
+    const loadForEdit = async () => {
+      setLoadingContext(true);
+      try {
+        const res = await jobWorkApi.getJobWorkById(Number(editOrderItemId), Number(editJobWorkId));
+        const jw = res.data;
+        if (cancelled) return;
+        setFormData({
+          ...EMPTY_FORM,
+          partyName: jw.party?.name || "",
+          partyId: jw.party?.id || "",
+          chithiNo: jw.chitthiNo || buildChithiNo(),
+          date: normalizeDateForInput(jw.jobDate),
+          time: jw.orderTime || getNow().time,
+        });
+        const editCtx = {
+          ...(await enrichSizeContext(jw.size, jw.finish)),
+          orderQtyPc: jw.qtyPc ?? null,
+          orderStickerQty: jw.stickerQty ?? null,
+        };
+        setItemContext(editCtx);
+        setCalc({
+          grossKg: jw.grossKg != null ? String(jw.grossKg) : "",
+          elementCount: jw.elementCount != null ? String(jw.elementCount) : "",
+          elementType: jw.elementType || "PETI",
+          petiWeightKg: jw.petiWeightKg != null ? String(jw.petiWeightKg) : "",
+          pcsWeight: editCtx.pcsWeight != null ? String(editCtx.pcsWeight) : "",
+          ratePerKg: jw.ratePerKg != null ? String(jw.ratePerKg) : "",
+        });
+        setExistingStatus(jw.status || "PENDING");
+        if (jw.jobWorkType === "INHOUSE") setJobWorkType("INHOUSE");
+        else if (jw.jobWorkType === "OUTSIDE") setJobWorkType("OUTSIDE");
+      } catch (err) {
+        if (!cancelled) setContextError(err?.response?.data?.message || "Failed to load job work data");
+      } finally {
+        if (!cancelled) setLoadingContext(false);
+      }
     };
 
-    if (mode === "edit" && editJobWorkId && editOrderItemId && !editJob) {
-      const fetchJobWork = async () => {
-        try {
-          const res = await jobWorkApi.getJobWorkById(Number(editOrderItemId), Number(editJobWorkId));
-          const jw = res.data;
-          const sizeLabel = [
-            jw.size?.sizeInInch,
-            jw.size?.sizeInMm ? `(${jw.size.sizeInMm})` : null,
-          ].filter(Boolean).join(" ");
-          const typeLabel = jw.elementType === "DRUM" ? "Wooden Peti" : "Peti";
-          setFormData({
-            ...EMPTY_FORM,
-            partyName: jw.party?.name || "",
-            partyId: jw.party?.id || "",
-            chithiNo: buildChithiNo(),
-            date: normalizeDateForInput(jw.jobDate),
-            sizeId: jw.size?.id || "",
-            stickerQty: jw.stickerQty != null ? String(jw.stickerQty) : "",
-          });
-          setItems([
-            createItemRow({
-              size: sizeLabel || "",
-              qtyPc: jw.qtyPc != null ? String(jw.qtyPc) : "",
-              qtyKg: jw.qtyKg != null ? String(jw.qtyKg) : "",
-              finish: jw.finish || "",
-              element: jw.elementCount != null ? String(jw.elementCount) : "",
-              elementType: typeLabel,
-              elementWeightGm: typeLabel === "Peti" ? "900" : "",
-            }),
-          ]);
-        } catch (err) {
-          toast.error(err?.response?.data?.message || "Failed to load job work data");
+    const loadForCreate = async () => {
+      if (!sourceOrderRow?.orderId || !sourceOrderRow?.partyId || !sourceOrderRow?.id) {
+        setContextError("Missing order context — open this page from an order item.");
+        return;
+      }
+      setLoadingContext(true);
+      try {
+        const res = await orderApi.getOrderById(Number(sourceOrderRow.partyId), Number(sourceOrderRow.orderId));
+        const order = res.data;
+        const orderItem = (order.orderItems || []).find((oi) => Number(oi.id) === Number(sourceOrderRow.id));
+        if (cancelled) return;
+        if (!orderItem) {
+          setContextError("Could not find this item on the order.");
+          return;
         }
-      };
-      fetchJobWork();
-      return;
+        // In-Side job work goes back to the order's own party — auto-select it. Out-Side is a
+        // separate vendor the user picks.
+        const isInside = jobWorkType === "INHOUSE";
+        const orderPartyName =
+          sourceOrderRow.partyName && sourceOrderRow.partyName !== "—" ? sourceOrderRow.partyName : "";
+        setFormData({
+          ...EMPTY_FORM,
+          partyName: isInside ? orderPartyName : "",
+          partyId: isInside ? sourceOrderRow.partyId || "" : "",
+          chithiNo: buildChithiNo(),
+          date: normalizeDateForInput(sourceOrderRow.date) || getNow().date,
+          time: getNow().time,
+        });
+        const createCtx = {
+          ...(await enrichSizeContext(orderItem.itemSize, orderItem.plating)),
+          orderQtyPc: orderItem.qtyPc ?? null,
+          orderStickerQty: orderItem.stickerQty ?? null,
+        };
+        setItemContext(createCtx);
+        setCalc((prev) => ({
+          ...prev,
+          pcsWeight: createCtx.pcsWeight != null ? String(createCtx.pcsWeight) : "",
+        }));
+        setExistingStatus("PENDING");
+      } catch (err) {
+        if (!cancelled) setContextError(err?.response?.data?.message || "Failed to load order item data");
+      } finally {
+        if (!cancelled) setLoadingContext(false);
+      }
+    };
+
+    if (manualMode) {
+      // Manual job work is not tied to an order — start blank, user enters everything.
+      setFormData({ ...EMPTY_FORM, chithiNo: buildChithiNo(), ...getNow() });
+    } else if (mode === "edit" && editJobWorkId && editOrderItemId) {
+      loadForEdit();
+    } else if (mode === "create") {
+      loadForCreate();
     }
 
-    if (mode === "edit" && editJob) {
-      const elementParts = extractElementParts(editJob.itemElementInput || editJob.itemElement);
-      const normalizedType = ELEMENT_TYPE_OPTIONS.includes(editJob.elementType)
-        ? editJob.elementType
-        : elementParts.elementType;
-      setFormData({
-        ...EMPTY_FORM,
-        partyName: editJob.partyName || "",
-        chithiNo: buildChithiNo(),
-        date: normalizeDateForInput(editJob.date),
-        stickerQty: editJob.stickerQty || "",
-      });
-      setItems([
-        createItemRow({
-          size: editJob.itemSize || "",
-          qtyPc: editJob.qtyPcInput || "",
-          qtyKg:
-            editJob.qtyKgInput ||
-            String(editJob.itemKg || "")
-              .replace(/kg/i, "")
-              .trim(),
-          finish: editJob.finish || "",
-          element: editJob.itemElementInput || elementParts.element,
-          elementType: normalizedType,
-          elementWeightGm: normalizedType === "Peti" ? "900" : "",
-        }),
-      ]);
-      return;
-    }
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mode, editJobWorkId, editOrderItemId, sourceOrderRow?.id, manualMode]);
 
-    if (sourceOrderRow) {
-      setFormData({
-        ...EMPTY_FORM,
-        partyName: sourceOrderRow.partyName || "",
-        partyId: sourceOrderRow.partyId || "",
-        chithiNo: buildChithiNo(),
-        date: normalizeDateForInput(sourceOrderRow.date),
-        sizeId: sourceOrderRow.sizeId || "",
-        stickerQty: sourceOrderRow.stickerQty === "—" ? "" : String(sourceOrderRow.stickerQty ?? ""),
-      });
-      setItems([
-        createItemRow({
-          size: sourceOrderRow.size || "",
-          qtyPc: sourceOrderRow.qtyPc === "—" ? "" : String(sourceOrderRow.qtyPc ?? ""),
-          qtyKg:
-            sourceOrderRow.qtyKg === "—"
-              ? ""
-              : String(sourceOrderRow.qtyKg ?? "")
-                  .replace(/kg/i, "")
-                  .trim(),
-          finish: sourceOrderRow.plating || "",
-          element: "",
-          elementType: "Peti",
-          elementWeightGm: "900",
-        }),
-      ]);
-      return;
-    }
+  // keep chithiNo's prefix in sync with the chosen job work type while creating
+  useEffect(() => {
+    if (mode !== "create") return;
+    setFormData((prev) => ({ ...prev, chithiNo: buildChithiNo() }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [jobWorkType, mode]);
 
-    setFormData((prev) => ({ ...EMPTY_FORM, chithiNo: prev.chithiNo || buildChithiNo() }));
-    setItems([createItemRow()]);
-  }, [mode, editJob, sourceOrderRow, editJobWorkId, editOrderItemId, inHouseStatus]);
-  const handleChange = (key, value) => {
-    setFormData((prev) => ({ ...prev, [key]: value }));
+  const derived = useMemo(() => computeDerived(calc, itemContext), [calc, itemContext]);
+
+  const handleChange = (key, value) => setFormData((prev) => ({ ...prev, [key]: value }));
+
+  // Switch the mode pill. Leaving/entering Manual resets the item + party context so the two
+  // flows never leak stale data into each other.
+  const switchMode = (next) => {
+    if (next === jobWorkType) return;
+    setJobWorkType(next);
+    if (next === "MANUAL") {
+      setItemContext(EMPTY_ITEM_CONTEXT);
+      setManualBlueprintId("");
+      setManualSizeId("");
+      setFormData((prev) => ({ ...prev, partyName: "", partyId: "" }));
+      setCalc((prev) => ({ ...prev, pcsWeight: "" }));
+    } else if (next === "INHOUSE" && sourceOrderRow) {
+      const orderPartyName =
+        sourceOrderRow.partyName && sourceOrderRow.partyName !== "—" ? sourceOrderRow.partyName : "";
+      setFormData((prev) => ({ ...prev, partyName: orderPartyName, partyId: sourceOrderRow.partyId || "" }));
+    } else if (next === "OUTSIDE") {
+      setFormData((prev) => ({ ...prev, partyName: "", partyId: "" }));
+    }
   };
 
   const handleSave = async () => {
-    const now = new Date();
-    const timeLabel = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
-    const primaryItem = items[0] || createItemRow();
-    const qtyKgRaw = String(primaryItem.qtyKg || "").trim();
-    const qtyKgLabel = qtyKgRaw ? `${qtyKgRaw}Kg` : "—";
-    const normalizedDate = normalizeDateForCard(formData.date);
-    const elementText =
-      primaryItem.element && primaryItem.elementType
-        ? `${primaryItem.element}${primaryItem.elementType === "Peti" ? "P" : ""}`
-        : "—";
-
-    // Try to save via API if we have the required IDs
-    const orderItemId = sourceOrderRow?.id || editOrderItemId || editJob?.sourceItemId;
-    const partyId = formData.partyId || sourceOrderRow?.partyId;
-    if (!partyId) { toast.error("Please select a party"); return; }
-    const sizeId = formData.sizeId || sourceOrderRow?.sizeId;
-    const orderId = sourceOrderRow?.orderId || editJob?.sourceOrderId || null;
-    const syncOrderRow = () => {
-      if (!orderItemId) return;
-      const overridePatch = {
-        jobWork: inHouseStatus,
-        platingStatus: true,
-      };
-      if (sourceOrderRow?.jobWorkNo !== undefined && sourceOrderRow?.jobWorkNo !== "—") {
-        overridePatch.jobWorkNo = sourceOrderRow.jobWorkNo;
-      }
-      upsertOrderJobOverride({
-        orderItemId: Number(orderItemId),
-        orderId,
-        ...overridePatch,
-      });
-    };
-
-    if (orderItemId && partyId && sizeId) {
-      setSaving(true);
-      try {
-        const jobWorkPayload = {
-          partyId: Number(partyId),
-          sizeId: Number(sizeId),
-          jobDate: formData.date || new Date().toISOString().slice(0, 10),
-          qtyPc: parseFloat(primaryItem.qtyPc) || 0,
-          qtyKg: qtyKgRaw ? parseFloat(qtyKgRaw) : undefined,
-          finish: primaryItem.finish || undefined,
-          elementCount: primaryItem.element ? parseFloat(primaryItem.element) : undefined,
-          elementType: primaryItem.elementType === "Peti" ? "PETI" : "DRUM",
-          stickerQty: formData.stickerQty ? parseFloat(formData.stickerQty) : undefined,
-          status: "PENDING",
-          jobWorkType: inHouseStatus === "Outside" ? "OUTSIDE" : inHouseStatus === "In-House" ? "INHOUSE" : "JOB_WORK",
-        };
-
-        if (mode === "edit" && (editJob?.apiId || editJobWorkId)) {
-          const jwId = editJobWorkId || editJob.apiId;
-          await jobWorkApi.updateJobWork(orderItemId, jwId, jobWorkPayload);
-          toast.success("Job work updated!");
-        } else {
-          await jobWorkApi.createJobWork(orderItemId, jobWorkPayload);
-          toast.success("Job work created!");
-        }
-        syncOrderRow();
-        navigate("/job-work", { state: sourceOrderRow ? { orderRow: sourceOrderRow } : undefined });
-        return;
-      } catch (err) {
-        toast.error(err?.response?.data?.message || "API save failed, saving locally");
-      } finally {
-        setSaving(false);
-      }
+    if (!formData.partyId) {
+      toast.error("Please select a job worker / party");
+      return;
     }
-
-    // Fallback to local navigation-based save
-    if (mode === "edit" && editJob?.id) {
-      const updatedJob = {
-        ...editJob,
-        partyName: formData.partyName,
-        date: normalizedDate || editJob.date,
-        jobDate: normalizedDate || editJob.jobDate || editJob.date,
-        itemSize: primaryItem.size,
-        qtyPcInput: String(primaryItem.qtyPc || ""),
-        qtyKgInput: qtyKgRaw,
-        itemKg: qtyKgLabel,
-        finish: primaryItem.finish,
-        itemElementInput: String(primaryItem.element || ""),
-        elementType: primaryItem.elementType,
-        elementWeightGm: primaryItem.elementWeightGm,
-        itemElement: elementText,
-        stickerQty: String(formData.stickerQty || ""),
-        inHouseStatus,
-        sourceOrderId: editJob.sourceOrderId ?? null,
-        sourceItemId: editJob.sourceItemId ?? null,
-      };
-      syncOrderRow();
-      navigate("/job-work", {
-        state: { savedJobWork: { mode: "edit", job: updatedJob } },
-      });
+    if (!itemContext.sizeId) {
+      toast.error("Missing item context — reopen this page from the order.");
+      return;
+    }
+    if (!calc.grossKg || parseFloat(calc.grossKg) <= 0) {
+      toast.error("Enter the gross weight (Kg) that was weighed");
       return;
     }
 
-    const newJob = {
-      id: Date.now(),
-      sourceOrderId: sourceOrderRow?.orderId ?? sourceOrderRow?.id ?? null,
-      sourceItemId: sourceOrderRow?.id ?? null,
-      jobId: `Job ID - ${String(Math.floor(Math.random() * 1000)).padStart(3, "0")}`,
-      partyName: formData.partyName,
-      finish: primaryItem.finish || "—",
-      stickerQty: String(formData.stickerQty || "0"),
-      date:
-        normalizedDate ||
-        normalizeDateForCard(new Date().toISOString().slice(0, 10)),
-      jobDate:
-        normalizedDate ||
-        normalizeDateForCard(new Date().toISOString().slice(0, 10)),
-      time: timeLabel,
-      itemSize: primaryItem.size || "—",
-      itemElementInput: String(primaryItem.element || ""),
-      elementType: primaryItem.elementType || "Peti",
-      elementWeightGm: primaryItem.elementWeightGm,
-      itemElement: elementText,
-      qtyPcInput: String(primaryItem.qtyPc || ""),
-      qtyKgInput: qtyKgRaw,
-      itemKg: qtyKgLabel,
-      returnElement: "—",
-      returnKg: "—",
-      ghati: "—",
-      returnKgInput: "",
-      ghatiInput: "",
-      returnElementInput: "",
-      returnType: "Peti",
-      status: "Completed",
-      completionStatus: "Pending",
-      inHouseStatus,
+    const orderItemId = editOrderItemId || sourceOrderRow?.id;
+    const payload = {
+      partyId: Number(formData.partyId),
+      sizeId: Number(itemContext.sizeId),
+      jobDate: formData.date || getNow().date,
+      finish: itemContext.finish || undefined,
+      grossKg: parseFloat(calc.grossKg),
+      qtyPc: derived.totalPcs ?? undefined,
+      qtyKg: derived.netKg ?? undefined,
+      pcsWeight: calc.pcsWeight ? parseFloat(calc.pcsWeight) : undefined,
+      elementCount: calc.elementCount ? parseFloat(calc.elementCount) : undefined,
+      elementType: calc.elementType,
+      petiWeightKg: calc.petiWeightKg ? parseFloat(calc.petiWeightKg) : undefined,
+      ratePerKg: calc.ratePerKg ? parseFloat(calc.ratePerKg) : undefined,
+      status: existingStatus,
+      jobWorkType,
+      chitthiNo: formData.chithiNo || undefined,
+      chitthiDate: formData.date || undefined,
+      orderTime: formData.time || undefined,
     };
-    syncOrderRow();
-    navigate("/job-work", {
-      state: { savedJobWork: { mode: "create", job: newJob } },
-    });
+
+    setSaving(true);
+    try {
+      if (isManual && mode !== "edit") {
+        // Manual job work is not tied to an order item — dedicated endpoint.
+        await axiosInstance.post("/api/v1/job-works/manual", payload);
+        toast.success("Manual job work created!");
+      } else if (mode === "edit") {
+        await jobWorkApi.updateJobWork(orderItemId, editJobWorkId, payload);
+        toast.success("Job work updated!");
+      } else {
+        await jobWorkApi.createJobWork(orderItemId, payload);
+        toast.success("Job work created!");
+      }
+
+      if (orderItemId && !isManual) {
+        upsertOrderJobOverride({
+          orderItemId: Number(orderItemId),
+          orderId: sourceOrderRow?.orderId ?? null,
+          jobWork: jobWorkTypeLabel,
+          platingStatus: true,
+        });
+      }
+
+      navigate("/job-work", { state: sourceOrderRow ? { orderRow: sourceOrderRow } : undefined });
+    } catch (err) {
+      toast.error(err?.response?.data?.message || "Failed to save job work");
+    } finally {
+      setSaving(false);
+    }
   };
+
+  if (contextError) {
+    return (
+      <SidebarLayout>
+        <div className="mx-auto max-w-2xl mt-10 bg-white border border-gray-200 rounded-lg p-8 text-center">
+          <p className="text-gray-700">{contextError}</p>
+          <button
+            type="button"
+            onClick={() => navigate("/order")}
+            className="mt-4 px-6 py-2 bg-gray-800 text-white rounded-lg text-sm hover:bg-gray-700 transition"
+          >
+            Back to Orders
+          </button>
+        </div>
+      </SidebarLayout>
+    );
+  }
+
+  const ModeIcon = (JOB_MODES.find((m) => m.value === jobWorkType) || JOB_MODES[0]).icon;
+  const LBL = "block text-sm font-medium text-gray-700 mb-1.5";
+  const INP =
+    "w-full px-3.5 py-2.5 border border-gray-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-gray-900/10 focus:border-gray-400 outline-none placeholder:text-gray-400";
+  const RO = "w-full px-3.5 py-2.5 border border-gray-200 rounded-lg bg-gray-50 text-gray-700 text-sm";
+  const backTo = sourceOrderRow ? "/order" : "/job-work";
+
+  const selectedBlueprint = blueprints.find((b) => String(b.id) === String(manualBlueprintId));
 
   return (
     <SidebarLayout>
-      <div className="mx-auto">
-        <div className="mb-6">
-          <PageHeader
-            title={mode === "edit" ? "Edit Job Work" : "Move to Job Work"}
-            description="Fill the job work details to create or update the record."
-            action={
-              <button
-                type="button"
-                onClick={() => navigate("/order")}
-                className="inline-flex items-center justify-center w-9 h-9 rounded-full border border-gray-300 text-gray-600 hover:text-gray-900 hover:border-gray-400 hover:bg-gray-50 transition"
-                aria-label="Close and go back to job work list"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            }
-          />
+      <div className="max-w-6xl mx-auto pb-12">
+        {/* Top bar */}
+        <div className="flex items-center justify-between mb-5">
+          <button
+            type="button"
+            onClick={() => navigate(backTo)}
+            className="inline-flex items-center gap-1.5 text-sm text-gray-600 hover:text-black transition"
+          >
+            <ChevronLeft className="w-4 h-4" /> Back
+          </button>
+          <button
+            type="button"
+            onClick={() => navigate(backTo)}
+            className="inline-flex items-center justify-center w-9 h-9 rounded-full border border-gray-200 text-gray-500 hover:text-gray-900 hover:bg-gray-50 transition"
+            aria-label="Close"
+          >
+            <X className="w-4 h-4" />
+          </button>
         </div>
 
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            handleSave();
-          }}
-          className="mb-8"
-        >
-          <div className="bg-white rounded-lg border border-gray-200 p-4 md:p-5">
-            <h3 className="text-2xl font-medium text-black mb-5">{mode === "edit" ? "Edit Job Work" : "Move to Job Work"}</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="relative" ref={partyRef}>
-                <label className="block text-md font-medium text-black mb-2">Job Worker name*</label>
-                <div
-                  className="w-full border border-gray-300 rounded-md px-3 py-2.5 text-md focus:outline-none focus:ring-1 focus:ring-gray-400 bg-white cursor-pointer flex items-center justify-between"
-                  onClick={() => setIsPartyOpen((prev) => !prev)}
-                >
-                  <span className={formData.partyName ? "text-black text-md" : "text-md text-gray-500"}>
-                    {formData.partyName || "Select Party"}
-                  </span>
-                  <ChevronDown className={`w-4 h-4 text-gray-500 transition-transform ${isPartyOpen ? "rotate-180" : ""}`} />
+        <div className="mb-6">
+          <h1 className="text-3xl font-semibold text-gray-900">
+            {mode === "edit" ? "Edit Job Work" : "New Job Work"}
+          </h1>
+          <p className="text-sm text-gray-500 mt-1">
+            Weigh the shipment once, enter Peti &amp; rate — pieces, stickers, cartons and the total are worked out for you.
+          </p>
+        </div>
+
+        {/* Mode selector */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
+          {JOB_MODES.map((m) => {
+            const Icon = m.icon;
+            const active = jobWorkType === m.value;
+            const disabled = mode === "edit";
+            return (
+              <button
+                key={m.value}
+                type="button"
+                disabled={disabled}
+                onClick={() => switchMode(m.value)}
+                className={`rounded-xl border p-3.5 text-left transition flex items-center gap-3 ${
+                  active
+                    ? "border-gray-900 bg-gray-900 text-white shadow-sm"
+                    : "border-gray-200 bg-white text-gray-700 hover:border-gray-400"
+                } ${disabled ? "opacity-60 cursor-not-allowed" : ""}`}
+              >
+                <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${active ? "bg-white/15" : "bg-gray-100"}`}>
+                  <Icon className={`w-4 h-4 ${active ? "text-white" : "text-gray-600"}`} />
+                </span>
+                <span className="flex flex-col">
+                  <span className="text-sm font-semibold">{m.label}</span>
+                  <span className={`text-xs ${active ? "text-white/70" : "text-gray-400"}`}>{m.hint}</span>
+                </span>
+              </button>
+            );
+          })}
+        </div>
+
+        <form onSubmit={(e) => { e.preventDefault(); handleSave(); }}>
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* LEFT — inputs */}
+            <div className="lg:col-span-2 space-y-5">
+              {/* Party & Reference */}
+              <div className="bg-white rounded-2xl border border-gray-200 p-5 shadow-sm">
+                <div className="flex items-center gap-2 mb-4">
+                  <ModeIcon className="w-4 h-4 text-gray-500" />
+                  <h3 className="text-base font-semibold text-gray-900">{jobWorkTypeLabel} — Party &amp; Reference</h3>
                 </div>
-                {isPartyOpen && (
-                  <div className="absolute z-20 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden">
-                    <div className="px-3 py-2 border-b border-gray-100">
-                      <input
-                        type="text"
-                        value={partySearch}
-                        onChange={(e) => setPartySearch(e.target.value)}
-                        placeholder="Search party..."
-                        className="w-full border border-gray-300 rounded-md px-3 py-2.5 text-md focus:outline-none focus:ring-1 focus:ring-gray-400"
-                        onClick={(e) => e.stopPropagation()}
-                        autoFocus
-                      />
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {jobWorkType === "INHOUSE" ? (
+                    <div>
+                      <label className={LBL}>Party Name</label>
+                      <input value={formData.partyName || "—"} readOnly className={RO} />
+                      <p className="text-xs text-gray-400 mt-1">Auto-fetched from the order</p>
                     </div>
-                    <div className="max-h-48 overflow-y-auto">
-                      {filteredParties.length === 0 ? (
-                        <p className="px-4 py-2 text-sm text-gray-400">No parties found</p>
-                      ) : (
-                        filteredParties.map((p) => (
-                          <button
-                            key={p.id}
-                            type="button"
-                            onClick={() => {
-                              setFormData((prev) => ({ ...prev, partyName: p.name, partyId: p.id }));
-                              setIsPartyOpen(false);
-                              setPartySearch("");
-                            }}
-                            className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-100 ${formData.partyId === p.id ? "font-semibold bg-gray-50" : ""}`}
-                          >
-                            {p.name}
-                          </button>
-                        ))
+                  ) : (
+                    <div className="relative" ref={partyRef}>
+                      <label className={LBL}>{isManual ? "Party Name*" : "Job Worker name*"}</label>
+                      <div
+                        className={`${INP} cursor-pointer flex items-center justify-between`}
+                        onClick={() => setIsPartyOpen((prev) => !prev)}
+                      >
+                        <span className={formData.partyName ? "text-gray-900" : "text-gray-400"}>
+                          {formData.partyName || "Select party"}
+                        </span>
+                        <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${isPartyOpen ? "rotate-180" : ""}`} />
+                      </div>
+                      {isPartyOpen && (
+                        <div className="absolute z-20 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden">
+                          <div className="px-3 py-2 border-b border-gray-100">
+                            <input
+                              type="text"
+                              value={partySearch}
+                              onChange={(e) => setPartySearch(e.target.value)}
+                              placeholder="Search party..."
+                              className={INP}
+                              onClick={(e) => e.stopPropagation()}
+                              autoFocus
+                            />
+                          </div>
+                          <div className="max-h-48 overflow-y-auto">
+                            {filteredParties.length === 0 ? (
+                              <p className="px-4 py-2 text-sm text-gray-400">No parties found</p>
+                            ) : (
+                              filteredParties.map((p) => (
+                                <button
+                                  key={p.id}
+                                  type="button"
+                                  onClick={() => {
+                                    setFormData((prev) => ({ ...prev, partyName: p.name, partyId: p.id }));
+                                    setIsPartyOpen(false);
+                                    setPartySearch("");
+                                  }}
+                                  className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-100 ${formData.partyId === p.id ? "font-semibold bg-gray-50" : ""}`}
+                                >
+                                  {p.name}
+                                </button>
+                              ))
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  <div>
+                    <label className={LBL}>Chithi No.</label>
+                    <input value={formData.chithiNo} readOnly className={RO} />
+                  </div>
+                  <div>
+                    <label className={LBL}>Chithi Date</label>
+                    <input type="date" value={formData.date} onChange={(e) => handleChange("date", e.target.value)} className={INP} />
+                  </div>
+                  <div>
+                    <label className={LBL}>Time</label>
+                    <input type="time" value={formData.time} onChange={(e) => handleChange("time", e.target.value)} className={INP} />
+                  </div>
+                </div>
+              </div>
+
+              {/* Item */}
+              <div className="bg-white rounded-2xl border border-gray-200 p-5 shadow-sm">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-2">
+                    <Package className="w-4 h-4 text-gray-500" />
+                    <h3 className="text-base font-semibold text-gray-900">Item Details</h3>
+                  </div>
+                  <span className="text-xs text-gray-400">
+                    {itemEditable ? "Pick from the item master" : loadingContext ? "Loading…" : "Fetched from the order"}
+                  </span>
+                </div>
+
+                {itemEditable ? (
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    {/* Item picker */}
+                    <div className="relative">
+                      <label className={LBL}>Item*</label>
+                      <button type="button" onClick={() => setOpenManualItem((v) => !v)} className={`${INP} flex items-center justify-between`}>
+                        <span className={itemContext.itemName ? "text-gray-900" : "text-gray-400"}>{itemContext.itemName || "Select item"}</span>
+                        <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${openManualItem ? "rotate-180" : ""}`} />
+                      </button>
+                      {openManualItem && (
+                        <div className="absolute z-20 mt-1 w-full max-h-52 overflow-y-auto bg-white border border-gray-200 rounded-lg shadow-lg">
+                          {blueprints.length === 0 ? (
+                            <p className="px-4 py-2 text-sm text-gray-400">No items</p>
+                          ) : (
+                            blueprints.map((bp) => (
+                              <button
+                                key={bp.id}
+                                type="button"
+                                onClick={() => {
+                                  setManualBlueprintId(String(bp.id));
+                                  setManualSizeId("");
+                                  setItemContext((prev) => ({ ...prev, sizeId: "", itemName: bp.itemName || "", category: bp.category?.name || "", sizeLabel: "", pcsWeight: null, pcsPerBox: null, boxPerCarton: null }));
+                                  setCalc((prev) => ({ ...prev, pcsWeight: "" }));
+                                  setOpenManualItem(false);
+                                }}
+                                className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-100 ${String(bp.id) === String(manualBlueprintId) ? "font-semibold bg-gray-50" : ""}`}
+                              >
+                                {bp.itemName || `Item #${bp.id}`}
+                                {bp.category?.name ? <span className="text-gray-400"> · {bp.category.name}</span> : null}
+                              </button>
+                            ))
+                          )}
+                        </div>
+                      )}
+                    </div>
+                    {/* Size picker */}
+                    <div className="relative">
+                      <label className={LBL}>Size*</label>
+                      <button
+                        type="button"
+                        disabled={!manualBlueprintId}
+                        onClick={() => setOpenManualSize((v) => !v)}
+                        className={`${INP} flex items-center justify-between ${!manualBlueprintId ? "opacity-60 cursor-not-allowed" : ""}`}
+                      >
+                        <span className={itemContext.sizeLabel ? "text-gray-900" : "text-gray-400"}>{itemContext.sizeLabel || "Select size"}</span>
+                        <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${openManualSize ? "rotate-180" : ""}`} />
+                      </button>
+                      {openManualSize && manualBlueprintId && (
+                        <div className="absolute z-20 mt-1 w-full max-h-52 overflow-y-auto bg-white border border-gray-200 rounded-lg shadow-lg">
+                          {manualSizes.length === 0 ? (
+                            <p className="px-4 py-2 text-sm text-gray-400">No sizes</p>
+                          ) : (
+                            manualSizes.map((s) => (
+                              <button
+                                key={s.id}
+                                type="button"
+                                onClick={() => { selectManualSize(s, selectedBlueprint); setOpenManualSize(false); }}
+                                className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-100 ${String(s.id) === String(manualSizeId) ? "font-semibold bg-gray-50" : ""}`}
+                              >
+                                {[s.sizeInInch, s.sizeInMm ? `(${s.sizeInMm})` : null].filter(Boolean).join(" ")}
+                              </button>
+                            ))
+                          )}
+                        </div>
+                      )}
+                    </div>
+                    {/* Finish picker */}
+                    <div className="relative">
+                      <label className={LBL}>Finish*</label>
+                      <button type="button" onClick={() => setOpenFinish((v) => !v)} className={`${INP} flex items-center justify-between`}>
+                        <span className={itemContext.finish ? "text-gray-900" : "text-gray-400"}>{itemContext.finish || "Select finish"}</span>
+                        <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${openFinish ? "rotate-180" : ""}`} />
+                      </button>
+                      {openFinish && (
+                        <div className="absolute z-20 mt-1 w-full max-h-52 overflow-y-auto bg-white border border-gray-200 rounded-lg shadow-lg">
+                          {FINISH_LABELS.map((f) => (
+                            <button
+                              key={f}
+                              type="button"
+                              onClick={() => { setItemContext((prev) => ({ ...prev, finish: f })); setOpenFinish(false); }}
+                              className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-100 ${itemContext.finish === f ? "font-semibold bg-gray-50" : ""}`}
+                            >
+                              {f}
+                            </button>
+                          ))}
+                        </div>
                       )}
                     </div>
                   </div>
-                )}
-              </div>
-              <div>
-                <label className="block text-md font-medium text-black mb-2">Chithi No.</label>
-                <input
-                  value={formData.chithiNo}
-                  readOnly
-                  className="w-full border border-gray-200 bg-gray-50 rounded-md px-3 py-2.5 text-md text-gray-600 cursor-default"
-                />
-              </div>
-              <div>
-                <label className="block text-md font-medium text-black mb-2">Chithi Date</label>
-                <input
-                  type="date"
-                  value={formData.date}
-                  onChange={(e) => handleChange("date", e.target.value)}
-                  className="w-full border border-gray-300 rounded-md px-3 py-2.5 text-md focus:outline-none focus:ring-1 focus:ring-gray-400"
-                />
-              </div>
-              <div>
-                <label className="block text-md font-medium text-black mb-2">Time</label>
-                <input
-                  type="time"
-                  value={formData.time}
-                  onChange={(e) => handleChange("time", e.target.value)}
-                  className="w-full border border-gray-300 rounded-md px-3 py-2.5 text-md focus:outline-none focus:ring-1 focus:ring-gray-400"
-                />
-              </div>
-            </div>
-          </div>
-
-          <div className="mt-4 bg-white rounded-lg border border-gray-200 p-4 md:p-5">
-            <div className="flex items-center justify-between mb-4">
-              <h4 className="text-2xl font-medium text-black mb-5">Add Items</h4>
-              <button
-                type="button"
-                onClick={addItem}
-                className="px-6 py-2 bg-gray-800 text-white rounded-lg text-sm hover:bg-gray-700 transition"
-              >
-                Add Item
-              </button>
-            </div>
-            {items.map((item, index) => (
-              <div key={index} className={`${index > 0 ? "pt-4 mt-4 border-t border-gray-200" : ""}`}>
-                <div className="flex items-center justify-between mb-3">
-                  <h3 className="text-md font-medium text-black">Item {index + 1}</h3>
-                  <button
-                    type="button"
-                    onClick={() => removeItem(index)}
-                    disabled={items.length === 1}
-                    className="text-red-500 hover:text-red-600 disabled:text-gray-300 disabled:cursor-not-allowed"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
-                </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div>
-                    <label className={FORM_LABEL_CLASS}>Item</label>
-                    <input
-                      value={item.itemName}
-                      onChange={(e) => updateItem(index, { itemName: e.target.value })}
-                      className={FORM_INPUT_CLASS}
-                      placeholder="Enter Item"
-                    />
-                  </div>
-                  <div>
-                    <label className={FORM_LABEL_CLASS}>Size</label>
-                    <input
-                      value={item.size}
-                      onChange={(e) => updateItem(index, { size: e.target.value })}
-                      className={FORM_INPUT_CLASS}
-                      placeholder="Enter Size"
-                    />
-                  </div>
-                  <div>
-                    <label className={FORM_LABEL_CLASS}>Finish</label>
-                    <input
-                      value={item.finish}
-                      onChange={(e) => updateItem(index, { finish: e.target.value })}
-                      className={FORM_INPUT_CLASS}
-                      placeholder="PVD Gold"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
-                  <div>
-                    <label className={FORM_LABEL_CLASS}>Unit Kgs.</label>
-                    <div className="grid grid-cols-2 gap-2">
-                      <input
-                        value={item.qtyPc}
-                        onChange={(e) => updateItemWithAutoCalc(index, { qtyPc: e.target.value })}
-                        className={FORM_INPUT_CLASS}
-                        placeholder="100"
-                      />
-                      <div className="w-full h-10 px-3 border border-gray-200 rounded-lg bg-gray-50 text-sm text-gray-600 flex items-center cursor-not-allowed">
-                        Kgs
+                ) : (
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    {[
+                      ["Item", itemContext.itemName],
+                      ["Category", itemContext.category],
+                      ["Size", itemContext.sizeLabel],
+                      ["Finish", itemContext.finish],
+                    ].map(([k, v]) => (
+                      <div key={k}>
+                        <label className={LBL}>{k}</label>
+                        <input value={v || "—"} readOnly className={RO} />
                       </div>
-                    </div>
+                    ))}
+                  </div>
+                )}
+                <div className="mt-4">
+                  <label className={LBL}>Pcs / Box · Box / Carton</label>
+                  <input value={`${itemContext.pcsPerBox ?? "—"} / ${itemContext.boxPerCarton ?? "—"}`} readOnly className={`${RO} md:max-w-xs`} />
+                </div>
+              </div>
+
+              {/* Weighing */}
+              <div className="bg-white rounded-2xl border border-gray-200 p-5 shadow-sm">
+                <div className="flex items-center gap-2 mb-1">
+                  <Scale className="w-4 h-4 text-gray-500" />
+                  <h3 className="text-base font-semibold text-gray-900">Weighing, Peti &amp; Rate</h3>
+                </div>
+                <p className="text-xs text-gray-400 mb-4">Net Kg = Gross − Peti × tare. Total Pcs = Net ÷ 1-pc weight.</p>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <label className={LBL}>Gross Kg (weighed)*</label>
+                    <input type="number" step="0.001" value={calc.grossKg} onChange={(e) => updateCalc({ grossKg: e.target.value })} className={INP} placeholder="150.150" />
                   </div>
                   <div>
-                    <label className={FORM_LABEL_CLASS}>Element</label>
-                    <div className="grid grid-cols-3 gap-2">
-                      <input
-                        value={item.element}
-                        onChange={(e) => updateItemWithAutoCalc(index, { element: e.target.value })}
-                        className={FORM_INPUT_CLASS}
-                        placeholder="02"
-                      />
+                    <label className={LBL}>Peti Count</label>
+                    <div className="grid grid-cols-2 gap-2">
+                      <input type="number" step="1" value={calc.elementCount} onChange={(e) => updateCalc({ elementCount: e.target.value })} className={INP} placeholder="5" />
                       <div className="relative">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setOpenElementTypeIndex((prev) => (prev === index ? null : index));
-                          }}
-                            className={FORM_SELECT_CLASS}
-                        >
-                          <span className="truncate">{item.elementType}</span>
-                          <ChevronDown className={`w-4 h-4 transition-transform ${openElementTypeIndex === index ? "rotate-180" : ""}`} />
+                        <button type="button" onClick={() => setOpenElementType((prev) => !prev)} className={`${INP} flex items-center justify-between`}>
+                          <span>{ELEMENT_TYPE_LABEL[calc.elementType]}</span>
+                          <ChevronDown className={`w-4 h-4 transition-transform ${openElementType ? "rotate-180" : ""}`} />
                         </button>
-                        {openElementTypeIndex === index && (
-                          <div className="absolute z-10 mt-1 w-40 rounded-md border border-gray-200 bg-white overflow-hidden shadow">
-                            {ELEMENT_TYPE_OPTIONS.map((option) => (
-                              <button
-                                key={option}
-                                type="button"
-                                onClick={() => {
-                                  updateItemWithAutoCalc(index, { elementType: option, elementWeightGm: option === "Peti" ? "900" : "" });
-                                  setOpenElementTypeIndex(null);
-                                }}
-                                className="w-full px-3 py-2.5 text-left text-sm hover:bg-gray-100"
-                              >
-                                {option}
+                        {openElementType && (
+                          <div className="absolute z-10 mt-1 w-full rounded-lg border border-gray-200 bg-white overflow-hidden shadow">
+                            {ELEMENT_TYPE_OPTIONS.map((opt) => (
+                              <button key={opt} type="button" onClick={() => { updateCalc({ elementType: opt }); setOpenElementType(false); }} className="w-full px-3 py-2 text-left text-sm hover:bg-gray-100">
+                                {ELEMENT_TYPE_LABEL[opt]}
                               </button>
                             ))}
                           </div>
                         )}
                       </div>
-                      <input
-                        value={item.elementWeightGm}
-                        onChange={(e) => updateItemWithAutoCalc(index, { elementWeightGm: e.target.value })}
-                        className={FORM_INPUT_CLASS}
-                        placeholder={item.elementType === "Peti" ? "900" : "Enter gm"}
-                      />
                     </div>
                   </div>
                   <div>
-                    <label className={FORM_LABEL_CLASS}>Net Weight</label>
-                    <input
-                      value={item.qtyKg}
-                      readOnly
-                      className="w-full px-4 py-2 border border-gray-200 rounded-lg bg-gray-50 text-gray-700 outline-none placeholder:text-sm placeholder:text-gray-400 cursor-not-allowed"
-                      placeholder="Auto calculated"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
-                  <div>
-                    <label className={FORM_LABEL_CLASS}>Process</label>
-                    <div className="flex items-center gap-6 text-sm text-gray-700">
-                      <label className="inline-flex items-center gap-2">
-                        <span>Emrey</span>
-                        <input
-                          type="checkbox"
-                          checked={item.processEmery}
-                          onChange={(e) => updateItem(index, { processEmery: e.target.checked })}
-                        />
-                      </label>
-                      <label className="inline-flex items-center gap-2">
-                        <span>Sartin</span>
-                        <input
-                          type="checkbox"
-                          checked={item.processSartin}
-                          onChange={(e) => updateItem(index, { processSartin: e.target.checked })}
-                        />
-                      </label>
-                    </div>
+                    <label className={LBL}>1 Peti Weight (Kg)</label>
+                    <input type="number" step="0.001" value={calc.petiWeightKg} onChange={(e) => updateCalc({ petiWeightKg: e.target.value })} className={INP} placeholder="1" />
                   </div>
                   <div>
-                    <label className={FORM_LABEL_CLASS}>Rate / Kgs</label>
-                    <input
-                      value={item.ratePerKg}
-                      onChange={(e) => {
-                        const ratePerKg = e.target.value;
-                        updateItem(index, {
-                          ratePerKg,
-                          totalAmount: calcTotalAmount(item.qtyKg, ratePerKg),
-                        });
-                      }}
-                      className={FORM_INPUT_CLASS}
-                      placeholder="875"
-                    />
+                    <label className={LBL}>1 Pcs Weight (Kg)</label>
+                    <input type="number" step="0.0001" value={calc.pcsWeight} onChange={(e) => updateCalc({ pcsWeight: e.target.value })} className={INP} placeholder="0.292" />
+                    <p className="text-xs text-gray-400 mt-1">From item — editable</p>
                   </div>
                   <div>
-                    <label className={FORM_LABEL_CLASS}>Total Amount</label>
-                    <input
-                      value={item.totalAmount}
-                      readOnly
-                      className="w-full px-4 py-2 border border-gray-200 rounded-lg bg-gray-50 text-gray-700 outline-none placeholder:text-sm placeholder:text-gray-400 cursor-not-allowed"
-                      placeholder="Auto"
-                    />
+                    <label className={LBL}>Rate / Kg</label>
+                    <input type="number" step="0.01" value={calc.ratePerKg} onChange={(e) => updateCalc({ ratePerKg: e.target.value })} className={INP} placeholder="60" />
                   </div>
                 </div>
               </div>
-            ))}
-          </div>
+            </div>
 
-          <div className="flex gap-4 justify-center mt-6">
-            <button
-              type="submit"
-              disabled={saving}
-              className="px-12 py-2 bg-gray-800 text-white rounded-lg hover:bg-gray-700 transition text-sm disabled:opacity-60 disabled:cursor-not-allowed"
-            >
-              {saving ? "Saving..." : "Save"}
-            </button>
-            <button
-              type="button"
-              onClick={() => navigate("/job-work", { state: sourceOrderRow ? { orderRow: sourceOrderRow } : undefined })}
-              disabled={saving}
-              className="px-12 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition text-sm"
-            >
-              Cancel
-            </button>
+            {/* RIGHT — live summary */}
+            <div>
+              <div className="sticky top-4 bg-white rounded-2xl border border-gray-200 p-5 shadow-sm">
+                <div className="flex items-center gap-2 mb-4">
+                  <Sparkles className="w-4 h-4 text-gray-500" />
+                  <h3 className="text-base font-semibold text-gray-900">Summary</h3>
+                </div>
+                <div className="rounded-xl bg-gray-900 text-white p-4 mb-4">
+                  <p className="text-xs text-white/60">Total Rate</p>
+                  <p className="text-3xl font-semibold mt-1">₹ {fmt(derived.totalRate, 0)}</p>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  {[
+                    ["Net Kg", fmt(derived.netKg, 3)],
+                    ["Total Pcs", fmt(derived.totalPcs, 0)],
+                    ["Sticker Qty", fmt(derived.stickerQty, 0)],
+                    ["Total Carton", fmt(derived.totalCarton, 2)],
+                  ].map(([k, v]) => (
+                    <div key={k} className="rounded-xl border border-gray-100 bg-gray-50 p-3">
+                      <p className="text-xs text-gray-400">{k}</p>
+                      <p className="text-lg font-semibold text-gray-900 mt-0.5">{v}</p>
+                    </div>
+                  ))}
+                </div>
+                <button
+                  type="submit"
+                  disabled={saving || loadingContext}
+                  className="mt-5 w-full py-2.5 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition text-sm font-medium disabled:opacity-60 disabled:cursor-not-allowed"
+                >
+                  {saving ? "Saving…" : mode === "edit" ? "Update Job Work" : "Create Job Work"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => navigate(backTo)}
+                  disabled={saving}
+                  className="mt-2 w-full py-2.5 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition text-sm font-medium"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
           </div>
         </form>
       </div>

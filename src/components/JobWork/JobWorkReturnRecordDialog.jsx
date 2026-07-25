@@ -4,11 +4,11 @@ import toast from "react-hot-toast";
 import { jobWorkReturnApi } from "../../services/apiService";
 
 const EMPTY_FORM = {
-  returnKg: "",
-  rsKg: "875",
   returnElementCount: "",
   elementType: "PETI",
-  elementWeightGm: "900",
+  petiWeightKg: "",
+  grossKg: "",
+  ghati: "",
   jobReturnDate: "",
 };
 
@@ -19,102 +19,102 @@ const parseNumber = (value) => {
   return Number.isFinite(parsed) ? parsed : null;
 };
 
-const getAutoNetKg = (form) => {
-  const returnKg = parseNumber(form.returnKg);
-  if (returnKg === null) return "";
-
-  const elementWeightKg = form.elementType === "PETI"
-    ? 0.9
-    : (() => {
-        const gm = parseNumber(form.elementWeightGm);
-        return gm !== null && gm > 0 ? gm / 1000 : null;
-      })();
-
-  if (elementWeightKg === null) return "";
-
-  const rawCount = parseNumber(form.returnElementCount);
-  const count = rawCount !== null && rawCount > 0 ? rawCount : 1;
-  return String(round3(Math.max(0, returnKg - count * elementWeightKg)));
+/** Net Kg = Gross Kg (weighed once) - Peti/Drum count * tare weight per Peti/Drum (kg). */
+const getNetKg = (form) => {
+  const grossKg = parseNumber(form.grossKg);
+  if (grossKg === null) return null;
+  const count = parseNumber(form.returnElementCount) ?? 0;
+  const petiWeightKg = parseNumber(form.petiWeightKg) ?? 0;
+  return Math.max(0, round3(grossKg - count * petiWeightKg));
 };
 
 const JobWorkReturnRecordDialog = ({ isOpen, jobWork, editingReturn, onClose, onSaved }) => {
   const [form, setForm] = useState(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
   const [isTypeOpen, setIsTypeOpen] = useState(false);
+  const [ghatiTouched, setGhatiTouched] = useState(false);
 
   useEffect(() => {
     if (!isOpen) return;
     setIsTypeOpen(false);
+    setGhatiTouched(false);
     if (editingReturn) {
       setForm({
-        returnKg: String(editingReturn.returnKg ?? ""),
-        rsKg: "875",
         returnElementCount: String(editingReturn.returnElementCount ?? ""),
         elementType: editingReturn.elementType || "PETI",
-        elementWeightGm: editingReturn.elementType === "DRUM" ? "" : "900",
+        petiWeightKg: editingReturn.petiWeightKg != null ? String(editingReturn.petiWeightKg) : "",
+        grossKg: editingReturn.grossKg != null ? String(editingReturn.grossKg) : "",
+        ghati: editingReturn.ghati != null ? String(editingReturn.ghati) : "",
         jobReturnDate: editingReturn.jobReturnDate ? editingReturn.jobReturnDate.substring(0, 10) : "",
       });
+      setGhatiTouched(true);
     } else {
       setForm(EMPTY_FORM);
     }
   }, [isOpen, editingReturn]);
 
-  if (!isOpen || !jobWork) return null;
-
-  const returns = jobWork.jobWorkReturns || [];
+  const returns = jobWork?.jobWorkReturns || [];
   const alreadyReturnedKg = round3(
     returns
       .filter((r) => r.id !== editingReturn?.id)
       .reduce((sum, r) => sum + (r.returnKg || 0) + (r.ghati || 0), 0)
   );
-  const sentKg = jobWork.qtyKg || 0;
-  const availableKg = round3(Math.max(0, sentKg - alreadyReturnedKg));
+  const sentKg = jobWork?.qtyKg || 0;
+  const remainingBeforeThisReturn = round3(Math.max(0, sentKg - alreadyReturnedKg));
+
+  const netKg = getNetKg(form);
+
+  // Auto-suggest Ghati as "what's still outstanding after this return", editable by the user.
+  useEffect(() => {
+    if (ghatiTouched) return;
+    if (netKg === null) return;
+    const suggested = round3(Math.max(0, remainingBeforeThisReturn - netKg));
+    setForm((prev) => ({ ...prev, ghati: suggested > 0 ? String(suggested) : "" }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [form.grossKg, form.returnElementCount, form.petiWeightKg]);
+
+  if (!isOpen || !jobWork) return null;
 
   const handleSave = async () => {
-    const kg = parseFloat(form.returnKg);
-    if (!form.returnKg || Number.isNaN(kg) || kg <= 0) {
-      toast.error("Return Kg is required and must be greater than 0");
+    const grossKg = parseFloat(form.grossKg);
+    if (!form.grossKg || Number.isNaN(grossKg) || grossKg <= 0) {
+      toast.error("Gross Kg is required and must be greater than 0");
       return;
     }
 
-    const netVal = parseNumber(getAutoNetKg(form));
-    if (netVal === null || netVal < 0 || netVal > kg) {
-      toast.error("Net could not be calculated from the selected element details");
+    if (netKg === null || netKg < 0) {
+      toast.error("Net Kg could not be calculated");
       return;
     }
 
-    const ghatiVal = Math.max(0, round3(kg - netVal));
-    const newContribution = round3(kg + (Number.isNaN(ghatiVal) ? 0 : ghatiVal));
-    if (sentKg > 0 && newContribution > availableKg) {
-      toast.error(`Return Kg + Ghati (${newContribution}) exceeds remaining (${availableKg} Kg)`);
-      return;
-    }
-
-    const ghatiPayload = ghatiVal || undefined;
-    if (ghatiPayload !== undefined && (Number.isNaN(ghatiPayload) || ghatiPayload < 0)) {
+    const ghatiVal = form.ghati ? parseFloat(form.ghati) : 0;
+    if (Number.isNaN(ghatiVal) || ghatiVal < 0) {
       toast.error("Ghati must be a valid non-negative number");
+      return;
+    }
+
+    const newContribution = round3(netKg + ghatiVal);
+    if (sentKg > 0 && newContribution > remainingBeforeThisReturn) {
+      toast.error(`Net Kg + Ghati (${newContribution}) exceeds remaining (${remainingBeforeThisReturn} Kg)`);
       return;
     }
 
     const elemCount = form.returnElementCount ? parseFloat(form.returnElementCount) : undefined;
     if (elemCount !== undefined && (Number.isNaN(elemCount) || elemCount < 0 || !Number.isInteger(elemCount))) {
-      toast.error("Return Element Count must be a valid non-negative integer");
+      toast.error("Peti/Drum count must be a valid non-negative integer");
       return;
     }
 
-    const elementWeight = form.elementType === "PETI" ? 900 : parseFloat(form.elementWeightGm);
-    if (form.elementType !== "PETI" && (Number.isNaN(elementWeight) || elementWeight <= 0)) {
-      toast.error("Element weight is required for Drum");
-      return;
-    }
+    const petiWeightKg = form.petiWeightKg ? parseFloat(form.petiWeightKg) : undefined;
 
     setSaving(true);
     try {
       const payload = {
-        returnKg: kg,
-        ghati: ghatiPayload,
+        grossKg,
+        petiWeightKg,
         returnElementCount: elemCount,
         elementType: form.elementType,
+        ghati: ghatiVal || undefined,
         jobReturnDate: form.jobReturnDate || undefined,
       };
 
@@ -146,14 +146,14 @@ const JobWorkReturnRecordDialog = ({ isOpen, jobWork, editingReturn, onClose, on
         </div>
         <div className="px-10 py-6 space-y-4">
           <div>
-            <label className="block text-sm font-medium text-black mb-1">Return Element</label>
+            <label className="block text-sm font-medium text-black mb-1">Peti / Drum Count</label>
             <div className="flex items-center gap-2">
               <input
                 type="number"
                 step="1"
                 value={form.returnElementCount}
                 onChange={(e) => setForm((prev) => ({ ...prev, returnElementCount: e.target.value }))}
-                placeholder="Enter Element"
+                placeholder="Enter count"
                 className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-500 outline-none placeholder:text-sm placeholder:text-gray-400"
               />
               <div className="relative w-28">
@@ -172,11 +172,7 @@ const JobWorkReturnRecordDialog = ({ isOpen, jobWork, editingReturn, onClose, on
                         key={opt}
                         type="button"
                         onClick={() => {
-                          setForm((prev) => ({
-                            ...prev,
-                            elementType: opt,
-                            elementWeightGm: opt === "PETI" ? "900" : "",
-                          }));
+                          setForm((prev) => ({ ...prev, elementType: opt }));
                           setIsTypeOpen(false);
                         }}
                         className="w-full text-left px-3 py-2 text-sm hover:bg-gray-100"
@@ -189,60 +185,62 @@ const JobWorkReturnRecordDialog = ({ isOpen, jobWork, editingReturn, onClose, on
               </div>
               <input
                 type="number"
-                step="1"
+                step="0.001"
                 min="0"
-                value={form.elementWeightGm}
-                onChange={(e) => setForm((prev) => ({ ...prev, elementWeightGm: e.target.value }))}
-                placeholder="gm"
-                disabled={form.elementType === "PETI"}
-                className={`w-28 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-gray-500 outline-none placeholder:text-sm placeholder:text-gray-400 ${
-                  form.elementType === "PETI"
-                    ? "border-gray-200 bg-gray-50 text-gray-500 cursor-not-allowed"
-                    : "border-gray-300 bg-white"
-                }`}
+                value={form.petiWeightKg}
+                onChange={(e) => setForm((prev) => ({ ...prev, petiWeightKg: e.target.value }))}
+                placeholder="Kg each"
+                className="w-28 px-3 py-2 border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-gray-500 outline-none placeholder:text-sm placeholder:text-gray-400"
               />
             </div>
           </div>
           <div>
-            <label className="block text-sm font-medium text-black mb-1">Return Kg <span className="text-red-400">*</span></label>
+            <label className="block text-sm font-medium text-black mb-1">Gross Kg (weighed) <span className="text-red-400">*</span></label>
             <input
               type="number"
               step="0.001"
-              value={form.returnKg}
-              onChange={(e) => setForm((prev) => ({ ...prev, returnKg: e.target.value }))}
+              value={form.grossKg}
+              onChange={(e) => setForm((prev) => ({ ...prev, grossKg: e.target.value }))}
               placeholder="Enter Kg."
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-500 outline-none placeholder:text-sm placeholder:text-gray-400"
             />
             {sentKg > 0 && (
               <p className="mt-1 text-xs text-gray-400">
-                Remaining (incl. Ghati): <span className="font-medium text-gray-600">{availableKg} Kg</span> of {sentKg} Kg
+                Remaining (incl. Ghati): <span className="font-medium text-gray-600">{remainingBeforeThisReturn} Kg</span> of {sentKg} Kg
               </p>
             )}
           </div>
           <div>
-            <label className="block text-sm font-medium text-black mb-1">Net</label>
+            <label className="block text-sm font-medium text-black mb-1">Net Kg</label>
             <input
               type="number"
               step="0.001"
-              value={getAutoNetKg(form)}
+              value={netKg ?? ""}
               readOnly
               placeholder="Auto calculated"
               className="w-full px-4 py-2 border border-gray-200 rounded-lg bg-gray-50 text-gray-700 outline-none placeholder:text-sm placeholder:text-gray-400 cursor-not-allowed"
             />
             <p className="mt-1 text-xs text-gray-400">
-              Net is auto calculated from Return Kg and {form.elementType === "PETI" ? "Peti (900 gm)" : "the manual gm value"}.
+              Net Kg = Gross Kg − (Peti/Drum count × weight each).
             </p>
           </div>
           <div>
-            <label className="block text-sm font-medium text-black mb-1">Rs/Kg</label>
+            <label className="block text-sm font-medium text-black mb-1">Ghati</label>
             <input
               type="number"
               step="0.001"
-              value={form.rsKg}
-              onChange={(e) => setForm((prev) => ({ ...prev, rsKg: e.target.value }))}
-              placeholder="875"
+              min="0"
+              value={form.ghati}
+              onChange={(e) => {
+                setGhatiTouched(true);
+                setForm((prev) => ({ ...prev, ghati: e.target.value }));
+              }}
+              placeholder="Auto suggested, editable"
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-500 outline-none placeholder:text-sm placeholder:text-gray-400"
             />
+            <p className="mt-1 text-xs text-gray-400">
+              Auto-suggested as the remaining shortfall after this return — adjust if the actual process loss differs.
+            </p>
           </div>
           <div className="pt-4 flex items-center justify-center gap-4">
             <button
