@@ -231,7 +231,7 @@ const MoveToJobWork = () => {
       pcsPerBox: size.inventory?.pcsPerBox ?? null,
       boxPerCarton: size.inventory?.boxPerCarton ?? null,
     }));
-    setCalc((prev) => ({ ...prev, pcsWeight: size.pcsWeight != null ? String(size.pcsWeight) : "" }));
+    setCalc((prev) => ({ ...prev, pcsWeight: size.pcsWeight != null ? String(round3(size.pcsWeight)) : "" }));
   };
 
   const buildChithiNo = () => {
@@ -340,7 +340,7 @@ const MoveToJobWork = () => {
           elementCount: jw.elementCount != null ? String(jw.elementCount) : "",
           elementType: jw.elementType || "PETI",
           petiWeightKg: jw.petiWeightKg != null ? String(jw.petiWeightKg) : "",
-          pcsWeight: editCtx.pcsWeight != null ? String(editCtx.pcsWeight) : "",
+          pcsWeight: editCtx.pcsWeight != null ? String(round3(editCtx.pcsWeight)) : "",
           ratePerKg: jw.ratePerKg != null ? String(jw.ratePerKg) : "",
         });
         setExistingStatus(jw.status || "PENDING");
@@ -389,7 +389,7 @@ const MoveToJobWork = () => {
         setItemContext(createCtx);
         setCalc((prev) => ({
           ...prev,
-          pcsWeight: createCtx.pcsWeight != null ? String(createCtx.pcsWeight) : "",
+          pcsWeight: createCtx.pcsWeight != null ? String(round3(createCtx.pcsWeight)) : "",
         }));
         setExistingStatus("PENDING");
       } catch (err) {

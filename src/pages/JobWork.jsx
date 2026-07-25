@@ -29,6 +29,13 @@ import DownloadStatementModal from "../components/DownloadStatementModal";
 const printJobWorkPng = sharedPrintJobWorkPng;
 
 const fmt = (v) => (v == null || v === '' ? '—' : v);
+const fmtNumber = (value, decimals) => {
+  if (value == null || value === '') return '—';
+  const num = Number(value);
+  if (Number.isNaN(num)) return value;
+  if (typeof decimals === 'number') return num.toFixed(decimals);
+  return String(Math.round(num));
+};
 const fmtDate = (s) => {
   if (!s) return '—';
   try { return new Date(s).toLocaleDateString('en-IN'); } catch { return s; }
@@ -37,6 +44,42 @@ const fmtDate = (s) => {
 const ReturnDialog = (props) => <JobWorkReturnRecordDialogShared {...props} />;
 const StatusDropdown = (props) => <JobWorkStatusDropdownShared {...props} />;
 const TypeDropdown = (props) => <JobWorkTypeDropdownShared {...props} />;
+
+// -- Print button with A6/A8 size choice -------------------------------------
+const PrintSizeButton = ({ printing, onPrint }) => {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        disabled={!!printing}
+        onClick={() => setOpen((p) => !p)}
+        className="inline-flex items-center gap-1.5 px-3 py-1 text-sm border border-gray-300 rounded-md text-black hover:bg-gray-100 transition disabled:opacity-60 disabled:cursor-not-allowed"
+      >
+        {printing ? (
+          <><span className="animate-spin inline-block w-3 h-3 border-2 border-gray-400 border-t-transparent rounded-full" /> Printingâ€¦</>
+        ) : (
+          <>Print <Printer className="w-4 h-4" /> <ChevronDown className={`w-3 h-3 transition-transform ${open ? "rotate-180" : ""}`} /></>
+        )}
+      </button>
+      {open && !printing && (
+        <div className="absolute z-20 right-0 mt-1 w-28 bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden">
+          {["A6", "A8"].map((size) => (
+            <button
+              key={size}
+              type="button"
+              onClick={() => { setOpen(false); onPrint(size); }}
+              className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50"
+            >
+              Print {size}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
 
 // -- Job Work Card -----------------------------------------------------------
 const JobWorkCardItem = ({ jw, onStatusChange, onTypeChange, onReturnRecord, onEditReturn, onDeleteReturn, onEdit, onDelete }) => {
@@ -102,18 +145,10 @@ const JobWorkCardItem = ({ jw, onStatusChange, onTypeChange, onReturnRecord, onE
         <div className="border border-gray-200 rounded-xl bg-gray-50 p-4">
           <div className="flex items-center justify-between mb-3">
             <p className="text-black font-semibold">Items</p>
-            <button
-              type="button"
-              disabled={printingKey === "javak"}
-              onClick={() => printJobWorkPng(jw.id, "JAVAK", setPrintingKey)}
-              className="inline-flex items-center gap-1.5 px-3 py-1 text-sm border border-gray-300 rounded-md text-black hover:bg-gray-100 transition disabled:opacity-60 disabled:cursor-not-allowed"
-            >
-              {printingKey === "javak" ? (
-                <><span className="animate-spin inline-block w-3 h-3 border-2 border-gray-400 border-t-transparent rounded-full" /> Printingâ€¦</>
-              ) : (
-                <>Print <Printer className="w-4 h-4" /></>
-              )}
-            </button>
+            <PrintSizeButton
+              printing={printingKey === "javak"}
+              onPrint={(size) => printJobWorkPng(jw.id, "JAVAK", size, setPrintingKey)}
+            />
           </div>
           <div className="grid grid-cols-5 text-xs text-gray-400 mb-1">
             <span>Size</span><span className="text-center">Peti</span><span className="text-center">Process</span><span className="text-center">Gross Kg</span><span className="text-right">Net Kg</span>
@@ -129,9 +164,9 @@ const JobWorkCardItem = ({ jw, onStatusChange, onTypeChange, onReturnRecord, onE
             <span>Total Pcs</span><span className="text-center">Sticker Qty</span><span className="text-right">Total Carton</span>
           </div>
           <div className="grid grid-cols-3 text-sm text-gray-700">
-            <span className="font-bold">{fmt(jw.qtyPc)}</span>
-            <span className="text-center font-bold">{fmt(jw.stickerQty)}</span>
-            <span className="text-right font-bold">{fmt(jw.totalCarton)}</span>
+            <span className="font-bold">{fmtNumber(jw.qtyPc)}</span>
+            <span className="text-center font-bold">{fmtNumber(jw.stickerQty, 0)}</span>
+            <span className="text-right font-bold">{fmtNumber(jw.totalCarton, 2)}</span>
           </div>
           <div className="mt-2 pt-2 border-t border-dashed border-gray-300 flex items-center justify-between text-xs text-gray-500">
             <span>Rate/Kg: <span className="font-bold text-black">{fmt(jw.ratePerKg)}</span></span>
@@ -159,18 +194,10 @@ const JobWorkCardItem = ({ jw, onStatusChange, onTypeChange, onReturnRecord, onE
                   <ChevronDown className={`w-3.5 h-3.5 transition-transform ${returnExpanded ? "rotate-180" : ""}`} />
                 </button>
               )}
-              <button
-                type="button"
-                disabled={printingKey === "aavak"}
-                onClick={() => printJobWorkPng(jw.id, "AAVAK", setPrintingKey)}
-                className="inline-flex items-center gap-1.5 px-3 py-1 text-sm border border-gray-300 rounded-md text-black hover:bg-gray-100 transition disabled:opacity-60 disabled:cursor-not-allowed"
-              >
-                {printingKey === "aavak" ? (
-                  <><span className="animate-spin inline-block w-3 h-3 border-2 border-gray-400 border-t-transparent rounded-full" /> Printingâ€¦</>
-                ) : (
-                  <>Print <Printer className="w-4 h-4" /></>
-                )}
-              </button>
+              <PrintSizeButton
+                printing={printingKey === "aavak"}
+                onPrint={(size) => printJobWorkPng(jw.id, "AAVAK", size, setPrintingKey)}
+              />
             </div>
           </div>
 

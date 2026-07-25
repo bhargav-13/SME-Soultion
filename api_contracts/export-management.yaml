@@ -79,6 +79,13 @@ paths:
           description: The variant of the job work form
           schema:
             $ref: '#/components/schemas/JobWorkFormType'
+        - name: paperSize
+          in: query
+          required: false
+          description: Sticker paper size to render the ticket for
+          schema:
+            $ref: '#/components/schemas/PaperSize'
+            default: A6
       responses:
         '200':
           description: PNG generated successfully
@@ -351,6 +358,11 @@ components:
       enum:
         - AAVAK
         - JAVAK
+    PaperSize:
+      type: string
+      enum:
+        - A6
+        - A8
     GresFillingFormType:
       type: string
       enum:

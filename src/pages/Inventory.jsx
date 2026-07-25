@@ -107,6 +107,8 @@ const createEmptyRow = () => {
   return row;
 };
 
+const round3 = (n) => Math.round(n * 1000) / 1000;
+
 // Convert API inventory row to table row format
 const apiRowToTableRow = (inv, itemId, sizes) => {
   const row = {
@@ -127,7 +129,7 @@ const apiRowToTableRow = (inv, itemId, sizes) => {
     if (col.key === "itemName") {
       row[col.key] = inv.itemName || "";
     } else if (col.key === "pcsWeight") {
-      row[col.key] = matchingSize?.pcsWeight != null ? String(matchingSize.pcsWeight) : "";
+      row[col.key] = matchingSize?.pcsWeight != null ? String(round3(matchingSize.pcsWeight)) : "";
     } else {
       row[col.key] = inv[col.key] != null ? String(inv[col.key]) : "";
     }
@@ -559,7 +561,7 @@ const Inventory = () => {
               else if (col.key === "sizeInInch") row[col.key] = size.sizeInInch || "";
               else if (col.key === "sizeInMm") row[col.key] = size.sizeInMm || "";
               else if (col.key === "dozenWeight") row[col.key] = size.dozenWeight != null ? String(size.dozenWeight) : "";
-              else if (col.key === "pcsWeight") row[col.key] = size.pcsWeight != null ? String(size.pcsWeight) : "";
+              else if (col.key === "pcsWeight") row[col.key] = size.pcsWeight != null ? String(round3(size.pcsWeight)) : "";
               else row[col.key] = "";
             });
           }
@@ -670,7 +672,7 @@ const Inventory = () => {
     setTableData((prev) =>
       prev.map((row, idx) => {
         if (idx !== rowIndex) return row;
-        return { ...row, sizeInInch: size.sizeInInch || "", sizeInMm: size.sizeInMm || "", dozenWeight: size.dozenWeight != null ? String(size.dozenWeight) : "", pcsWeight: size.pcsWeight != null ? String(size.pcsWeight) : "" };
+        return { ...row, sizeInInch: size.sizeInInch || "", sizeInMm: size.sizeInMm || "", dozenWeight: size.dozenWeight != null ? String(size.dozenWeight) : "", pcsWeight: size.pcsWeight != null ? String(round3(size.pcsWeight)) : "" };
       })
     );
   }, []);

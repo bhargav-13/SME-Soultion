@@ -1,12 +1,13 @@
 import toast from "react-hot-toast";
 import { axiosInstance } from "../services/apiService";
 
-export const printJobWorkPng = async (jwId, formType, setLoadingKey) => {
+export const printJobWorkPng = async (jwId, formType, paperSize, setLoadingKey) => {
   const key = String(formType || "").toLowerCase();
   setLoadingKey?.(key);
 
   try {
     const res = await axiosInstance.get(`/api/v1/job-works/${jwId}/type/${formType}/png`, {
+      params: { paperSize: paperSize || "A6" },
       responseType: "blob",
       headers: { Accept: "image/png,application/json" },
     });
@@ -14,7 +15,8 @@ export const printJobWorkPng = async (jwId, formType, setLoadingKey) => {
     const blob = new Blob([res.data], { type: "image/png" });
     const blobUrl = URL.createObjectURL(blob);
     const label = formType === "AAVAK" ? "aavak" : "javak";
-    const filename = `job-work-${jwId}-${label}.png`;
+    const sizeLabel = String(paperSize || "A6").toLowerCase();
+    const filename = `job-work-${jwId}-${label}-${sizeLabel}.png`;
 
     const a = document.createElement("a");
     a.href = blobUrl;
@@ -54,7 +56,7 @@ export const printJobWorkPng = async (jwId, formType, setLoadingKey) => {
       if (iframe.parentNode) iframe.parentNode.removeChild(iframe);
     }, 120000);
 
-    toast.success(`${label.toUpperCase()} image downloaded. Print dialog will open shortly.`);
+    toast.success(`${label.toUpperCase()} (${sizeLabel.toUpperCase()}) image downloaded. Print dialog will open shortly.`);
   } catch (err) {
     const msg = err?.response?.data?.message || err?.message || "Failed to generate print";
     toast.error(msg);
