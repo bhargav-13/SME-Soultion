@@ -49,7 +49,11 @@ const ItemsTable = ({
     <tbody className="divide-y divide-gray-200">
       {items && items.length > 0 ? (
         items.map((item) => (
-          <tr key={item.id} className="hover:bg-gray-50 transition">
+          <tr
+            key={item.id}
+            className="hover:bg-gray-50 transition cursor-pointer"
+            onDoubleClick={() => (onView ? onView(item) : onEdit && onEdit(item))}
+          >
             <td className="px-6 py-4 text-sm text-gray-900 text-center">
               {item.sizeInch}
             </td>

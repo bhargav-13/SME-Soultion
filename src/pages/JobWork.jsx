@@ -108,7 +108,10 @@ const JobWorkCardItem = ({ jw, onStatusChange, onTypeChange, onReturnRecord, onE
   const processLabel = /sartin/i.test(String(jw.finish || "")) ? "Sartin" : "Emrey";
 
   return (
-    <div className="border border-gray-200 rounded-xl bg-white p-4 shadow-sm">
+    <div
+      className="border border-gray-200 rounded-xl bg-white p-4 shadow-sm cursor-pointer"
+      onDoubleClick={onEdit}
+    >
       {/* Header row */}
       <div className="flex items-start justify-between gap-3 mb-3">
         <div>
@@ -339,8 +342,13 @@ const JobWork = () => {
       } else {
         // No specific order â€” fetch across all order items via the parties/orders endpoint
         // then fan out per order-item. We use a lightweight approach: fetch all orders and collect job works.
-        const ordersRes = await axiosInstance.get(`/api/v1/parties/orders?page=0&size=500`);
-        const ordersData = ordersRes.data?.data || [];
+        // Manual job works aren't tied to any order item, so they can't be found by that fan-out â€”
+        // fetch them separately from the global listing endpoint and merge them in.
+        const [ordersRes, manualRes] = await Promise.allSettled([
+          axiosInstance.get(`/api/v1/parties/orders?page=0&size=500`),
+          axiosInstance.get(`/api/v1/job-works`, { params: { jobWorkType: "MANUAL", page: 0, size: 500 } }),
+        ]);
+        const ordersData = ordersRes.status === "fulfilled" ? (ordersRes.value.data?.data || []) : [];
         const allJws = [];
         for (const partyResp of ordersData) {
           for (const order of (partyResp.orders || [])) {
@@ -353,6 +361,11 @@ const JobWork = () => {
               } catch { /* skip items with no job works */ }
             }
           }
+        }
+        if (manualRes.status === "fulfilled") {
+          const manualData = manualRes.value.data;
+          const manualList = Array.isArray(manualData?.data) ? manualData.data : Array.isArray(manualData) ? manualData : [];
+          manualList.forEach(jw => allJws.push({ ...jw, orderItemId: null }));
         }
         setJobWorks(mergeSavedJobWork(allJws));
       }
@@ -368,7 +381,7 @@ const JobWork = () => {
   // â”€â”€ Status update â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const handleStatusChange = async (jw, newStatus) => {
     try {
-      await jobWorkApi.updateJobWorkStatus(jw.orderItemId, jw.id, { status: newStatus });
+      await jobWorkApi.updateJobWorkStatus(jw.orderItemId ?? 0, jw.id, { status: newStatus });
       toast.success("Status updated!");
       setJobWorks(prev => prev.map(j => j.id === jw.id ? { ...j, status: newStatus } : j));
     } catch (err) {
@@ -379,7 +392,7 @@ const JobWork = () => {
   // â”€â”€ Type update â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const handleTypeChange = async (jw, newType) => {
     try {
-      await jobWorkApi.updateJobWorkType(jw.orderItemId, jw.id, { jobWorkType: newType });
+      await jobWorkApi.updateJobWorkType(jw.orderItemId ?? 0, jw.id, { jobWorkType: newType });
       toast.success("Type updated!");
       setJobWorks(prev => prev.map(j => j.id === jw.id ? { ...j, jobWorkType: newType } : j));
       upsertOrderJobOverride({
@@ -397,7 +410,7 @@ const JobWork = () => {
     if (!deleteTarget) return;
     setDeleting(true);
     try {
-      await jobWorkApi.deleteJobWork(deleteTarget.orderItemId, deleteTarget.id);
+      await jobWorkApi.deleteJobWork(deleteTarget.orderItemId ?? 0, deleteTarget.id);
       toast.success("Job work deleted!");
       setJobWorks(prev => prev.filter(j => j.id !== deleteTarget.id));
       removeOrderJobOverride({ orderItemId: deleteTarget.orderItemId });
@@ -417,13 +430,13 @@ const JobWork = () => {
     // Re-fetch this specific job work to get updated returns.
     if (returnTarget) {
       try {
-        const res = await jobWorkApi.getJobWorkById(returnTarget.orderItemId, returnTarget.id);
+        const res = await jobWorkApi.getJobWorkById(returnTarget.orderItemId ?? 0, returnTarget.id);
         const freshJw = res.data;
         const returns = freshJw?.jobWorkReturns || [];
         const totalReturned = Math.round(returns.reduce((sum, r) => sum + (r.returnKg || 0) + (r.ghati || 0), 0) * 1000) / 1000;
         const sentKg = freshJw?.qtyKg || 0;
         if (sentKg > 0 && totalReturned >= sentKg && freshJw?.status !== "COMPLETE") {
-          await jobWorkApi.updateJobWorkStatus(returnTarget.orderItemId, returnTarget.id, { status: "COMPLETE" });
+          await jobWorkApi.updateJobWorkStatus(returnTarget.orderItemId ?? 0, returnTarget.id, { status: "COMPLETE" });
           toast.success("All Kg returned â€” Job work auto-marked as Complete!");
           loadJobWorks();
         }
@@ -437,7 +450,7 @@ const JobWork = () => {
     const { jw: targetJw, ret: targetRet } = deleteReturnTarget;
     setDeletingReturn(true);
     try {
-      await jobWorkReturnApi.deleteJobWorkReturn(targetJw.orderItemId, targetJw.id, targetRet.id);
+      await jobWorkReturnApi.deleteJobWorkReturn(targetJw.orderItemId ?? 0, targetJw.id, targetRet.id);
       toast.success("Return record deleted!");
       loadJobWorks();
     } catch (err) {
@@ -584,7 +597,11 @@ const JobWork = () => {
                 onReturnRecord={() => { setReturnTarget(jw); setEditingReturn(null); }}
                 onEditReturn={(ret) => { setReturnTarget(jw); setEditingReturn(ret); }}
                 onDeleteReturn={(ret) => setDeleteReturnTarget({ jw, ret })}
-                onEdit={() => navigate("/job-work/move", { state: { mode: "edit", jobWorkId: jw.id, orderItemId: jw.orderItemId, prefillOrderRow: orderRow } })}
+                onEdit={() => navigate("/job-work/move", {
+                  state: jw.jobWorkType === "MANUAL"
+                    ? { mode: "edit", jobWorkId: jw.id, jobWorkMode: "MANUAL", prefillJobWork: jw }
+                    : { mode: "edit", jobWorkId: jw.id, orderItemId: jw.orderItemId, prefillOrderRow: orderRow }
+                })}
                 onDelete={() => setDeleteTarget(jw)}
               />
             ))}

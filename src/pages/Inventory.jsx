@@ -455,6 +455,8 @@ const Inventory = () => {
   const [editingItemCategoryId, setEditingItemCategoryId] = useState("");
   const [itemActionLoading, setItemActionLoading] = useState(false);
   const [deleteItemTarget, setDeleteItemTarget]   = useState(null); // {id, name}
+  const [clearAllOpen, setClearAllOpen] = useState(false);
+  const [clearingAll, setClearingAll] = useState(false);
 
   const [saving, setSaving] = useState(false);
 
@@ -1301,27 +1303,29 @@ const Inventory = () => {
             title="Stock Master"
             description="Manage items, sizes, stock & packing details"
             action={
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5">
                 <PrimaryActionButton
                   onClick={() => setViewItemsDialog(true)}
                   icon={Eye}
-                  className="border-gray-800 text-black px-4"
+                  size="sm"
+                  className="border-gray-800 text-black"
                 >
                   View Items
                 </PrimaryActionButton>
                 <PrimaryActionButton
                   onClick={() => setAddItemDialog(true)}
                   icon={Plus}
-                  className="border-gray-800 text-black px-4"
+                  size="sm"
+                  className="border-gray-800 text-black"
                 >
                   Add Item
                 </PrimaryActionButton>
                 <button
                   type="button"
                   onClick={() => navigate("/add-inventory")}
-                  className="flex items-center gap-2 bg-gray-900 border border-gray-900 text-white px-4 py-2 rounded-lg hover:bg-gray-700 hover:border-gray-700 transition font-medium"
+                  className="flex items-center gap-1.5 whitespace-nowrap bg-gray-900 border border-gray-900 text-white px-3 py-1.5 rounded-lg text-sm hover:bg-gray-700 hover:border-gray-700 transition font-medium"
                 >
-                  <Plus className="w-5 h-5" />
+                  <Plus className="w-4 h-4" />
                   Add Inventory
                 </button>
                 <input
@@ -1334,17 +1338,30 @@ const Inventory = () => {
                 <PrimaryActionButton
                   onClick={() => importInputRef.current?.click()}
                   icon={Upload}
-                  className="border-gray-800 text-black px-4"
+                  size="sm"
+                  className="border-gray-800 text-black"
                 >
                   Upload Excel
                 </PrimaryActionButton>
                 <PrimaryActionButton
                   onClick={() => setIsFormulaOpen(true)}
                   icon={Check}
-                  className="border-gray-800 text-black px-4"
+                  size="sm"
+                  className="border-gray-800 text-black"
                 >
                   Formula
                 </PrimaryActionButton>
+                {items.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setClearAllOpen(true)}
+                    title="Delete all items"
+                    className="flex items-center gap-1.5 shrink-0 whitespace-nowrap px-3 py-1.5 border border-red-200 text-red-600 rounded-lg text-sm font-medium hover:bg-red-50 transition"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                    Clear All
+                  </button>
+                )}
               </div>
             }
           />
@@ -2008,6 +2025,32 @@ const Inventory = () => {
         onConfirm={handleDeleteRow}
         onCancel={() => setDeleteDialog({ open: false, rowIndex: null })}
         isDangerous
+      />
+
+      {/* Clear All items confirmation */}
+      <ConfirmationDialog
+        isOpen={clearAllOpen}
+        title="Clear All Items"
+        message={`Are you sure you want to delete all ${items.length} item(s) and their sizes/inventory? This action cannot be undone.`}
+        confirmText={clearingAll ? "Clearing…" : "Clear All"}
+        cancelText="Cancel"
+        isDangerous
+        onCancel={() => setClearAllOpen(false)}
+        onConfirm={async () => {
+          setClearingAll(true);
+          try {
+            await Promise.all(
+              items.map((item) => axiosInstance.delete(`/api/v1/item-blueprints/${item.id}`))
+            );
+            toast.success("All items cleared!");
+            await loadAll();
+          } catch (err) {
+            toast.error(err?.response?.data?.message || "Failed to clear all items");
+          } finally {
+            setClearingAll(false);
+            setClearAllOpen(false);
+          }
+        }}
       />
 
       {/* Import Stock Master Excel confirmation */}

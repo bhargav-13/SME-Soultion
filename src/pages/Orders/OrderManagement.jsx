@@ -703,7 +703,8 @@ const OrderManagement = () => {
                       return (
                         <tr
                           key={row.id}
-                          className={`border-b border-gray-200 ${
+                          onDoubleClick={() => setViewOrder(row)}
+                          className={`border-b border-gray-200 cursor-pointer ${
                             row._updatedAt && row._createdAt && row._updatedAt !== row._createdAt
                               ? "bg-yellow-50"
                               : "hover:bg-gray-50"

@@ -1,5 +1,6 @@
 import React, { useCallback, useDeferredValue, useEffect, useMemo, useState } from "react";
 import { useLocation } from "react-router-dom";
+import { Trash2 } from "lucide-react";
 import { normalizeSearch } from "../../utils/search";
 import SidebarLayout from "../../components/SidebarLayout";
 import PageHeader from "../../components/PageHeader";
@@ -9,6 +10,7 @@ import ClientListDialog from "../../components/Client/ClientListDialog";
 import ClientDetailsDialog from "../../components/Client/ClientDetailsDialog";
 import ClientImportDialog from "../../components/Client/ClientImportDialog";
 import ClientAddItemDialog from "../../components/Client/ClientAddItemDialog";
+import ConfirmationDialog from "../../components/ConfirmationDialog";
 import PricingFormulaDialog from "../../components/Client/PricingFormulaDialog";
 import EditableClientTable from "../../components/Client/EditableClientTable";
 import { CLIENT_TABLE_COLUMNS } from "../../Data/clientmanagementdata";
@@ -441,10 +443,26 @@ const ClientSelect = () => {
     setSelectedCell(null);
   };
 
-  const handleDeleteAll = () => {
-    setInventoryRows([]);
-    setEditingCell(null);
-    setSelectedCell(null);
+  const [isClearAllOpen, setIsClearAllOpen] = useState(false);
+  const [clearingAll, setClearingAll] = useState(false);
+
+  const handleDeleteAll = async () => {
+    if (!selectedClient?.id) return;
+    setClearingAll(true);
+    try {
+      await Promise.all(
+        apiItems.map((item) => clientInventoryApi.deleteClientInventory(selectedClient.id, item.id))
+      );
+      toast.success("All items cleared!");
+      await fetchInventory(selectedClient.id);
+    } catch {
+      toast.error("Failed to clear all items");
+    } finally {
+      setClearingAll(false);
+      setEditingCell(null);
+      setSelectedCell(null);
+      setIsClearAllOpen(false);
+    }
   };
 
   const handleCloseDetails = () => {
@@ -587,6 +605,18 @@ const ClientSelect = () => {
                     >
                       Cancel
                     </button>
+                    {apiItems.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => setIsClearAllOpen(true)}
+                        disabled={saving || clearingAll}
+                        title="Delete all items for this client"
+                        className="flex items-center gap-1.5 shrink-0 whitespace-nowrap px-3 py-2 border border-red-200 text-red-600 rounded-lg hover:bg-red-50 transition text-sm font-medium cursor-pointer disabled:opacity-60"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                        Clear All
+                      </button>
+                    )}
                   </div>
                 </div>
                 {filteredRows.length === 0 && (
@@ -649,6 +679,17 @@ const ClientSelect = () => {
         onClose={handleCloseDetails}
         readOnlyCols={READ_ONLY_COLS}
         modifiedRowIndices={modifiedRowIndices}
+      />
+
+      <ConfirmationDialog
+        isOpen={isClearAllOpen}
+        title="Clear All Items"
+        message={`Are you sure you want to delete all ${apiItems.length} item(s) for ${selectedClientName}? This action cannot be undone.`}
+        confirmText={clearingAll ? "Clearing…" : "Clear All"}
+        cancelText="Cancel"
+        isDangerous
+        onCancel={() => setIsClearAllOpen(false)}
+        onConfirm={handleDeleteAll}
       />
     </SidebarLayout>
   );

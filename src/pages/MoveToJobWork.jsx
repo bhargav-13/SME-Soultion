@@ -218,6 +218,14 @@ const MoveToJobWork = () => {
     return bp?.sizes || [];
   }, [blueprints, manualBlueprintId]);
 
+  // Editing a Manual job work: once blueprints load, back-fill which item owns the
+  // already-selected size, so the item/size dropdowns show the right selection.
+  useEffect(() => {
+    if (!manualMode || mode !== "edit" || manualBlueprintId || !itemContext.sizeId || blueprints.length === 0) return;
+    const owner = blueprints.find((b) => (b.sizes || []).some((s) => String(s.id) === String(itemContext.sizeId)));
+    if (owner) setManualBlueprintId(String(owner.id));
+  }, [manualMode, mode, manualBlueprintId, itemContext.sizeId, blueprints]);
+
   // In Manual mode, selecting an item-master size fills the item context + editable 1-pc weight.
   const selectManualSize = (size, bp) => {
     setManualSizeId(String(size.id));
@@ -353,6 +361,42 @@ const MoveToJobWork = () => {
       }
     };
 
+    const loadForManualEdit = async (jw) => {
+      setLoadingContext(true);
+      try {
+        if (cancelled) return;
+        setFormData({
+          ...EMPTY_FORM,
+          partyName: jw.party?.name || "",
+          partyId: jw.party?.id || "",
+          chithiNo: jw.chitthiNo || buildChithiNo(),
+          date: normalizeDateForInput(jw.jobDate),
+          time: jw.orderTime || getNow().time,
+        });
+        const editCtx = {
+          ...(await enrichSizeContext(jw.size, jw.finish)),
+          orderQtyPc: jw.qtyPc ?? null,
+          orderStickerQty: jw.stickerQty ?? null,
+        };
+        if (cancelled) return;
+        setItemContext(editCtx);
+        if (editCtx.sizeId) setManualSizeId(String(editCtx.sizeId));
+        setCalc({
+          grossKg: jw.grossKg != null ? String(jw.grossKg) : "",
+          elementCount: jw.elementCount != null ? String(jw.elementCount) : "",
+          elementType: jw.elementType || "PETI",
+          petiWeightKg: jw.petiWeightKg != null ? String(jw.petiWeightKg) : "",
+          pcsWeight: editCtx.pcsWeight != null ? String(round3(editCtx.pcsWeight)) : "",
+          ratePerKg: jw.ratePerKg != null ? String(jw.ratePerKg) : "",
+        });
+        setExistingStatus(jw.status || "PENDING");
+      } catch (err) {
+        if (!cancelled) setContextError(err?.response?.data?.message || "Failed to load job work data");
+      } finally {
+        if (!cancelled) setLoadingContext(false);
+      }
+    };
+
     const loadForCreate = async () => {
       if (!sourceOrderRow?.orderId || !sourceOrderRow?.partyId || !sourceOrderRow?.id) {
         setContextError("Missing order context — open this page from an order item.");
@@ -399,7 +443,9 @@ const MoveToJobWork = () => {
       }
     };
 
-    if (manualMode) {
+    if (manualMode && mode === "edit" && location.state?.prefillJobWork) {
+      loadForManualEdit(location.state.prefillJobWork);
+    } else if (manualMode) {
       // Manual job work is not tied to an order — start blank, user enters everything.
       setFormData({ ...EMPTY_FORM, chithiNo: buildChithiNo(), ...getNow() });
     } else if (mode === "edit" && editJobWorkId && editOrderItemId) {
@@ -490,6 +536,10 @@ const MoveToJobWork = () => {
         // Manual job work is not tied to an order item — dedicated endpoint.
         await axiosInstance.post("/api/v1/job-works/manual", payload);
         toast.success("Manual job work created!");
+      } else if (isManual && mode === "edit") {
+        // Manual job work has no order item to relink — dedicated update endpoint.
+        await axiosInstance.put(`/api/v1/job-works/manual/${editJobWorkId}`, payload);
+        toast.success("Manual job work updated!");
       } else if (mode === "edit") {
         await jobWorkApi.updateJobWork(orderItemId, editJobWorkId, payload);
         toast.success("Job work updated!");

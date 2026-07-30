@@ -57,7 +57,8 @@ const PartiesTable = ({
             {filteredParties.map((party) => (
               <tr
                 key={party.id}
-                className="border-b border-gray-200 hover:bg-gray-50"
+                className="border-b border-gray-200 hover:bg-gray-50 cursor-pointer"
+                onDoubleClick={() => handleEdit(party)}
               >
                 <td className="px-6 py-4 text-sm text-gray-900 text-center">
                   {party.name}

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Plus } from "lucide-react";
+import { Plus, Trash2 } from "lucide-react";
 import SidebarLayout from "../../../components/SidebarLayout";
 import ConfirmationDialog from "../../../components/ConfirmationDialog";
 import EditItemDialog from "../../../components/Item/EditItemDialog";
@@ -27,6 +27,8 @@ const ItemMaster = () => {
     itemId: null,
     itemName: "",
   });
+  const [clearAllOpen, setClearAllOpen] = useState(false);
+  const [clearingAll, setClearingAll] = useState(false);
   const [editDialog, setEditDialog] = useState({
     isOpen: false,
     data: null,
@@ -186,6 +188,21 @@ const ItemMaster = () => {
     handleDeleteClick(item);
   };
 
+  const handleConfirmClearAll = async () => {
+    setClearingAll(true);
+    try {
+      await Promise.all(items.map((item) => itemApi.deleteItem(item.id)));
+      await fetchItems();
+      toast.success("All items cleared!");
+    } catch (error) {
+      console.error("Error clearing items:", error);
+      toast.error(error.response?.data?.message || "Failed to clear all items");
+    } finally {
+      setClearingAll(false);
+      setClearAllOpen(false);
+    }
+  };
+
   return (
     <SidebarLayout>
       <div className="space-y-6">
@@ -194,13 +211,26 @@ const ItemMaster = () => {
           title="Item Master"
           description="Centralised management of all items with sizes, weights, categories, and stock details."
           action={
-            <PrimaryActionButton
-              onClick={handleAddItem}
-              icon={Plus}
-              className="border-gray-800 text-black px-4"
-            >
-              Add Item
-            </PrimaryActionButton>
+            <div className="flex items-center gap-2">
+              {items.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setClearAllOpen(true)}
+                  title="Delete all items"
+                  className="flex items-center gap-1.5 shrink-0 whitespace-nowrap px-3 py-2 border border-red-200 text-red-600 rounded-lg text-sm font-medium hover:bg-red-50 transition"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  Clear All
+                </button>
+              )}
+              <PrimaryActionButton
+                onClick={handleAddItem}
+                icon={Plus}
+                className="border-gray-800 text-black px-4"
+              >
+                Add Item
+              </PrimaryActionButton>
+            </div>
           }
         />
 
@@ -271,6 +301,18 @@ const ItemMaster = () => {
         onCancel={() =>
           setDeleteDialog({ isOpen: false, itemId: null, itemName: "" })
         }
+        isDangerous={true}
+      />
+
+      {/* Clear All Confirmation Dialog */}
+      <ConfirmationDialog
+        isOpen={clearAllOpen}
+        title="Clear All Items"
+        message={`Are you sure you want to delete all ${items.length} item(s)? This action cannot be undone.`}
+        confirmText={clearingAll ? "Clearing…" : "Clear All"}
+        cancelText="Cancel"
+        onConfirm={handleConfirmClearAll}
+        onCancel={() => setClearAllOpen(false)}
         isDangerous={true}
       />
     </SidebarLayout>
