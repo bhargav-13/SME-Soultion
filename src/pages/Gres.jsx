@@ -16,9 +16,16 @@ import DownloadStatementModal from "../components/DownloadStatementModal";
 
 const round3 = (n) => Math.round(n * 1000) / 1000;
 
+/** Display Ch. No. as the zero-padded monthly serial. Falls back to whatever's in
+ *  the legacy chitthiNo column only for pre-migration rows that have no serial. */
+const displayChNo = (apiRecord) =>
+  apiRecord.chNoSerial != null
+    ? String(apiRecord.chNoSerial).padStart(3, "0")
+    : apiRecord.chitthiNo || "";
+
 const normalizeGresRecord = (apiRecord) => ({
   id: apiRecord.id,
-  chithiNo: apiRecord.chitthiNo || "",
+  chithiNo: displayChNo(apiRecord),
   vendorName: apiRecord.party?.name || "",
   vendorId: apiRecord.party?.id,
   date: apiRecord.chitthiDate || "",
@@ -27,14 +34,14 @@ const normalizeGresRecord = (apiRecord) => ({
   gresType: "INHOUSE",
   items: (apiRecord.items || []).map((item) => ({
     id: item.id,
-    itemName: item.size ? (item.size.sizeInInch || item.size.sizeInMm || "") : "",
+    itemName: item.size?.itemName || "",
     size: item.size?.sizeInInch || item.size?.sizeInMm || "",
     qtyPc: item.unitKg != null ? String(item.unitKg) : "",
     qtyKg: item.netWeight != null ? String(item.netWeight) : "",
     unitType: item.unitType || "Kgs",
     element: item.elementCount != null ? String(item.elementCount) : "",
     elementType: item.elementType || "PETI",
-    elementWeightGm: "900",
+    petiWeightKg: item.petiWeightKg != null ? String(item.petiWeightKg) : "",
     ratePerKg: item.ratePerKg != null ? String(item.ratePerKg) : "",
     totalAmount: item.totalAmount != null ? String(item.totalAmount) : "",
   })),
@@ -43,29 +50,24 @@ const normalizeGresRecord = (apiRecord) => ({
     id: ret.id,
     returnElement: ret.returnElementCount != null ? String(ret.returnElementCount) : "",
     returnType: ret.elementType || "PETI",
-    returnKg: ret.returnKg != null ? ret.returnKg : 0,
-    netKg: ret.returnKg != null && ret.ghati != null ? round3(ret.returnKg - ret.ghati) : 0,
+    grossKg: ret.grossKg,
+    petiWeightKg: ret.petiWeightKg,
+    returnKg: ret.returnKg != null ? ret.returnKg : 0, // this is the NET now
+    netKg: ret.returnKg != null ? ret.returnKg : 0,    // alias kept for GresCard's Total Net row
     ghati: ret.ghati != null ? ret.ghati : 0,
     returnDate: ret.returnDate || ret.createdAt || "",
-    rsKg: "",
   })),
   createdAt: apiRecord.createdAt || "",
 });
 
+/** Status-only quick update from the card — items are echoed back untouched (no
+ *  size id on the normalized card row, so we DON'T send items here or the backend
+ *  would drop them all). Item edits happen on the full Edit page. */
 const buildUpdatePayload = (gres, statusOverride) => ({
   partyId: Number(gres.vendorId),
   chitthiDate: gres.date || new Date().toISOString().slice(0, 10),
   orderTime: gres.time || undefined,
   status: statusOverride || gres.status,
-  items: (gres.items || []).map((item) => ({
-    unitKg: item.qtyPc ? Number(item.qtyPc) || undefined : undefined,
-    unitType: item.unitType || "Kgs",
-    elementCount: item.element ? Number(item.element) || undefined : undefined,
-    elementType: item.elementType,
-    netWeight: item.qtyKg ? Number(item.qtyKg) || undefined : undefined,
-    ratePerKg: item.ratePerKg ? Number(item.ratePerKg) || undefined : undefined,
-    totalAmount: item.totalAmount ? Number(item.totalAmount) || undefined : undefined,
-  })),
 });
 
 const Gres = () => {
@@ -132,6 +134,9 @@ const Gres = () => {
   const handleReturnSaved = async (payload) => {
     if (!returnTarget) return;
     const apiPayload = {
+      grossKg: payload.grossKg,
+      petiWeightKg: payload.petiWeightKg,
+      // returnKg + ghati are recomputed server-side, but sending them keeps optimistic UI honest.
       returnKg: payload.returnKg,
       ghati: payload.ghati,
       returnElementCount: payload.returnElement ? Number(payload.returnElement) || undefined : undefined,

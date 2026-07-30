@@ -15,6 +15,7 @@ import {
   KeyRound,
   ClipboardList,
   ShoppingBag,
+  Building2,
 } from "lucide-react"; // icons
 
 import Navbar from "./navbar";
@@ -225,6 +226,11 @@ const SidebarLayout = ({ children }) => {
       to: "/in-house-plating",
       label: "In House Plating",
       icon: <Layers className="w-5 h-5" />,
+    },
+    {
+      to: "/outside-job-work",
+      label: "Outside Job Work",
+      icon: <Building2 className="w-5 h-5" />,
     },
   ];
 

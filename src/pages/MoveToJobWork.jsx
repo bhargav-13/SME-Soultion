@@ -451,7 +451,11 @@ const MoveToJobWork = () => {
       return;
     }
     if (!itemContext.sizeId) {
-      toast.error("Missing item context — reopen this page from the order.");
+      toast.error(isManual ? "Select an item and size" : "Missing item context — reopen this page from the order.");
+      return;
+    }
+    if (isManual && !itemContext.finish) {
+      toast.error("Select a finish");
       return;
     }
     if (!calc.grossKg || parseFloat(calc.grossKg) <= 0) {

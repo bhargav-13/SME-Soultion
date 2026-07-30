@@ -19,6 +19,8 @@ import JobWork from "./pages/JobWork";
 import MoveToJobWork from "./pages/MoveToJobWork";
 import Gres from "./pages/Gres";
 import MoveToGres from "./pages/MoveToGres";
+import InHousePlating from "./pages/InHousePlating";
+import OutsideJobWork from "./pages/OutsideJobWork";
 import PackingInvoice from "./pages/PackingInvoice";
 import AddPackingInvoice from "./pages/AddPackingInvoice";
 import PurchaseManagement from "./pages/Bills/PurchaseManagement";
@@ -212,6 +214,22 @@ const AppRoutes = () => {
         element={
           <ProtectedRoute allowedRoles={["ADMIN"]}>
             <MoveToGres />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/in-house-plating"
+        element={
+          <ProtectedRoute allowedRoles={["ADMIN"]}>
+            <InHousePlating />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/outside-job-work"
+        element={
+          <ProtectedRoute allowedRoles={["ADMIN"]}>
+            <OutsideJobWork />
           </ProtectedRoute>
         }
       />

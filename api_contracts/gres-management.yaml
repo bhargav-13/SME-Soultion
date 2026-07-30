@@ -370,7 +370,7 @@ components:
         unitKg:
           type: number
           format: double
-          description: Quantity in KG
+          description: Gross weight in Kg (Excel "Kgs")
         unitType:
           type: string
           description: Unit type (Kgs / Pcs)
@@ -379,27 +379,41 @@ components:
           format: double
         elementType:
           $ref: '#/components/schemas/GresElementType'
+        petiWeightKg:
+          type: number
+          format: double
+          description: Tare weight per Peti in Kg (Excel "1 Peti Weight")
         netWeight:
           type: number
           format: double
+          description: Auto-computed Net Kg = unitKg - elementCount * petiWeightKg
         ratePerKg:
           type: number
           format: double
         totalAmount:
           type: number
           format: double
+          description: Auto-computed Total Rate = round(netWeight * ratePerKg)
 
     NewGresFillingReturn:
-      required:
-        - returnKg
       type: object
       properties:
+        grossKg:
+          type: number
+          format: double
+          description: Gross Kg returned (Excel "Kgs")
+        petiWeightKg:
+          type: number
+          format: double
+          description: Tare per Peti in Kg (Excel "1 Peti Weight")
         returnKg:
           type: number
           format: double
+          description: Auto-computed Net Kg = grossKg - returnElementCount * petiWeightKg
         ghati:
           type: number
           format: double
+          description: Auto-computed diff = Return Net - Job Net (+/-)
         returnElementCount:
           type: number
           format: double
@@ -420,6 +434,13 @@ components:
           $ref: '#/components/schemas/GresFillingParty'
         chitthiNo:
           type: string
+          description: Zero-padded monthly serial (e.g. "001")
+        chNoSerial:
+          type: integer
+          description: Raw monthly serial (1..N per calendar month)
+        chNoYearMonth:
+          type: string
+          description: "YYYY-MM the serial belongs to"
         chitthiDate:
           type: string
           format: date
@@ -460,6 +481,9 @@ components:
           format: double
         elementType:
           $ref: '#/components/schemas/GresElementType'
+        petiWeightKg:
+          type: number
+          format: double
         netWeight:
           type: number
           format: double
@@ -476,6 +500,12 @@ components:
         id:
           type: integer
           format: int64
+        grossKg:
+          type: number
+          format: double
+        petiWeightKg:
+          type: number
+          format: double
         returnKg:
           type: number
           format: double
@@ -513,6 +543,13 @@ components:
           type: string
         sizeInMm:
           type: string
+        itemId:
+          type: integer
+          format: int64
+          description: Parent item blueprint id (lets the Edit form re-select the item)
+        itemName:
+          type: string
+          description: Parent item blueprint name (for display)
 
     PaginatedResultGresFilling:
       type: object

@@ -1055,6 +1055,7 @@ components:
         - INHOUSE
         - OUTSIDE
         - JOB_WORK
+        - MANUAL
 
     # ---- Job Work ----
     NewJobWork:
@@ -1086,6 +1087,14 @@ components:
           type: number
           format: double
           description: 1-pc weight used for this job work (fetched from item, editable)
+        pcsPerBox:
+          type: number
+          format: double
+          description: Pcs-per-box (client-resolved for manual; order-item value used for order-based)
+        boxPerCarton:
+          type: number
+          format: double
+          description: Box-per-carton (client-resolved for manual; order-item value used for order-based)
         finish:
           type: string
         elementCount:
