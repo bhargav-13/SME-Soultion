@@ -197,7 +197,7 @@ const SidebarLayout = ({ children }) => {
     },
     {
       to: "/gres",
-      label: "Gres",
+      label: "Gris",
       icon: <Package2 className="w-5 h-5" />,
     },
     {
