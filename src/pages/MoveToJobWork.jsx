@@ -3,7 +3,7 @@ import { ChevronLeft, ChevronDown, X, Building2, Home, PencilLine, Package, Scal
 import { useLocation, useNavigate } from "react-router-dom";
 import SidebarLayout from "../components/SidebarLayout";
 import toast from "react-hot-toast";
-import { jobWorkApi, orderApi, partyApi, itemBlueprintApi, inventoryApi, axiosInstance } from "../services/apiService";
+import { jobWorkApi, orderApi, partyApi, itemBlueprintApi, inventoryApi, clientInventoryApi, axiosInstance } from "../services/apiService";
 import { upsertOrderJobOverride } from "../utils/orderJobWorkSync";
 import { FINISH_LABELS } from "../constants/finishes";
 
@@ -132,6 +132,9 @@ const MoveToJobWork = () => {
   const [blueprints, setBlueprints] = useState([]);
   const [manualBlueprintId, setManualBlueprintId] = useState("");
   const [manualSizeId, setManualSizeId] = useState("");
+  // Manual mode: size ids that belong to the selected party's imported client inventory.
+  // Empty set ⇒ party has no imported inventory (or none selected) ⇒ fall back to full master.
+  const [clientSizeIds, setClientSizeIds] = useState(() => new Set());
   const [openManualItem, setOpenManualItem] = useState(false);
   const [openManualSize, setOpenManualSize] = useState(false);
   const [openFinish, setOpenFinish] = useState(false);
@@ -200,6 +203,35 @@ const MoveToJobWork = () => {
     fetchBlueprints();
   }, []);
 
+  // Manual mode: when a party is selected, scope the item/size pickers to that party's
+  // imported client inventory. If the party has no imported inventory, the set stays empty
+  // and the pickers fall back to the full item master.
+  useEffect(() => {
+    if (!isManual || !formData.partyId) {
+      setClientSizeIds(new Set());
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await clientInventoryApi.getInventoryByClient(formData.partyId);
+        const items = Array.isArray(res.data) ? res.data : res.data?.data ?? [];
+        if (cancelled) return;
+        const ids = new Set(
+          items
+            .map((it) => (it.size?.id != null ? String(it.size.id) : null))
+            .filter(Boolean)
+        );
+        setClientSizeIds(ids);
+      } catch {
+        if (!cancelled) setClientSizeIds(new Set()); // fall back to full master
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [isManual, formData.partyId]);
+
   const vendorParties = useMemo(
     () => parties.filter((p) => p.partyType === "VENDOR" || p.partyType === "BOTH"),
     [parties]
@@ -213,10 +245,21 @@ const MoveToJobWork = () => {
     return selectableParties.filter((p) => (p.name || "").toLowerCase().includes(q));
   }, [selectableParties, partySearch]);
 
+  // Items to offer in Manual mode: only those with a size in the party's imported inventory,
+  // or every item when the party has none (fall back to full master).
+  const manualBlueprints = useMemo(() => {
+    if (clientSizeIds.size === 0) return blueprints;
+    return blueprints.filter((b) =>
+      (b.sizes || []).some((s) => clientSizeIds.has(String(s.id)))
+    );
+  }, [blueprints, clientSizeIds]);
+
   const manualSizes = useMemo(() => {
     const bp = blueprints.find((b) => String(b.id) === String(manualBlueprintId));
-    return bp?.sizes || [];
-  }, [blueprints, manualBlueprintId]);
+    const sizes = bp?.sizes || [];
+    if (clientSizeIds.size === 0) return sizes;
+    return sizes.filter((s) => clientSizeIds.has(String(s.id)));
+  }, [blueprints, manualBlueprintId, clientSizeIds]);
 
   // Editing a Manual job work: once blueprints load, back-fill which item owns the
   // already-selected size, so the item/size dropdowns show the right selection.
@@ -706,6 +749,13 @@ const MoveToJobWork = () => {
                                     setFormData((prev) => ({ ...prev, partyName: p.name, partyId: p.id }));
                                     setIsPartyOpen(false);
                                     setPartySearch("");
+                                    // Party drives the Manual item/size list, so clear any prior pick.
+                                    if (isManual) {
+                                      setManualBlueprintId("");
+                                      setManualSizeId("");
+                                      setItemContext((prev) => ({ ...prev, sizeId: "", itemName: "", category: "", sizeLabel: "", pcsWeight: null, pcsPerBox: null, boxPerCarton: null }));
+                                      setCalc((prev) => ({ ...prev, pcsWeight: "" }));
+                                    }
                                   }}
                                   className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-100 ${formData.partyId === p.id ? "font-semibold bg-gray-50" : ""}`}
                                 >
@@ -756,10 +806,10 @@ const MoveToJobWork = () => {
                       </button>
                       {openManualItem && (
                         <div className="absolute z-20 mt-1 w-full max-h-52 overflow-y-auto bg-white border border-gray-200 rounded-lg shadow-lg">
-                          {blueprints.length === 0 ? (
+                          {manualBlueprints.length === 0 ? (
                             <p className="px-4 py-2 text-sm text-gray-400">No items</p>
                           ) : (
-                            blueprints.map((bp) => (
+                            manualBlueprints.map((bp) => (
                               <button
                                 key={bp.id}
                                 type="button"

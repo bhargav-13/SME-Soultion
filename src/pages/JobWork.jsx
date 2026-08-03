@@ -9,6 +9,7 @@ import {
   ChevronLeft,
   Download,
   Plus,
+  Languages,
 } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 import SidebarLayout from "../components/SidebarLayout";
@@ -25,6 +26,7 @@ import JobWorkStatusDropdownShared from "../components/JobWork/JobWorkStatusDrop
 import JobWorkTypeDropdownShared from "../components/JobWork/JobWorkTypeDropdown";
 import JobWorkReturnRecordDialogShared from "../components/JobWork/JobWorkReturnRecordDialog";
 import DownloadStatementModal from "../components/DownloadStatementModal";
+import TranslationDialog from "../components/JobWork/TranslationDialog";
 
 const printJobWorkPng = sharedPrintJobWorkPng;
 
@@ -302,6 +304,7 @@ const JobWork = () => {
   const [deleteReturnTarget, setDeleteReturnTarget] = useState(null); // { jw, ret } for deleting a specific return
   const [deletingReturn, setDeletingReturn] = useState(false);
   const [statementOpen, setStatementOpen] = useState(false);
+  const [translationOpen, setTranslationOpen] = useState(false);
 
   const mergeSavedJobWork = useCallback((list) => {
     if (!savedJobWork?.job) return list;
@@ -564,6 +567,14 @@ const JobWork = () => {
                   <Download className="w-4 h-4" />
                   Download Statement
                 </button>
+                <button
+                  type="button"
+                  onClick={() => setTranslationOpen(true)}
+                  className="inline-flex items-center gap-2 px-4 py-3 border border-gray-300 rounded-lg bg-white text-sm text-gray-700 hover:bg-gray-50 transition whitespace-nowrap"
+                >
+                  <Languages className="w-4 h-4" />
+                  Translations
+                </button>
               </div>
             }
           />
@@ -577,6 +588,11 @@ const JobWork = () => {
           onDownload={(partyId, startDate, endDate) =>
             exportApi.getJobWorkReportPdf(partyId, startDate, endDate, { responseType: "blob" })
           }
+        />
+
+        <TranslationDialog
+          isOpen={translationOpen}
+          onClose={() => setTranslationOpen(false)}
         />
 
         {/* Content */}

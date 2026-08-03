@@ -45,6 +45,7 @@ import {
     CategoryApi,
     ItemApi,
     PartyApi,
+    TranslationApi,
 } from '../api-clients/master';
 import {
     AuthenticationApi,
@@ -301,6 +302,7 @@ let partyApi = new PartyApi(createApiConfig(), config.API_BASE_URL, axiosInstanc
 let categoryApi = new CategoryApi(createApiConfig(), config.API_BASE_URL, axiosInstance);
 
 let itemApi = new ItemApi(createApiConfig(), config.API_BASE_URL, axiosInstance);
+let translationApi = new TranslationApi(createApiConfig(), config.API_BASE_URL, axiosInstance);
 let authApi = new AuthenticationApi(createUserMgmtConfig(), config.API_BASE_URL, axiosInstance);
 let userManagementApi = new UserManagementApi(createUserMgmtConfig(), config.API_BASE_URL, axiosInstance);
 let invoiceApi = new InvoiceApi(createInvoiceMgmtConfig(), config.API_BASE_URL, axiosInstance);
@@ -332,6 +334,7 @@ export const updateApiClients = () => {
     categoryApi = new CategoryApi(masterConfig, config.API_BASE_URL, axiosInstance);
 
     itemApi = new ItemApi(masterConfig, config.API_BASE_URL, axiosInstance);
+    translationApi = new TranslationApi(masterConfig, config.API_BASE_URL, axiosInstance);
     authApi = new AuthenticationApi(userConfig, config.API_BASE_URL, axiosInstance);
     userManagementApi = new UserManagementApi(userConfig, config.API_BASE_URL, axiosInstance);
     invoiceApi = new InvoiceApi(createInvoiceMgmtConfig(), config.API_BASE_URL, axiosInstance);
@@ -358,6 +361,7 @@ export {
     partyApi,
     categoryApi,
     itemApi,
+    translationApi,
     authApi,
     userManagementApi,
     axiosInstance,
@@ -387,6 +391,7 @@ export default {
     party: partyApi,
     category: categoryApi,
     item: itemApi,
+    translation: translationApi,
     auth: authApi,
     userManagement: userManagementApi,
     updateClients: updateApiClients,
