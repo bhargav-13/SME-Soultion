@@ -72,10 +72,13 @@ const GresReturnDialog = ({ isOpen, gres, editingReturn, onClose, onSave }) => {
   }, [jobNet, otherReturnedNet]);
 
   const returnNet = useMemo(() => computeReturnNet(form), [form]);
+  // Diff is cumulative: all returns so far (incl. this one) vs the job's net. Negative = still
+  // short (a shortfall / ghati); this makes the final entry read the true loss, not this row
+  // measured against the whole job net.
   const ghati = useMemo(() => {
     if (returnNet == null || jobNet == null) return null;
-    return round3(returnNet - jobNet);
-  }, [returnNet, jobNet]);
+    return round3(otherReturnedNet + returnNet - jobNet);
+  }, [returnNet, jobNet, otherReturnedNet]);
 
   if (!isOpen || !gres) return null;
 
@@ -241,7 +244,7 @@ const GresReturnDialog = ({ isOpen, gres, editingReturn, onClose, onSave }) => {
                 }`}
               />
               <p className="mt-1 text-xs text-gray-400">
-                Return Net {fmt(returnNet)} − Job Net {fmt(jobNet)}
+                Total Returned {fmt(round3(otherReturnedNet + (returnNet || 0)))} − Job Net {fmt(jobNet)}
               </p>
             </div>
           </div>

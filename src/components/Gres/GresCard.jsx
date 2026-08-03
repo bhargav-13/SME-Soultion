@@ -31,11 +31,14 @@ const GresCard = ({
   const returns = useMemo(() => gres.returns || [], [gres.returns]);
 
   const totals = useMemo(() => {
-    const totalReturn = round3(returns.reduce((sum, item) => sum + (Number(item.returnKg) || 0), 0));
+    // Total Return = gross weight returned; Total Net = net after tare.
+    const totalReturn = round3(returns.reduce((sum, item) => sum + (Number(item.grossKg) || 0), 0));
     const totalNet = round3(returns.reduce((sum, item) => sum + (Number(item.netKg) || 0), 0));
-    const totalGhati = round3(returns.reduce((sum, item) => sum + (Number(item.ghati) || 0), 0));
+    // Ghati (process loss) is a job-level figure: what was sent (job net) minus all net returned.
+    const jobNet = Number(primaryItem.qtyKg) || 0;
+    const totalGhati = returns.length ? round3(jobNet - totalNet) : 0;
     return { totalReturn, totalNet, totalGhati };
-  }, [returns]);
+  }, [returns, primaryItem.qtyKg]);
 
   const productName = primaryItem.itemName || primaryItem.size || "—";
   const sizeLabel = primaryItem.size || "—";
@@ -161,7 +164,7 @@ const GresCard = ({
                       </div>
                       <div className="grid grid-cols-4 text-sm text-gray-700">
                         <span className="font-bold">{ret.returnElement || "—"}</span>
-                        <span className="text-center font-bold">{fmt(ret.returnKg)} Kg</span>
+                        <span className="text-center font-bold">{fmt(ret.grossKg)} Kg</span>
                         <span className="text-center font-bold">{fmt(ret.netKg)} Kg</span>
                         <span className="text-right font-bold">{fmt(ret.rsKg)}</span>
                       </div>

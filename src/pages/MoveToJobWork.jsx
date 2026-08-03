@@ -135,6 +135,9 @@ const MoveToJobWork = () => {
   // Manual mode: size ids that belong to the selected party's imported client inventory.
   // Empty set ⇒ party has no imported inventory (or none selected) ⇒ fall back to full master.
   const [clientSizeIds, setClientSizeIds] = useState(() => new Set());
+  // Manual mode: sizeId(string) → the client's inventory row, so packaging (pcsPerBox /
+  // boxPerCarton / pcsPerCarton) is taken from Client Management, not the stock master.
+  const [clientInvBySizeId, setClientInvBySizeId] = useState(() => new Map());
   const [openManualItem, setOpenManualItem] = useState(false);
   const [openManualSize, setOpenManualSize] = useState(false);
   const [openFinish, setOpenFinish] = useState(false);
@@ -209,6 +212,7 @@ const MoveToJobWork = () => {
   useEffect(() => {
     if (!isManual || !formData.partyId) {
       setClientSizeIds(new Set());
+      setClientInvBySizeId(new Map());
       return;
     }
     let cancelled = false;
@@ -217,14 +221,21 @@ const MoveToJobWork = () => {
         const res = await clientInventoryApi.getInventoryByClient(formData.partyId);
         const items = Array.isArray(res.data) ? res.data : res.data?.data ?? [];
         if (cancelled) return;
-        const ids = new Set(
-          items
-            .map((it) => (it.size?.id != null ? String(it.size.id) : null))
-            .filter(Boolean)
-        );
+        const ids = new Set();
+        const bySize = new Map();
+        for (const it of items) {
+          if (it.size?.id == null) continue;
+          const key = String(it.size.id);
+          ids.add(key);
+          bySize.set(key, it);
+        }
         setClientSizeIds(ids);
+        setClientInvBySizeId(bySize);
       } catch {
-        if (!cancelled) setClientSizeIds(new Set()); // fall back to full master
+        if (!cancelled) {
+          setClientSizeIds(new Set()); // fall back to full master
+          setClientInvBySizeId(new Map());
+        }
       }
     })();
     return () => {
@@ -270,7 +281,10 @@ const MoveToJobWork = () => {
   }, [manualMode, mode, manualBlueprintId, itemContext.sizeId, blueprints]);
 
   // In Manual mode, selecting an item-master size fills the item context + editable 1-pc weight.
+  // Packaging (pcs/box, box/carton) is taken from the party's Client Management row when present,
+  // falling back to the stock-master inventory for parties with no client-specific override.
   const selectManualSize = (size, bp) => {
+    const clientInv = clientInvBySizeId.get(String(size.id));
     setManualSizeId(String(size.id));
     setItemContext((prev) => ({
       ...prev,
@@ -279,8 +293,8 @@ const MoveToJobWork = () => {
       category: bp?.category?.name || "",
       sizeLabel: [size.sizeInInch, size.sizeInMm ? `(${size.sizeInMm})` : null].filter(Boolean).join(" "),
       pcsWeight: size.pcsWeight ?? null,
-      pcsPerBox: size.inventory?.pcsPerBox ?? null,
-      boxPerCarton: size.inventory?.boxPerCarton ?? null,
+      pcsPerBox: clientInv?.pcsPerBox ?? size.inventory?.pcsPerBox ?? null,
+      boxPerCarton: clientInv?.boxPerCarton ?? size.inventory?.boxPerCarton ?? null,
     }));
     setCalc((prev) => ({ ...prev, pcsWeight: size.pcsWeight != null ? String(round3(size.pcsWeight)) : "" }));
   };
@@ -561,6 +575,10 @@ const MoveToJobWork = () => {
       grossKg: parseFloat(calc.grossKg),
       qtyPc: derived.totalPcs ?? undefined,
       qtyKg: derived.netKg ?? undefined,
+      // Packaging resolved on the client (client-management override in Manual mode) so the
+      // server's sticker/carton calc matches what the form showed.
+      pcsPerBox: itemContext.pcsPerBox ?? undefined,
+      boxPerCarton: itemContext.boxPerCarton ?? undefined,
       pcsWeight: calc.pcsWeight ? parseFloat(calc.pcsWeight) : undefined,
       elementCount: calc.elementCount ? parseFloat(calc.elementCount) : undefined,
       elementType: calc.elementType,

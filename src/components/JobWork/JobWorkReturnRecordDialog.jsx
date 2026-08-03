@@ -118,11 +118,14 @@ const JobWorkReturnRecordDialog = ({ isOpen, jobWork, editingReturn, onClose, on
         jobReturnDate: form.jobReturnDate || undefined,
       };
 
+      // Manual job works have no order item; the return endpoint ignores this path segment
+      // (it resolves by jobWorkId), so send 0 rather than null to keep the URL valid.
+      const orderItemPathId = jobWork.orderItemId ?? 0;
       if (editingReturn?.id) {
-        await jobWorkReturnApi.updateJobWorkReturn(jobWork.orderItemId, jobWork.id, editingReturn.id, payload);
+        await jobWorkReturnApi.updateJobWorkReturn(orderItemPathId, jobWork.id, editingReturn.id, payload);
         toast.success("Return record updated!");
       } else {
-        await jobWorkReturnApi.createJobWorkReturn(jobWork.orderItemId, jobWork.id, payload);
+        await jobWorkReturnApi.createJobWorkReturn(orderItemPathId, jobWork.id, payload);
         toast.success("Return record saved!");
       }
 
