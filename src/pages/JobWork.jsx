@@ -21,14 +21,13 @@ import { jobWorkApi, jobWorkReturnApi, axiosInstance, exportApi } from "../servi
 import toast from "react-hot-toast";
 import Loader from "../components/Loader";
 import { normalizeJobWorkLabel, removeOrderJobOverride, upsertOrderJobOverride } from "../utils/orderJobWorkSync";
-import { printJobWorkPng as sharedPrintJobWorkPng } from "../utils/jobWorkPrint";
+import { printJobWorkChitthi } from "../utils/jobWorkChitthi";
 import JobWorkStatusDropdownShared from "../components/JobWork/JobWorkStatusDropdown";
 import JobWorkTypeDropdownShared from "../components/JobWork/JobWorkTypeDropdown";
 import JobWorkReturnRecordDialogShared from "../components/JobWork/JobWorkReturnRecordDialog";
 import DownloadStatementModal from "../components/DownloadStatementModal";
 import TranslationDialog from "../components/JobWork/TranslationDialog";
 
-const printJobWorkPng = sharedPrintJobWorkPng;
 
 const fmt = (v) => (v == null || v === '' ? '—' : v);
 const fmtNumber = (value, decimals) => {
@@ -152,7 +151,7 @@ const JobWorkCardItem = ({ jw, onStatusChange, onTypeChange, onReturnRecord, onE
             <p className="text-black font-semibold">Items</p>
             <PrintSizeButton
               printing={printingKey === "javak"}
-              onPrint={(size) => printJobWorkPng(jw.id, "JAVAK", size, setPrintingKey)}
+              onPrint={(size) => printJobWorkChitthi(jw, "JAVAK", size, setPrintingKey)}
             />
           </div>
           <div className="grid grid-cols-5 text-xs text-gray-400 mb-1">
@@ -201,7 +200,7 @@ const JobWorkCardItem = ({ jw, onStatusChange, onTypeChange, onReturnRecord, onE
               )}
               <PrintSizeButton
                 printing={printingKey === "aavak"}
-                onPrint={(size) => printJobWorkPng(jw.id, "AAVAK", size, setPrintingKey)}
+                onPrint={(size) => printJobWorkChitthi(jw, "AAVAK", size, setPrintingKey)}
               />
             </div>
           </div>

@@ -506,6 +506,9 @@ components:
       properties:
         type:
           $ref: '#/components/schemas/TranslationType'
+        partyId:
+          type: integer
+          format: int64
         sourceText:
           type: string
         hindi:
@@ -520,6 +523,9 @@ components:
           format: int64
         type:
           $ref: '#/components/schemas/TranslationType'
+        partyId:
+          type: integer
+          format: int64
         sourceText:
           type: string
         hindi:

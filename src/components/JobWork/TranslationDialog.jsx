@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState } from "react";
 import { X } from "lucide-react";
 import toast from "react-hot-toast";
 import { translationApi } from "../../services/apiService";
+import { invalidateChitthiDictionary } from "../../utils/jobWorkChitthi";
 
 const TABS = [
   { key: "FINISH", label: "Finish" },
@@ -11,14 +12,15 @@ const TABS = [
 /**
  * Editor for the global party/finish translation dictionary used by the Job Work print.
  * A toggle switches between the Finish and Party lists; Hindi + Gujarati are editable per row
- * and saved back with PUT /api/v1/translations (upsert keyed by type + sourceText).
+ * and saved back with PUT /api/v1/translations. Rows are tracked by their own id — party rows
+ * upsert by partyId (name-independent), finish rows by sourceText.
  */
 const TranslationDialog = ({ isOpen, onClose }) => {
   const [activeTab, setActiveTab] = useState("FINISH");
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
-  // Set of sourceText values edited since the last fetch.
+  // Set of row ids edited since the last fetch.
   const [dirty, setDirty] = useState(new Set());
 
   const fetchRows = useCallback(async (type) => {
@@ -48,11 +50,9 @@ const TranslationDialog = ({ isOpen, onClose }) => {
     setActiveTab(key);
   };
 
-  const handleEdit = (sourceText, field, value) => {
-    setRows((prev) =>
-      prev.map((r) => (r.sourceText === sourceText ? { ...r, [field]: value } : r))
-    );
-    setDirty((prev) => new Set(prev).add(sourceText));
+  const handleEdit = (id, field, value) => {
+    setRows((prev) => prev.map((r) => (r.id === id ? { ...r, [field]: value } : r)));
+    setDirty((prev) => new Set(prev).add(id));
   };
 
   const handleSave = async () => {
@@ -62,17 +62,20 @@ const TranslationDialog = ({ isOpen, onClose }) => {
     }
     setSaving(true);
     try {
-      const changed = rows.filter((r) => dirty.has(r.sourceText));
+      const changed = rows.filter((r) => dirty.has(r.id));
       await Promise.all(
         changed.map((r) =>
           translationApi.upsertTranslation({
             type: activeTab,
+            partyId: r.partyId,
             sourceText: r.sourceText,
             hindi: r.hindi ?? "",
             gujarati: r.gujarati ?? "",
           })
         )
       );
+      // Drop the print's cached dictionary so the next chitthi picks up these edits immediately.
+      invalidateChitthiDictionary();
       toast.success(`Saved ${changed.length} translation${changed.length !== 1 ? "s" : ""}`);
       await fetchRows(activeTab);
     } catch {
@@ -144,13 +147,13 @@ const TranslationDialog = ({ isOpen, onClose }) => {
               </thead>
               <tbody>
                 {rows.map((r) => (
-                  <tr key={r.sourceText} className="border-b border-gray-50">
+                  <tr key={r.id} className="border-b border-gray-50">
                     <td className="py-2 pr-3 text-gray-800 align-middle">{r.sourceText}</td>
                     <td className="py-2 px-3">
                       <input
                         type="text"
                         value={r.hindi ?? ""}
-                        onChange={(e) => handleEdit(r.sourceText, "hindi", e.target.value)}
+                        onChange={(e) => handleEdit(r.id, "hindi", e.target.value)}
                         className="w-full border border-gray-300 rounded-md px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-gray-900"
                       />
                     </td>
@@ -158,7 +161,7 @@ const TranslationDialog = ({ isOpen, onClose }) => {
                       <input
                         type="text"
                         value={r.gujarati ?? ""}
-                        onChange={(e) => handleEdit(r.sourceText, "gujarati", e.target.value)}
+                        onChange={(e) => handleEdit(r.id, "gujarati", e.target.value)}
                         className="w-full border border-gray-300 rounded-md px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-gray-900"
                       />
                     </td>

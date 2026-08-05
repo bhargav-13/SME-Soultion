@@ -7,9 +7,10 @@ export const printJobWorkPng = async (jwId, formType, paperSize, setLoadingKey) 
 
   try {
     const res = await axiosInstance.get(`/api/v1/job-works/${jwId}/type/${formType}/png`, {
-      params: { paperSize: paperSize || "A6" },
+      // `t` busts any browser/CDN caching so an edited translation is never masked by a stale PNG.
+      params: { paperSize: paperSize || "A6", t: Date.now() },
       responseType: "blob",
-      headers: { Accept: "image/png,application/json" },
+      headers: { Accept: "image/png,application/json", "Cache-Control": "no-cache" },
     });
 
     const blob = new Blob([res.data], { type: "image/png" });
