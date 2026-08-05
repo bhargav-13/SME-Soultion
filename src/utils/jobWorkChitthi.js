@@ -249,8 +249,9 @@ export const printJobWorkChitthi = async (jw, formType, paperSize, setLoadingKey
     const css = a8 ? buildCss(0.5, 52, 74) : buildCss(1, 105, 148);
     const body = buildBody(jw, formType, ctx);
 
+    // Real (off-screen) size so html2canvas can rasterize the ticket at its true dimensions.
     const iframe = document.createElement("iframe");
-    iframe.style.cssText = "position:fixed;top:-9999px;left:-9999px;width:0;height:0;border:0;";
+    iframe.style.cssText = `position:fixed;top:-9999px;left:-9999px;border:0;width:${a8 ? 52 : 105}mm;height:${a8 ? 74 : 148}mm;`;
     document.body.appendChild(iframe);
     const doc = iframe.contentDocument || iframe.contentWindow.document;
     doc.open();
@@ -259,17 +260,45 @@ export const printJobWorkChitthi = async (jw, formType, paperSize, setLoadingKey
       <style>${css}</style></head><body>${body}</body></html>`);
     doc.close();
 
-    const win = iframe.contentWindow;
-    const doPrint = () => {
-      win.focus();
-      win.print();
-      setTimeout(() => iframe.parentNode && iframe.parentNode.removeChild(iframe), 60000);
-    };
-    // Wait for the logo image + web fonts so nothing prints half-rendered.
+    // Wait for web fonts + the logo image so neither the PNG nor the print is half-rendered.
     const waitFonts = doc.fonts && doc.fonts.ready ? doc.fonts.ready : Promise.resolve();
-    Promise.race([waitFonts, new Promise((r) => setTimeout(r, 1500))]).then(() => setTimeout(doPrint, 150));
+    await Promise.race([waitFonts, new Promise((r) => setTimeout(r, 2000))]);
+    await Promise.all(
+      Array.from(doc.images).map((img) =>
+        img.complete ? Promise.resolve() : new Promise((res) => { img.onload = img.onerror = res; })
+      )
+    );
 
-    toast.success(`${key.toUpperCase()} (${String(paperSize).toUpperCase()}) print dialog opening…`);
+    // Download a PNG snapshot alongside printing. html2canvas rasterizes the already-shaped DOM,
+    // so Hindi/Gujarati and the band colors are baked into the image correctly. Best-effort —
+    // a capture failure must never block the print.
+    try {
+      const { default: html2canvas } = await import("html2canvas");
+      const ticket = doc.querySelector(".ticket");
+      const canvas = await html2canvas(ticket, {
+        scale: 3,
+        backgroundColor: "#ffffff",
+        useCORS: true,
+        logging: false,
+      });
+      const label = formType === "AAVAK" ? "aavak" : "javak";
+      const a = document.createElement("a");
+      a.href = canvas.toDataURL("image/png");
+      a.download = `job-work-${jw.jobWorkLabel || jw.id}-${label}-${String(paperSize).toLowerCase()}.png`;
+      a.style.display = "none";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+    } catch (imgErr) {
+      console.warn("Chitthi image export failed", imgErr);
+    }
+
+    const win = iframe.contentWindow;
+    win.focus();
+    win.print();
+    setTimeout(() => iframe.parentNode && iframe.parentNode.removeChild(iframe), 60000);
+
+    toast.success(`${key.toUpperCase()} (${String(paperSize).toUpperCase()}) downloaded — print dialog opening…`);
   } catch (err) {
     toast.error(err?.response?.data?.message || err?.message || "Failed to generate print");
   } finally {
