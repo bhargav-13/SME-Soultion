@@ -1193,6 +1193,12 @@ components:
           format: date
         orderTime:
           type: string
+        jobWorkNo:
+          type: integer
+          format: int32
+        jobWorkLabel:
+          type: string
+          description: Party-wise number shown on the list and print, e.g. "AZ-1".
 
     JobWorkParty:
       type: object

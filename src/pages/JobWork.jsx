@@ -118,7 +118,7 @@ const JobWorkCardItem = ({ jw, onStatusChange, onTypeChange, onReturnRecord, onE
       <div className="flex items-start justify-between gap-3 mb-3">
         <div>
           <div className="flex items-center gap-3 text-black">
-            <span className="font-semibold text-sm">JW-{jw.id}</span>
+            <span className="font-semibold text-sm">{jw.jobWorkLabel || `JW-${jw.id}`}</span>
             <button type="button" onClick={onEdit} aria-label="Edit job work" className="text-gray-500 hover:text-gray-800 transition">
               <SquarePen className="w-4 h-4" />
             </button>
@@ -638,7 +638,7 @@ const JobWork = () => {
       <ConfirmationDialog
         isOpen={Boolean(deleteTarget)}
         title="Delete Job Work"
-        message={`Are you sure you want to delete job work JW-${deleteTarget?.id}?`}
+        message={`Are you sure you want to delete job work ${deleteTarget?.jobWorkLabel || `JW-${deleteTarget?.id}`}?`}
         confirmText={deleting ? "Deletingâ€¦" : "Delete"}
         cancelText="Cancel"
         isDangerous
