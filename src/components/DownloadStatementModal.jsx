@@ -70,6 +70,15 @@ const DownloadStatementModal = ({ isOpen, onClose, title = "Download Statement",
         ? response.data
         : new Blob([response.data], { type: "application/pdf" });
 
+      // A 2xx that is actually a JSON error (some proxies do this) or an empty body is not a PDF.
+      if (blob.type && blob.type.includes("application/json")) {
+        const msg = await readBlobError(blob);
+        throw new Error(msg || "Server returned an error instead of a PDF");
+      }
+      if (blob.size === 0) {
+        throw new Error("The generated statement was empty");
+      }
+
       const url = URL.createObjectURL(blob);
       const a   = document.createElement("a");
       a.href        = url;
@@ -82,9 +91,33 @@ const DownloadStatementModal = ({ isOpen, onClose, title = "Download Statement",
       toast.success("Statement downloaded!");
       onClose();
     } catch (err) {
-      toast.error(err?.response?.data?.message || "Failed to download statement");
+      // When responseType is "blob", an error response body is also a Blob — read it so the real
+      // backend message (e.g. a render failure) surfaces instead of a generic "Failed" toast.
+      let message = err?.message;
+      const data = err?.response?.data;
+      if (data instanceof Blob) {
+        message = (await readBlobError(data)) || message;
+      } else if (typeof data?.message === "string") {
+        message = data.message;
+      }
+      toast.error(message || "Failed to download statement");
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Reads an error Blob body and pulls out a human message (JSON {message} or raw text).
+  const readBlobError = async (blob) => {
+    try {
+      const text = await blob.text();
+      try {
+        const json = JSON.parse(text);
+        return json.message || json.error || text;
+      } catch {
+        return text;
+      }
+    } catch {
+      return "";
     }
   };
 
