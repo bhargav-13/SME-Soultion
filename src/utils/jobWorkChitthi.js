@@ -86,8 +86,6 @@ function buildCss(k, pageW, pageH) {
     .frame { width: 100%; border-collapse: collapse; }
     .logo-band { background: #fff; text-align: center; padding: ${mm(1.6)} 0 ${mm(1.2)} 0; }
     .logo-band img { height: ${mm(7.5)}; width: auto; }
-    .printout-band { background: #241C17; color: #fff; text-align: center; font-weight: 700;
-      font-size: ${px(12.5)}; letter-spacing: ${px(2)}; padding: ${mm(1.5)} 0; }
     .title-band { background: #E8A736; color: #241C17; text-align: center; font-weight: 700;
       font-size: ${px(13)}; letter-spacing: ${px(0.4)}; padding: ${mm(1.8)} 0;
       border-top: ${pt(1)} solid #241C17; border-bottom: ${pt(1.2)} solid #241C17; }
@@ -193,7 +191,6 @@ function buildBody(jw, formType, ctx) {
     <div class="ticket">
       <table class="frame">
         <tr><td class="logo-band"><img src="${logo}" alt="Ishita Industries"/></td></tr>
-        <tr><td class="printout-band">PRINT OUT</td></tr>
         <tr><td class="title-band">${esc(title)}</td></tr>
         <tr><td style="padding:0;">
           <table class="meta"><tr>
@@ -209,6 +206,7 @@ function buildBody(jw, formType, ctx) {
             <tr><td class="k">From :-</td><td class="v">Ishita Industries</td></tr>
             ${toRow}
             <tr class="finish-row"><td class="k">Finishing :-</td><td class="v">${esc(ctx.finishTri)}</td></tr>
+            <tr><td class="k">Doz. :-</td><td class="v">${esc(jw.size?.itemName || "—")}</td></tr>
             <tr><td class="k">Size :-</td><td class="v">${esc(jw.size?.sizeInInch || "—")}</td></tr>
           </table>
         </td></tr>
@@ -274,8 +272,9 @@ export const printJobWorkChitthi = async (jw, formType, paperSize, setLoadingKey
     // a capture failure must never block the print.
     try {
       const { default: html2canvas } = await import("html2canvas");
-      const ticket = doc.querySelector(".ticket");
-      const canvas = await html2canvas(ticket, {
+      // Capture the body (not just .ticket): the ticket's 2.5mm margin then becomes white
+      // padding inside the snapshot, so its outer border is never clipped at the canvas edge.
+      const canvas = await html2canvas(doc.body, {
         scale: 3,
         backgroundColor: "#ffffff",
         useCORS: true,
