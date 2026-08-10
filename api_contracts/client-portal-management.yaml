@@ -637,6 +637,39 @@ components:
           format: double
         jobActionDone:
           type: boolean
+        jobWork:
+          $ref: '#/components/schemas/ClientItemJobWork'
+
+    ClientItemJobWork:
+      type: object
+      description: Live job-work progress for this order item; null when the item has not been sent to job work.
+      properties:
+        type:
+          type: string
+          description: OUTSIDE | INHOUSE | JOB_WORK | MANUAL
+        typeLabel:
+          type: string
+          description: Human label for the type (e.g. "Outside", "In House").
+        status:
+          type: string
+          description: PENDING | COMPLETE
+        finish:
+          type: string
+        jobWorkNo:
+          type: integer
+          format: int32
+        sentKg:
+          type: number
+          format: double
+        returnedKg:
+          type: number
+          format: double
+        ghatiKg:
+          type: number
+          format: double
+        remainingKg:
+          type: number
+          format: double
 
     PaginatedResultClientOrder:
       type: object

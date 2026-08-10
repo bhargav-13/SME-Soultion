@@ -10,7 +10,7 @@ import toast from "react-hot-toast";
 import GresCard from "../components/Gres/GresCard";
 import GresReturnDialog from "../components/Gres/GresReturnDialog";
 import { gresFillingApi, gresFillingReturnApi, exportApi } from "../services/apiService";
-import { printGresFillingPng } from "../utils/gresFillingPrint";
+import { printGresChitthi } from "../utils/gresChitthi";
 import PrimaryActionButton from "../components/PrimaryActionButton";
 import DownloadStatementModal from "../components/DownloadStatementModal";
 
@@ -287,7 +287,9 @@ const Gres = () => {
                 onDeleteReturn={(ret) => setDeleteReturnTarget({ gres, ret })}
                 onEdit={() => navigate("/gres/move", { state: { mode: "edit", gresId: gres.id } })}
                 onDelete={() => setDeleteTarget(gres)}
-                onPrint={(id, formType, setLoadingKey) => printGresFillingPng(id, formType, setLoadingKey)}
+                onPrint={(record, formType, size, setLoadingKey) =>
+                  printGresChitthi(record, formType, size, setLoadingKey)
+                }
               />
             ))}
           </div>

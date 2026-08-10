@@ -3,8 +3,9 @@ import { Download } from "lucide-react";
 import SidebarLayout from "../../components/SidebarLayout";
 import PageHeader from "../../components/PageHeader";
 import OrderStatusBadge from "../../components/ClientPortal/OrderStatusBadge";
+import JobWorkProgress from "../../components/ClientPortal/JobWorkProgress";
 import { clientPortalClientApi, clientPortalInvoicesApi } from "../../services/apiService";
-import { deriveErpOrderStatus, ORDER_STATUS } from "../../utils/clientShop";
+import { deriveErpOrderStatus, ORDER_STATUS, ORDER_STATUS_TABS } from "../../utils/clientShop";
 import toast from "react-hot-toast";
 
 const PAGE_SIZE = 10;
@@ -13,7 +14,7 @@ const INVOICES_PAGE_SIZE = 10;
 
 const TABS = [
   { key: "ALL", label: "All" },
-  ...Object.entries(ORDER_STATUS).map(([key, cfg]) => ({ key, label: cfg.label })),
+  ...ORDER_STATUS_TABS.map((key) => ({ key, label: ORDER_STATUS[key].label })),
 ];
 
 const MyOrders = () => {
@@ -97,7 +98,9 @@ const MyOrders = () => {
     // Once a request is approved and an order is created in Order Management
     // (req.orderId set), keep showing the request card under its familiar
     // "Request N" label, but reflect the live job-work/dispatch status of
-    // the order it spawned instead of the static "Approved" status.
+    // the order it spawned instead of the static "Approved" status. The lines
+    // shown are then the order's own items, so they carry the live per-item
+    // dispatch and job-work progress rather than the frozen request lines.
     const requests = orderRequests.map((req) => {
       const linkedOrder = req.orderId != null ? ordersById.get(req.orderId) : null;
       const derived = linkedOrder ? deriveErpOrderStatus(linkedOrder) : null;
@@ -109,8 +112,8 @@ const MyOrders = () => {
         status: derived ? derived.status : req.status,
         dispatchedPc: derived?.dispatchedPc,
         totalPc: derived?.totalPc,
-        items: req.items || [],
-        isRequest: true,
+        items: (linkedOrder ? linkedOrder.items : req.items) || [],
+        isRequest: !linkedOrder,
       };
     });
 
@@ -215,14 +218,13 @@ const MyOrders = () => {
                     </p>
                   </div>
                 </div>
+                <div className="overflow-x-auto">
                 <table className="w-full">
                   <thead>
                     <tr className="border-b border-gray-200">
-                      {order.isRequest && (
-                        <th className="px-6 py-3 text-center text-sm font-[550] text-black">
-                          Item
-                        </th>
-                      )}
+                      <th className="px-6 py-3 text-center text-sm font-[550] text-black">
+                        Item
+                      </th>
                       <th className="px-6 py-3 text-center text-sm font-[550] text-black">
                         Size (Inch)
                       </th>
@@ -243,6 +245,9 @@ const MyOrders = () => {
                           <th className="px-6 py-3 text-center text-sm font-[550] text-black">
                             Pending (Pc)
                           </th>
+                          <th className="px-6 py-3 text-center text-sm font-[550] text-black">
+                            Job Work
+                          </th>
                         </>
                       )}
                     </tr>
@@ -250,11 +255,9 @@ const MyOrders = () => {
                   <tbody>
                     {(order.items || []).map((item) => (
                       <tr key={item.id} className="border-b border-gray-100 last:border-0">
-                        {order.isRequest && (
-                          <td className="px-6 py-3 text-sm text-gray-700 text-center">
-                            {item.itemName || "-"}
-                          </td>
-                        )}
+                        <td className="px-6 py-3 text-sm text-gray-700 text-center">
+                          {item.itemName || "-"}
+                        </td>
                         <td className="px-6 py-3 text-sm text-gray-700 text-center">
                           {item.sizeInInch || "-"}
                         </td>
@@ -275,12 +278,16 @@ const MyOrders = () => {
                             <td className="px-6 py-3 text-sm text-gray-700 text-center">
                               {item.pendingPc ?? "-"}
                             </td>
+                            <td className="px-6 py-3 text-center">
+                              <JobWorkProgress jobWork={item.jobWork} />
+                            </td>
                           </>
                         )}
                       </tr>
                     ))}
                   </tbody>
                 </table>
+                </div>
               </div>
             ))}
           </div>

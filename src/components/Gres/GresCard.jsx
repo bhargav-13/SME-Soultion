@@ -1,7 +1,6 @@
 import React, { useMemo, useState } from "react";
 import { CircleCheck, ChevronDown, Printer, SquarePen, Trash2 } from "lucide-react";
 import GresStatusDropdown from "./GresStatusDropdown";
-import GresTypeDropdown from "./GresTypeDropdown";
 
 const round3 = (n) => Math.round(n * 1000) / 1000;
 const fmt = (v) => (v == null || v === "" ? "—" : v);
@@ -14,12 +13,46 @@ const fmtDate = (s) => {
   }
 };
 
+// Print button with an A6/A8 size chooser — matches the Job Work card's print control.
+const PrintSizeButton = ({ printing, onPrint }) => {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        disabled={!!printing}
+        onClick={() => setOpen((p) => !p)}
+        className="inline-flex items-center gap-1.5 px-3 py-1 text-sm border border-gray-300 rounded-md text-black hover:bg-gray-100 transition disabled:opacity-60 disabled:cursor-not-allowed"
+      >
+        {printing ? (
+          <><span className="animate-spin inline-block w-3 h-3 border-2 border-gray-400 border-t-transparent rounded-full" /> Printing…</>
+        ) : (
+          <>Print <Printer className="w-4 h-4" /> <ChevronDown className={`w-3 h-3 transition-transform ${open ? "rotate-180" : ""}`} /></>
+        )}
+      </button>
+      {open && !printing && (
+        <div className="absolute z-20 right-0 mt-1 w-28 bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden">
+          {["A6", "A8"].map((size) => (
+            <button
+              key={size}
+              type="button"
+              onClick={() => { setOpen(false); onPrint(size); }}
+              className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50"
+            >
+              Print {size}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
 const GresCard = ({
   gres,
   onEdit,
   onDelete,
   onStatusChange,
-  onTypeChange,
   onReturnRecord,
   onEditReturn,
   onDeleteReturn,
@@ -46,7 +79,7 @@ const GresCard = ({
     ? `${primaryItem.element} ${primaryItem.elementType === "DRUM" ? "Drum" : "Peti"}`
     : "—";
 
-  const handlePrint = () => onPrint?.(gres.id, "JAVAK", setPrintLoading);
+  const handlePrint = (formType, size) => onPrint?.(gres, formType, size, setPrintLoading);
 
   return (
     <div className="border border-gray-200 rounded-xl bg-white p-4 shadow-sm">
@@ -85,14 +118,10 @@ const GresCard = ({
         <div className="border border-gray-200 rounded-xl bg-gray-50 p-4">
           <div className="flex items-center justify-between mb-3">
             <p className="text-black font-semibold">Items</p>
-            <button
-              type="button"
-              onClick={handlePrint}
-              disabled={printLoading === "javak"}
-              className="inline-flex items-center gap-1.5 px-3 py-1 text-sm border border-gray-300 rounded-md text-black hover:bg-gray-100 transition disabled:opacity-50"
-            >
-              {printLoading === "javak" ? "Printing…" : "Print"} <Printer className="w-4 h-4" />
-            </button>
+            <PrintSizeButton
+              printing={printLoading === "javak"}
+              onPrint={(size) => handlePrint("JAVAK", size)}
+            />
           </div>
           <div className="grid grid-cols-4 text-xs text-gray-400 mb-1">
             <span>Size</span>
@@ -126,14 +155,10 @@ const GresCard = ({
                   <ChevronDown className={`w-3.5 h-3.5 transition-transform ${expanded ? "rotate-180" : ""}`} />
                 </button>
               )}
-              <button
-                type="button"
-                onClick={handlePrint}
-                disabled={printLoading === "javak"}
-                className="inline-flex items-center gap-1.5 px-3 py-1 text-sm border border-gray-300 rounded-md text-black hover:bg-gray-100 transition disabled:opacity-50"
-              >
-                {printLoading === "javak" ? "Printing…" : "Print"} <Printer className="w-4 h-4" />
-              </button>
+              <PrintSizeButton
+                printing={printLoading === "aavak"}
+                onPrint={(size) => handlePrint("AAVAK", size)}
+              />
             </div>
           </div>
 
@@ -192,7 +217,6 @@ const GresCard = ({
 
       <div className="flex flex-wrap items-center gap-3">
         <GresStatusDropdown value={gres.status} onChange={(value) => onStatusChange(gres, value)} disabled={gres.status === "COMPLETE"} />
-        <GresTypeDropdown value={gres.gresType} onChange={(value) => onTypeChange(gres, value)} />
         <button
           type="button"
           onClick={onReturnRecord}

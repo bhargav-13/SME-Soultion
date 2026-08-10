@@ -8,13 +8,14 @@ import PageHeader from "../../components/PageHeader";
 import PrimaryActionButton from "../../components/PrimaryActionButton";
 import ConfirmationDialog from "../../components/ConfirmationDialog";
 import toast from "react-hot-toast";
-import { axiosInstance, partyApi, orderDispatchApi } from "../../services/apiService";
+import { axiosInstance, partyApi, orderDispatchApi, orderApi } from "../../services/apiService";
 import Loader from "../../components/Loader";
 import {
   normalizeJobWorkLabel,
   readOrderJobOverrides,
   upsertOrderJobOverride,
 } from "../../utils/orderJobWorkSync";
+import { normalizeSearch } from "../../utils/search";
 
 // ─── Flatten API response into table rows ───────────────────────────────────
 const flattenOrders = (apiData) => {
@@ -143,6 +144,12 @@ const OrderManagement = () => {
   const [partySearch, setPartySearch] = useState("");
   const [partyDropOpen, setPartyDropOpen] = useState(false);
   const partyDropRef                  = useRef(null);
+
+  // ── Selected party (orders are shown one party at a time, like Client Management) ──
+  const [selectedParty, setSelectedParty] = useState(null);
+  const [pickerOpen, setPickerOpen]   = useState(false);
+  const [pickerSearch, setPickerSearch] = useState("");
+  const pickerRef                     = useRef(null);
   const [dispatchDialog, setDispatchDialog] = useState(null);
   const [savingEdit, setSavingEdit]   = useState(false);
 
@@ -161,38 +168,51 @@ const OrderManagement = () => {
   };
 
   // ── Fetch ─────────────────────────────────────────────────────────────────
+  // Orders are shown one party at a time (newest-first by create time). Nothing loads
+  // until a party is picked — mirrors the "select client first" flow in Client Management.
   const triggerFetch = useCallback(
     async (search = debouncedSearch.current, pageNum = page) => {
+      if (!selectedParty?.id) {
+        setOrders([]);
+        setTotalPages(0);
+        setTotalElements(0);
+        return;
+      }
       setLoading(true);
       try {
-        const params = new URLSearchParams();
-        if (search)        params.set("search", search);
-        if (sortByFields)  params.set("sortByFields", sortByFields);
-        if (direction)     params.set("direction", direction);
-        // When searching, fetch a larger batch so client-side filter has enough data
-        const fetchSize = search ? 200 : PAGE_SIZE;
-        params.set("page", search ? 0 : pageNum);
-        params.set("size", fetchSize);
-
-        const res = await axiosInstance.get(`/api/v1/parties/orders?${params.toString()}`);
-        const data = res.data;
-        setOrders(flattenOrders(data.data || []));
-        setTotalPages(search ? 1 : (data.totalPages ?? 0));
-        setTotalElements(data.totalElements ?? 0);
+        // When searching, pull a larger batch and filter on the client (space-insensitively) instead
+        // of passing the term to the backend — the server's search is exact, so "6x1.1/2x5/32" would
+        // never match a size stored as "6 x 1.1/2 x 5/32". Client-side normalizeSearch handles that.
+        const searching = Boolean(search);
+        const res = await orderApi.getAllOrders(
+          selectedParty.id,
+          undefined,
+          searching ? 0 : pageNum,
+          searching ? 200 : PAGE_SIZE,
+          sortByFields || "createdAt",
+          direction || "DESC"
+        );
+        const body = res.data || {};
+        // Per-party endpoint returns { data: { party, orders }, totalPages, ... } — wrap the single
+        // party group so the existing row-flattening logic can be reused unchanged.
+        const partyOrders = body.data || null;
+        setOrders(flattenOrders(partyOrders ? [partyOrders] : []));
+        setTotalPages(searching ? 1 : (body.totalPages ?? 0));
+        setTotalElements(body.totalElements ?? 0);
       } catch (err) {
         toast.error(err?.response?.data?.message || "Failed to load orders");
       } finally {
         setLoading(false);
       }
     },
-    [page, sortByFields, direction]
+    [page, sortByFields, direction, selectedParty]
   );
 
-  // re-fetch when page / sort / direction changes
+  // re-fetch when the selected party / page / sort / direction changes
   useEffect(() => {
     triggerFetch(debouncedSearch.current, page);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page, sortByFields, direction]);
+  }, [page, sortByFields, direction, selectedParty]);
 
   useEffect(() => {
     const reloadOverrides = () => setOrderJobOverrides(readOrderJobOverrides());
@@ -221,23 +241,49 @@ const OrderManagement = () => {
     return () => document.removeEventListener("mousedown", handler);
   }, [partyDropOpen]);
 
+  useEffect(() => {
+    if (!pickerOpen) return;
+    const handler = (e) => {
+      if (pickerRef.current && !pickerRef.current.contains(e.target)) {
+        setPickerOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [pickerOpen]);
+
+  // Pick a party to view its orders (resets to the first page).
+  const handleSelectParty = (p) => {
+    setSelectedParty(p);
+    setPage(0);
+    setPickerOpen(false);
+    setPickerSearch("");
+  };
+
   // ── Client-side search + type filter ──────────────────────────────────────
   const filteredOrders = useMemo(() => {
     let result = orders;
 
-    // Client-side search across key fields (supplements server-side search)
-    const q = searchTerm.trim().toLowerCase();
+    // Space-insensitive search: strip whitespace from both the query and the row so a size typed
+    // as "6x1.1/2x5/32" matches one stored as "6 x 1.1/2 x 5/32". The end user shouldn't have to
+    // reproduce the exact spacing.
+    const q = normalizeSearch(searchTerm);
     if (q) {
-      result = result.filter((order) =>
-        (order.partyName || "").toLowerCase().includes(q) ||
-        (order.size || "").toLowerCase().includes(q) ||
-        (order.plating || "").toLowerCase().includes(q) ||
-        String(order.qtyPc ?? "").includes(q) ||
-        String(order.qtyKg ?? "").includes(q) ||
-        normalizeJobWorkLabel(order.jobWork).toLowerCase().includes(q) ||
-        (order.date || "").includes(q) ||
-        String(order.id ?? "").includes(q)
-      );
+      result = result.filter((order) => {
+        const haystack = normalizeSearch(
+          [
+            order.partyName,
+            order.size,
+            order.plating,
+            order.qtyPc,
+            order.qtyKg,
+            normalizeJobWorkLabel(order.jobWork),
+            order.date,
+            order.id,
+          ].join(" ")
+        );
+        return haystack.includes(q);
+      });
     }
 
     // Type filter
@@ -616,6 +662,61 @@ const OrderManagement = () => {
           />
         </div>
 
+        {/* Party picker — choose a party to view its orders (newest first by create time) */}
+        <div className="mb-6 max-w-md" ref={pickerRef}>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Party</label>
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => { setPickerSearch(""); setPickerOpen((o) => !o); }}
+              className={`w-full flex items-center justify-between px-3 py-2.5 border rounded-lg bg-white text-sm transition ${pickerOpen ? "ring-1 ring-gray-400 border-gray-400" : "border-gray-300 hover:border-gray-400"}`}
+            >
+              <span className={selectedParty ? "text-gray-900" : "text-gray-400"}>
+                {selectedParty?.name || "Select a party to view its orders"}
+              </span>
+              <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${pickerOpen ? "rotate-180" : ""}`} />
+            </button>
+            {pickerOpen && (
+              <div className="absolute z-40 top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden">
+                <div className="p-2 border-b border-gray-100">
+                  <input
+                    type="text"
+                    autoFocus
+                    value={pickerSearch}
+                    onChange={(e) => setPickerSearch(e.target.value)}
+                    placeholder="Search party…"
+                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-gray-400"
+                  />
+                </div>
+                <div className="max-h-64 overflow-y-auto">
+                  {parties.filter((p) => (p.name || "").toLowerCase().includes(pickerSearch.toLowerCase())).length === 0 ? (
+                    <div className="px-3 py-3 text-sm text-gray-400">No parties found</div>
+                  ) : (
+                    parties
+                      .filter((p) => (p.name || "").toLowerCase().includes(pickerSearch.toLowerCase()))
+                      .map((p) => (
+                        <button
+                          key={p.id}
+                          type="button"
+                          onClick={() => handleSelectParty(p)}
+                          className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-50 ${selectedParty?.id === p.id ? "font-semibold bg-gray-50" : "text-gray-700"}`}
+                        >
+                          {p.name}
+                        </button>
+                      ))
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {!selectedParty ? (
+          <div className="flex flex-col items-center justify-center rounded-lg border border-dashed border-gray-300 bg-gray-50 py-20 text-center">
+            <p className="text-sm text-gray-500">Select a party above to view its orders.</p>
+          </div>
+        ) : (
+        <>
         <div className="grid grid-cols-3 gap-6 mb-8">
           <StatsCard label="Total Order" value={totalFilteredOrders} className="h-[90px] rounded-md" />
           <StatsCard label="Total Pending Order" value={totalPendingOrders} className="h-[90px] rounded-md" />
@@ -843,6 +944,8 @@ const OrderManagement = () => {
             </div>
           )}
         </div>
+        </>
+        )}
       </div>
 
       {/* View dialog */}

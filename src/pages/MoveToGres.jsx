@@ -50,6 +50,29 @@ const EMPTY_CALC = {
   ratePerKg: "",
 };
 
+// Shared field styles. Labels mirror the client's Excel exactly ("Peti :-" style).
+const LBL = "block text-sm font-medium text-black mb-1";
+const INP =
+  "w-full px-3 py-2 border border-gray-300 rounded-md text-sm bg-white focus:ring-2 focus:ring-gray-900/10 focus:border-gray-400 outline-none placeholder:text-gray-400";
+const RO = "w-full px-3 py-2 border border-gray-200 rounded-md bg-gray-50 text-gray-800 text-sm";
+
+// Defined at module scope (NOT inside MoveToGres): a component declared inside the parent's render
+// is a brand-new type on every keystroke, so React unmounts/remounts its <input> and the caret is
+// lost after one character. Hoisting it keeps the input mounted so typing stays focused.
+const UnitInput = ({ value, onChange, placeholder, unit, step = "0.001" }) => (
+  <div className="flex items-center gap-2">
+    <input
+      type="number"
+      step={step}
+      value={value}
+      onChange={onChange}
+      placeholder={placeholder}
+      className={`flex-1 min-w-0 ${INP}`}
+    />
+    {unit ? <span className="text-sm text-gray-500 w-8 shrink-0">{unit}</span> : null}
+  </div>
+);
+
 const MoveToGres = () => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -239,28 +262,6 @@ const MoveToGres = () => {
       setSaving(false);
     }
   };
-
-  // Labels mirror the client's Excel exactly ("Peti :-" style). Inputs sit
-  // beside a tiny unit chip on the right so the value reads as it would on the
-  // sheet (5 Peti / 150.150 Kg / 145.150 kg / 726).
-  const LBL = "block text-sm font-medium text-black mb-1";
-  const INP =
-    "w-full px-3 py-2 border border-gray-300 rounded-md text-sm bg-white focus:ring-2 focus:ring-gray-900/10 focus:border-gray-400 outline-none placeholder:text-gray-400";
-  const RO = "w-full px-3 py-2 border border-gray-200 rounded-md bg-gray-50 text-gray-800 text-sm";
-
-  const UnitInput = ({ value, onChange, placeholder, unit, step = "0.001" }) => (
-    <div className="flex items-center gap-2">
-      <input
-        type="number"
-        step={step}
-        value={value}
-        onChange={onChange}
-        placeholder={placeholder}
-        className={`flex-1 min-w-0 ${INP}`}
-      />
-      {unit ? <span className="text-sm text-gray-500 w-8 shrink-0">{unit}</span> : null}
-    </div>
-  );
 
   const netKgText = derived.netKg != null ? `${derived.netKg} kg` : "";
   const totalRateText = derived.totalRate != null ? `${derived.totalRate}` : "";
