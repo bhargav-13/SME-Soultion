@@ -84,6 +84,8 @@ function buildCss(k, pageW, pageH) {
     .frame { width: 100%; border-collapse: collapse; }
     .logo-band { background: #fff; text-align: center; padding: ${mm(1.6)} 0 ${mm(1.2)} 0; }
     .logo-band img { height: ${mm(7.5)}; width: auto; }
+    .printout-band { background: #241C17; color: #fff; text-align: center; font-weight: 700;
+      font-size: ${px(12.5)}; letter-spacing: ${px(2)}; padding: ${mm(1.5)} 0; }
     .title-band { background: #E8A736; color: #241C17; text-align: center; font-weight: 700;
       font-size: ${px(13)}; letter-spacing: ${px(0.4)}; padding: ${mm(1.8)} 0;
       border-top: ${pt(1)} solid #241C17; border-bottom: ${pt(1.2)} solid #241C17; }
@@ -100,6 +102,7 @@ function buildCss(k, pageW, pageH) {
     table.info tr.rate-row td { background: #FFF3D6; border-bottom: ${pt(1)} solid #E8A736; }
     table.info tr.rate-row td.k { color: #8A5A12; background: #FBE7BC; }
     table.info tr.rate-row td.v { color: #A5620A; font-size: ${px(12.5)}; }
+    table.info.rate-block { border-top: ${pt(1.2)} solid #241C17; }
     table.info tr.total-row td { background: #FDF3E0; }
     table.info tr.total-row td.k { color: #241C17; font-weight: 700; }
     table.info tr.total-row td.v { color: #B87813; font-size: ${px(13.5)}; font-weight: 700; }
@@ -127,9 +130,10 @@ function buildCss(k, pageW, pageH) {
   `;
 }
 
-function buildBody(gres, formType, ctx) {
-  const isAavak = formType === "AAVAK";
-  const title = gres.gresType === "OUTSIDE" ? "Out Side Gres" : "In Side Gres";
+function buildBody(gres, ctx) {
+  // Gris has no stored in-house/outside type, so the title stays neutral rather than
+  // asserting one — it used to print "In Side Gres" on every chitthi regardless.
+  const title = "Gris Job Work";
 
   const item = gres.items?.[0] || {};
   const petiLabel = item.elementType === "DRUM" ? "Drum" : "Peti";
@@ -137,36 +141,36 @@ function buildBody(gres, formType, ctx) {
 
   // JAVAK (sent): Peti / 1-Peti tare / Gross Kg (unitKg) / Net Kg (netWeight).
   const javakCol = `
-    <div class="fr"><div class="fk">${esc(petiLabel)}</div><div class="fv">${esc(int0(item.element))}</div></div>
-    <div class="fr"><div class="fk">1 ${esc(petiLabel)} Weight</div><div class="fv">${esc(dec3(item.petiWeightKg, " Kg"))}</div></div>
-    <div class="fr"><div class="fk">Gross Kg</div><div class="fv">${esc(dec3(item.qtyPc, " Kg"))}</div></div>
-    <div class="fr net net-javak"><div class="fk">Net Kg</div><div class="fv">${esc(dec3(item.qtyKg, " kg"))}</div></div>`;
+    <div class="fr"><div class="fk">${esc(petiLabel)} :-</div><div class="fv">${esc(int0(item.element))}</div></div>
+    <div class="fr"><div class="fk">1 ${esc(petiLabel)} Weight :-</div><div class="fv">${esc(dec3(item.petiWeightKg, " Kg"))}</div></div>
+    <div class="fr"><div class="fk">Kg :-</div><div class="fv">${esc(dec3(item.qtyPc, " Kg"))}</div></div>
+    <div class="fr net net-javak"><div class="fk">Net Kg :-</div><div class="fv">${esc(dec3(item.qtyKg, " kg"))}</div></div>`;
 
   const returns = gres.returns || [];
   const returnPetiLabel = returns[0]?.returnType === "DRUM" ? "Drum" : "Peti";
   // Tare is per-container, not additive, so take it from the first return that carries one.
   const returnPetiWeight = returns.find((r) => r?.petiWeightKg != null)?.petiWeightKg;
   const aavakCol = `
-    <div class="fr"><div class="fk">${esc(returnPetiLabel)}</div><div class="fv">${esc(int0(sumField(returns, "returnElement")))}</div></div>
-    <div class="fr"><div class="fk">1 ${esc(returnPetiLabel)} Weight</div><div class="fv">${esc(dec3(returnPetiWeight, " Kg"))}</div></div>
-    <div class="fr"><div class="fk">Gross Kg</div><div class="fv">${esc(dec3(sumField(returns, "grossKg"), " Kg"))}</div></div>
-    <div class="fr net net-aavak"><div class="fk">Net Kg</div><div class="fv">${esc(dec3(sumField(returns, "netKg"), " kg"))}</div></div>`;
+    <div class="fr"><div class="fk">${esc(returnPetiLabel)} :-</div><div class="fv">${esc(int0(sumField(returns, "returnElement")))}</div></div>
+    <div class="fr"><div class="fk">1 ${esc(returnPetiLabel)} Weight :-</div><div class="fv">${esc(dec3(returnPetiWeight, " Kg"))}</div></div>
+    <div class="fr"><div class="fk">Kgs :-</div><div class="fv">${esc(dec3(sumField(returns, "grossKg"), " Kg"))}</div></div>
+    <div class="fr net net-aavak"><div class="fk">Net Kg :-</div><div class="fv">${esc(dec3(sumField(returns, "netKg"), " kg"))}</div></div>`;
 
-  const jaTable = isAavak
-    ? `<table class="ja dual">
-         <tr><th class="h-javak">JAVAK</th><th class="h-aavak">AAVAK</th></tr>
-         <tr><td class="col c-javak">${javakCol}</td><td class="col c-aavak">${aavakCol}</td></tr>
-       </table>`
-    : `<table class="ja">
-         <tr><th class="h-javak">JAVAK</th></tr>
-         <tr><td class="col c-javak">${javakCol}</td></tr>
-       </table>`;
+  // Both columns always print, so the slip reads the same whether or not the goods are
+  // back yet — the Aavak side simply shows dashes until returns are recorded.
+  const jaTable = `
+    <table class="ja dual">
+      <tr><th class="h-javak">Javak</th><th class="h-aavak">Aavak</th></tr>
+      <tr><td class="col c-javak">${javakCol}</td><td class="col c-aavak">${aavakCol}</td></tr>
+    </table>`;
 
-  const ghatiRow = isAavak
-    ? `<tr><td class="ghati"><span class="gk">Ghati :-</span> ${esc(dec3(sumField(returns, "ghati"), ""))}</td></tr>`
-    : "";
+  // Driven by the data rather than the form type, to match the always-present Aavak column.
+  const ghatiRow =
+    sumField(returns, "ghati") != null
+      ? `<tr><td class="ghati"><span class="gk">Ghati :-</span> ${esc(dec3(sumField(returns, "ghati"), ""))}</td></tr>`
+      : "";
 
-  const hasRate = item.ratePerKg != null && item.ratePerKg !== "";
+  const hasRate = item.ratePerKg != null && item.ratePerKg !== "" && !isNaN(Number(item.ratePerKg));
   const netKg = item.qtyKg;
   const hasNet = netKg != null && netKg !== "" && !isNaN(Number(netKg));
   // Total Rate is computed and stored on save; fall back to the same Net x Rate formula the
@@ -179,7 +183,7 @@ function buildBody(gres, formType, ctx) {
         : null;
 
   const rateRow = hasRate
-    ? `<tr class="rate-row"><td class="k">Rate/Kg :-</td><td class="v">${esc(item.ratePerKg)}</td></tr>
+    ? `<tr class="rate-row"><td class="k">Rate / Kg :-</td><td class="v">${esc(Number(item.ratePerKg).toFixed(2))}</td></tr>
        <tr class="rate-row"><td class="k">Total Kg :-</td><td class="v">${esc(dec3(netKg, " kg"))}</td></tr>
        <tr class="rate-row total-row"><td class="k">Total Rate :-</td><td class="v">${esc(int0(totalAmount))}</td></tr>`
     : "";
@@ -188,10 +192,11 @@ function buildBody(gres, formType, ctx) {
     <div class="ticket">
       <table class="frame">
         <tr><td class="logo-band"><img src="${logo}" alt="Ishita Industries"/></td></tr>
+        <tr><td class="printout-band">PRINT OUT</td></tr>
         <tr><td class="title-band">${esc(title)}</td></tr>
         <tr><td style="padding:0;">
           <table class="meta"><tr>
-            <td><span class="meta-k">Ch. No.</span> <span class="job-no">${esc(gres.chithiNo || `GRES-${gres.id}`)}</span></td>
+            <td><span class="meta-k">Job No.</span> <span class="job-no">${esc(gres.chithiNo || `GRES-${gres.id}`)}</span></td>
             <td class="r">
               <span class="meta-k">Date :-</span> <span class="meta-hl">${esc(ctx.dt)}</span><br/>
               <span class="meta-k">Time :-</span> <span class="meta-hl">${esc(ctx.tm)}</span>
@@ -202,13 +207,13 @@ function buildBody(gres, formType, ctx) {
           <table class="info">
             <tr><td class="k">From :-</td><td class="v">Ishita Industries</td></tr>
             <tr><td class="k">To :-</td><td class="v">${esc(ctx.partyTri)}</td></tr>
-            <tr><td class="k">Doz. :-</td><td class="v">${esc(item.itemName || "—")}</td></tr>
+            <tr><td class="k">Item Name :-</td><td class="v">${esc(item.itemName || "—")}</td></tr>
             <tr><td class="k">Size :-</td><td class="v">${esc(item.size || "—")}</td></tr>
-            ${rateRow}
           </table>
         </td></tr>
         <tr><td style="padding:0;">${jaTable}</td></tr>
         ${ghatiRow}
+        ${rateRow ? `<tr><td style="padding:0;"><table class="info rate-block">${rateRow}</table></td></tr>` : ""}
         <tr><td class="footer">ISHITA INDUSTRIES &nbsp;•&nbsp; Precision Customise Components &amp; Fasteners</td></tr>
       </table>
     </div>`;
@@ -240,7 +245,7 @@ export const printGresChitthi = async (gres, formType, paperSize, setLoadingKey)
 
     const a8 = String(paperSize).toUpperCase() === "A8";
     const css = a8 ? buildCss(0.5, 52, 74) : buildCss(1, 105, 148);
-    const body = buildBody(gres, formType, ctx);
+    const body = buildBody(gres, ctx);
 
     // Real (off-screen) size so html2canvas can rasterize the ticket at its true dimensions.
     const iframe = document.createElement("iframe");
