@@ -325,8 +325,27 @@ const MoveToJobWork = () => {
    * embedded size only carries {id, sizeInInch, sizeInMm}. Any field the size already
    * carries wins, so an enriched backend response is left untouched.
    */
-  const enrichSizeContext = async (size, finish) => {
+  const enrichSizeContext = async (size, finish, partyId) => {
     const base = { ...applySizeContext(size), finish: finish || "" };
+
+    // Party-customized packing (Client Management) takes precedence over the item master, exactly
+    // like the create flow (selectManualSize). Only pcsPerBox / boxPerCarton are party-specific;
+    // pcsWeight/itemName stay item-master values. Done before the early-return + master fallback
+    // below so the client values win and the `?? inv.*` fallbacks only fill what's still missing.
+    if (partyId != null && size?.id != null) {
+      try {
+        const ciRes = await clientInventoryApi.getInventoryByClient(Number(partyId), Number(size.id));
+        const ciList = Array.isArray(ciRes.data) ? ciRes.data : ciRes.data?.data ?? [];
+        const ci = ciList[0];
+        if (ci) {
+          if (ci.pcsPerBox != null) base.pcsPerBox = ci.pcsPerBox;
+          if (ci.boxPerCarton != null) base.boxPerCarton = ci.boxPerCarton;
+        }
+      } catch {
+        // client inventory optional — fall back to the item master below
+      }
+    }
+
     if (base.itemName && base.pcsWeight != null && base.pcsPerBox != null) return base;
 
     try {
@@ -395,7 +414,7 @@ const MoveToJobWork = () => {
           time: jw.orderTime || getNow().time,
         });
         const editCtx = {
-          ...(await enrichSizeContext(jw.size, jw.finish)),
+          ...(await enrichSizeContext(jw.size, jw.finish, jw.party?.id)),
           orderQtyPc: jw.qtyPc ?? null,
           orderStickerQty: jw.stickerQty ?? null,
         };
@@ -431,7 +450,7 @@ const MoveToJobWork = () => {
           time: jw.orderTime || getNow().time,
         });
         const editCtx = {
-          ...(await enrichSizeContext(jw.size, jw.finish)),
+          ...(await enrichSizeContext(jw.size, jw.finish, jw.party?.id)),
           orderQtyPc: jw.qtyPc ?? null,
           orderStickerQty: jw.stickerQty ?? null,
         };
@@ -483,7 +502,9 @@ const MoveToJobWork = () => {
           time: getNow().time,
         });
         const createCtx = {
-          ...(await enrichSizeContext(orderItem.itemSize, orderItem.plating)),
+          // Packing comes from the ORDER's party (the client), not the job-work vendor — the item
+          // is boxed to the client's spec regardless of who plates it.
+          ...(await enrichSizeContext(orderItem.itemSize, orderItem.plating, sourceOrderRow.partyId)),
           orderQtyPc: orderItem.qtyPc ?? null,
           orderStickerQty: orderItem.stickerQty ?? null,
         };

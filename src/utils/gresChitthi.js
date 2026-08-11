@@ -184,7 +184,6 @@ function buildBody(gres, ctx) {
 
   const rateRow = hasRate
     ? `<tr class="rate-row"><td class="k">Rate / Kg :-</td><td class="v">${esc(Number(item.ratePerKg).toFixed(2))}</td></tr>
-       <tr class="rate-row"><td class="k">Total Kg :-</td><td class="v">${esc(dec3(netKg, " kg"))}</td></tr>
        <tr class="rate-row total-row"><td class="k">Total Rate :-</td><td class="v">${esc(int0(totalAmount))}</td></tr>`
     : "";
 
@@ -192,7 +191,6 @@ function buildBody(gres, ctx) {
     <div class="ticket">
       <table class="frame">
         <tr><td class="logo-band"><img src="${logo}" alt="Ishita Industries"/></td></tr>
-        <tr><td class="printout-band">PRINT OUT</td></tr>
         <tr><td class="title-band">${esc(title)}</td></tr>
         <tr><td style="padding:0;">
           <table class="meta"><tr>

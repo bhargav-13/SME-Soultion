@@ -329,13 +329,15 @@ const OrderManagement = () => {
   const confirmDelete = async () => {
     if (!deleteTarget) return;
     try {
+      // Delete just this order item. The backend removes the parent order only if it was the
+      // last item on it.
       await axiosInstance.delete(
-        `/api/v1/parties/${deleteTarget.partyId}/orders/${deleteTarget.orderId}`
+        `/api/v1/parties/${deleteTarget.partyId}/orders/${deleteTarget.orderId}/items/${deleteTarget.id}`
       );
-      toast.success("Order deleted");
+      toast.success("Order item deleted");
       triggerFetch(debouncedSearch.current, page);
     } catch (err) {
-      toast.error(err?.response?.data?.message || "Failed to delete order");
+      toast.error(err?.response?.data?.message || "Failed to delete order item");
     } finally {
       setDeleteTarget(null);
     }
@@ -998,8 +1000,8 @@ const OrderManagement = () => {
 
       <ConfirmationDialog
         isOpen={Boolean(deleteTarget)}
-        title="Delete Order"
-        message={`Are you sure you want to delete this order for ${deleteTarget?.partyName || "this party"}?`}
+        title="Delete Order Item"
+        message={`Delete this item${deleteTarget?.size ? ` (${deleteTarget.size})` : ""} from ${deleteTarget?.partyName || "this party"}'s order? If it's the only item, the whole order is removed.`}
         confirmText="Delete"
         cancelText="Cancel"
         isDangerous
