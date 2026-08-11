@@ -100,6 +100,9 @@ function buildCss(k, pageW, pageH) {
     table.info tr.rate-row td { background: #FFF3D6; border-bottom: ${pt(1)} solid #E8A736; }
     table.info tr.rate-row td.k { color: #8A5A12; background: #FBE7BC; }
     table.info tr.rate-row td.v { color: #A5620A; font-size: ${px(12.5)}; }
+    table.info tr.total-row td { background: #FDF3E0; }
+    table.info tr.total-row td.k { color: #241C17; font-weight: 700; }
+    table.info tr.total-row td.v { color: #B87813; font-size: ${px(13.5)}; font-weight: 700; }
     table.ja { width: 100%; border-collapse: collapse; border-top: ${pt(1.2)} solid #241C17; }
     table.ja th { font-size: ${px(11.5)}; font-weight: 700; padding: ${mm(1.5)} 0; color: #fff; letter-spacing: ${px(0.6)}; }
     th.h-javak { background: #1B6CA8; }
@@ -132,16 +135,20 @@ function buildBody(gres, formType, ctx) {
   const petiLabel = item.elementType === "DRUM" ? "Drum" : "Peti";
   const logo = new URL(logoUrl, window.location.href).href;
 
-  // JAVAK (sent): Peti / Gross Kg (unitKg) / Net Kg (netWeight).
+  // JAVAK (sent): Peti / 1-Peti tare / Gross Kg (unitKg) / Net Kg (netWeight).
   const javakCol = `
     <div class="fr"><div class="fk">${esc(petiLabel)}</div><div class="fv">${esc(int0(item.element))}</div></div>
+    <div class="fr"><div class="fk">1 ${esc(petiLabel)} Weight</div><div class="fv">${esc(dec3(item.petiWeightKg, " Kg"))}</div></div>
     <div class="fr"><div class="fk">Gross Kg</div><div class="fv">${esc(dec3(item.qtyPc, " Kg"))}</div></div>
     <div class="fr net net-javak"><div class="fk">Net Kg</div><div class="fv">${esc(dec3(item.qtyKg, " kg"))}</div></div>`;
 
   const returns = gres.returns || [];
   const returnPetiLabel = returns[0]?.returnType === "DRUM" ? "Drum" : "Peti";
+  // Tare is per-container, not additive, so take it from the first return that carries one.
+  const returnPetiWeight = returns.find((r) => r?.petiWeightKg != null)?.petiWeightKg;
   const aavakCol = `
     <div class="fr"><div class="fk">${esc(returnPetiLabel)}</div><div class="fv">${esc(int0(sumField(returns, "returnElement")))}</div></div>
+    <div class="fr"><div class="fk">1 ${esc(returnPetiLabel)} Weight</div><div class="fv">${esc(dec3(returnPetiWeight, " Kg"))}</div></div>
     <div class="fr"><div class="fk">Gross Kg</div><div class="fv">${esc(dec3(sumField(returns, "grossKg"), " Kg"))}</div></div>
     <div class="fr net net-aavak"><div class="fk">Net Kg</div><div class="fv">${esc(dec3(sumField(returns, "netKg"), " kg"))}</div></div>`;
 
@@ -159,10 +166,23 @@ function buildBody(gres, formType, ctx) {
     ? `<tr><td class="ghati"><span class="gk">Ghati :-</span> ${esc(dec3(sumField(returns, "ghati"), ""))}</td></tr>`
     : "";
 
-  const rateRow =
-    item.ratePerKg != null && item.ratePerKg !== ""
-      ? `<tr class="rate-row"><td class="k">Rate/Kg :-</td><td class="v">${esc(item.ratePerKg)}</td></tr>`
-      : "";
+  const hasRate = item.ratePerKg != null && item.ratePerKg !== "";
+  const netKg = item.qtyKg;
+  const hasNet = netKg != null && netKg !== "" && !isNaN(Number(netKg));
+  // Total Rate is computed and stored on save; fall back to the same Net x Rate formula the
+  // server uses so a record saved without it still prints a figure rather than a dash.
+  const totalAmount =
+    item.totalAmount != null && item.totalAmount !== "" && !isNaN(Number(item.totalAmount))
+      ? Number(item.totalAmount)
+      : hasRate && hasNet
+        ? Math.round(Number(netKg) * Number(item.ratePerKg))
+        : null;
+
+  const rateRow = hasRate
+    ? `<tr class="rate-row"><td class="k">Rate/Kg :-</td><td class="v">${esc(item.ratePerKg)}</td></tr>
+       <tr class="rate-row"><td class="k">Total Kg :-</td><td class="v">${esc(dec3(netKg, " kg"))}</td></tr>
+       <tr class="rate-row total-row"><td class="k">Total Rate :-</td><td class="v">${esc(int0(totalAmount))}</td></tr>`
+    : "";
 
   return `
     <div class="ticket">
