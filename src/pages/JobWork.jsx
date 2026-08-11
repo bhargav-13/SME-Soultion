@@ -7,6 +7,7 @@ import {
   ChevronDown,
   RefreshCw,
   ChevronLeft,
+  ChevronRight,
   Download,
   Plus,
   Languages,
@@ -305,6 +306,27 @@ const JobWork = () => {
   const [statementOpen, setStatementOpen] = useState(false);
   const [translationOpen, setTranslationOpen] = useState(false);
 
+  // â”€â”€ Server-side pagination (global view only) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  const PAGE_SIZE = 10;
+  const isGlobal = !orderRow?.id;
+  const [page, setPage] = useState(0);
+  const [totalPages, setTotalPages] = useState(0);
+  const [totalElements, setTotalElements] = useState(0);
+  const [serverStats, setServerStats] = useState({ total: 0, completed: 0, pending: 0 });
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+
+  // Map the UI type filter to the backend JobWorkType enum (empty = all).
+  const typeParam = typeFilter === "IN_HOUSE" ? "INHOUSE" : typeFilter === "JOB_WORK" ? "JOB_WORK" : "";
+
+  // Debounce the search box so we don't hit the server on every keystroke.
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(searchTerm.trim()), 350);
+    return () => clearTimeout(t);
+  }, [searchTerm]);
+
+  // Any filter change resets to the first page (global view is server-paginated).
+  useEffect(() => { setPage(0); }, [debouncedSearch, typeParam, isGlobal]);
+
   const mergeSavedJobWork = useCallback((list) => {
     if (!savedJobWork?.job) return list;
 
@@ -342,41 +364,34 @@ const JobWork = () => {
         // Attach orderItemId to each jw so return dialog can use it
         setJobWorks(mergeSavedJobWork(list.map(jw => ({ ...jw, orderItemId: Number(orderRow.id) }))));
       } else {
-        // No specific order â€” fetch across all order items via the parties/orders endpoint
-        // then fan out per order-item. We use a lightweight approach: fetch all orders and collect job works.
-        // Manual job works aren't tied to any order item, so they can't be found by that fan-out â€”
-        // fetch them separately from the global listing endpoint and merge them in.
-        const [ordersRes, manualRes] = await Promise.allSettled([
-          axiosInstance.get(`/api/v1/parties/orders?page=0&size=500`),
-          axiosInstance.get(`/api/v1/job-works`, { params: { jobWorkType: "MANUAL", page: 0, size: 500 } }),
+        // No specific order â€” fetch a single page across all order items via the global listing
+        // endpoint. Search + type filter + pagination all run DB-side (Specification + LIMIT/OFFSET);
+        // the response carries orderItemId (null for manual jobs) plus embedded returns, party and
+        // size, so no per-order-item fan-out is needed. The stat cards come from a separate counts
+        // endpoint so they reflect the whole (filtered) dataset, not just this page.
+        const filterParams = {
+          ...(debouncedSearch ? { search: debouncedSearch } : {}),
+          ...(typeParam ? { jobWorkType: typeParam } : {}),
+        };
+        const [listRes, statsRes] = await Promise.all([
+          axiosInstance.get(`/api/v1/job-works`, { params: { ...filterParams, page, size: PAGE_SIZE } }),
+          axiosInstance.get(`/api/v1/job-works/stats`, { params: filterParams }),
         ]);
-        const ordersData = ordersRes.status === "fulfilled" ? (ordersRes.value.data?.data || []) : [];
-        const allJws = [];
-        for (const partyResp of ordersData) {
-          for (const order of (partyResp.orders || [])) {
-            for (const item of (order.orderItems || [])) {
-              try {
-                const jwRes  = await jobWorkApi.getAllJobWorks(Number(item.id), undefined, 0, 200);
-                const jwData = jwRes.data;
-                const jwList = Array.isArray(jwData?.data) ? jwData.data : Array.isArray(jwData) ? jwData : [];
-                jwList.forEach(jw => allJws.push({ ...jw, orderItemId: Number(item.id) }));
-              } catch { /* skip items with no job works */ }
-            }
-          }
-        }
-        if (manualRes.status === "fulfilled") {
-          const manualData = manualRes.value.data;
-          const manualList = Array.isArray(manualData?.data) ? manualData.data : Array.isArray(manualData) ? manualData : [];
-          manualList.forEach(jw => allJws.push({ ...jw, orderItemId: null }));
-        }
-        setJobWorks(mergeSavedJobWork(allJws));
+        const data = listRes.data;
+        const list = Array.isArray(data?.data) ? data.data : Array.isArray(data) ? data : [];
+        setJobWorks(mergeSavedJobWork(
+          list.map(jw => ({ ...jw, orderItemId: jw.orderItemId ?? null }))
+        ));
+        setTotalPages(data?.totalPages ?? 0);
+        setTotalElements(data?.totalElements ?? list.length);
+        setServerStats(statsRes.data || { total: 0, completed: 0, pending: 0 });
       }
     } catch (err) {
       toast.error(err?.response?.data?.message || "Failed to load job works");
     } finally {
       setLoading(false);
     }
-  }, [orderRow, mergeSavedJobWork]);
+  }, [orderRow, mergeSavedJobWork, page, debouncedSearch, typeParam]);
 
   useEffect(() => { loadJobWorks(); }, [loadJobWorks]);
 
@@ -386,6 +401,7 @@ const JobWork = () => {
       await jobWorkApi.updateJobWorkStatus(jw.orderItemId ?? 0, jw.id, { status: newStatus });
       toast.success("Status updated!");
       setJobWorks(prev => prev.map(j => j.id === jw.id ? { ...j, status: newStatus } : j));
+      if (isGlobal) loadJobWorks(); // resync server-side stat cards (completed/pending)
     } catch (err) {
       toast.error(err?.response?.data?.message || "Failed to update status");
     }
@@ -402,6 +418,7 @@ const JobWork = () => {
         jobWork: normalizeJobWorkLabel(newType),
         platingStatus: true,
       });
+      if (isGlobal && typeParam) loadJobWorks(); // resync when a type filter is active
     } catch (err) {
       toast.error(err?.response?.data?.message || "Failed to update type");
     }
@@ -416,6 +433,7 @@ const JobWork = () => {
       toast.success("Job work deleted!");
       setJobWorks(prev => prev.filter(j => j.id !== deleteTarget.id));
       removeOrderJobOverride({ orderItemId: deleteTarget.orderItemId });
+      if (isGlobal) loadJobWorks(); // resync totals + pull the next row onto this page
     } catch (err) {
       toast.error(err?.response?.data?.message || "Failed to delete");
     } finally {
@@ -465,8 +483,12 @@ const JobWork = () => {
 
   // â”€â”€ Filter â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const filtered = useMemo(() => {
+    // Global view is filtered + paginated server-side, so the current page is shown as-is.
+    if (isGlobal) return jobWorks;
+
+    // Order-scoped view holds the full (small) list for that order item — filter on the client.
     let filteredList = jobWorks;
-    
+
     // Apply type filter
     if (typeFilter) {
       filteredList = filteredList.filter(jw => {
@@ -494,15 +516,24 @@ const JobWork = () => {
     }
     
     return filteredList;
-  }, [jobWorks, searchTerm, typeFilter]);
+  }, [jobWorks, searchTerm, typeFilter, isGlobal]);
 
+  // Global view: counts come from the server (whole filtered dataset). Order-scoped view: count the
+  // small client-held list.
   const stats = useMemo(
-    () => ({
-      totalJobWorks: filtered.length,
-      completedJobWorks: filtered.filter((jw) => jw.status === "COMPLETE").length,
-      pendingJobWorks: filtered.filter((jw) => jw.status === "PENDING").length,
-    }),
-    [filtered]
+    () =>
+      isGlobal
+        ? {
+            totalJobWorks: serverStats.total,
+            completedJobWorks: serverStats.completed,
+            pendingJobWorks: serverStats.pending,
+          }
+        : {
+            totalJobWorks: filtered.length,
+            completedJobWorks: filtered.filter((jw) => jw.status === "COMPLETE").length,
+            pendingJobWorks: filtered.filter((jw) => jw.status === "PENDING").length,
+          },
+    [filtered, isGlobal, serverStats]
   );
 
   // â”€â”€ Header context info â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -620,6 +651,35 @@ const JobWork = () => {
                 onDelete={() => setDeleteTarget(jw)}
               />
             ))}
+          </div>
+        )}
+
+        {/* Pagination (global view, server-side) */}
+        {isGlobal && !loading && totalPages > 1 && (
+          <div className="flex items-center justify-between mt-6 px-1">
+            <p className="text-sm text-gray-500">
+              Page {page + 1} of {totalPages} &nbsp;·&nbsp; {totalElements} job works
+            </p>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setPage((p) => Math.max(0, p - 1))}
+                disabled={page === 0}
+                className="p-1.5 rounded border border-gray-300 text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                aria-label="Previous page"
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+              <button
+                type="button"
+                onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
+                disabled={page >= totalPages - 1}
+                className="p-1.5 rounded border border-gray-300 text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                aria-label="Next page"
+              >
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
           </div>
         )}
       </div>
