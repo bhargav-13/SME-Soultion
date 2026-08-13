@@ -994,7 +994,8 @@ components:
       type: string
       description: >-
         Stage a single requested line item is at in the works. An order request as a whole reports
-        the stage of its least advanced item.
+        the furthest stage any of its items has reached, except DISPATCHED which needs every item;
+        this per-item stage is what says which items are actually where.
       enum:
         - APPROVED
         - IN_PLATING

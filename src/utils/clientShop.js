@@ -122,14 +122,15 @@ export const formatKg = (value) => {
 /**
  * Derive a display status for an order coming from the existing ERP order API.
  *
- * The order takes the stage of its *least advanced* item — the bottleneck — so
- * the badge answers "what is this order still waiting on?" rather than
- * flattering it with the progress of whichever item happens to be furthest
- * along. Per-item detail is in the Job Work column of the order table.
+ * The order takes the *furthest* stage any of its items has reached, matching
+ * the server's ClientOrderFulfillmentService. A real order runs a dozen lines
+ * that move at different speeds, so rolling up the least advanced line would
+ * pin the order in "Approved" until the last line was sent for plating. Which
+ * lines are where is in the Job Work column of the order table.
  *
  * Returns an object: { status, dispatchedPc, totalPc }
  *  - APPROVED: order created, nothing sent for plating or dispatched yet
- *  - IN_PLATING: at least one item is still out for plating (outside/in-house)
+ *  - IN_PLATING: something is out for plating (outside/in-house), nothing back
  *  - READY_TO_DISPATCH: something is back from plating and waiting to go out
  *  - DISPATCHED: every piece ordered has gone out (includes counts)
  */
@@ -141,13 +142,17 @@ export const deriveErpOrderStatus = (order) => {
   const dispatchedPc = items.reduce((sum, it) => sum + (Number(it.dispatchedPc) || 0), 0);
   const counts = { dispatchedPc, totalPc };
 
-  const bottleneck = items
-    .map(deriveItemStage)
-    .reduce((slowest, stage) =>
-      ITEM_STAGE_RANK[stage] < ITEM_STAGE_RANK[slowest] ? stage : slowest
-    );
+  const stages = items.map(deriveItemStage);
 
-  return { status: bottleneck, ...counts };
+  // DISPATCHED is the one all-or-nothing stage: while any line is still to go out, the order is
+  // not dispatched — a line already gone counts as (at least) ready.
+  if (stages.every((stage) => stage === "DISPATCHED")) return { status: "DISPATCHED", ...counts };
+
+  const furthest = stages.reduce((best, stage) =>
+    ITEM_STAGE_RANK[stage] > ITEM_STAGE_RANK[best] ? stage : best
+  );
+
+  return { status: furthest === "DISPATCHED" ? "READY_TO_DISPATCH" : furthest, ...counts };
 };
 
 // ─── localStorage-backed cart ──────────────────────────────────────────────
