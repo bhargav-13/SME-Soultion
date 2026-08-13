@@ -510,6 +510,9 @@ const JobWork = () => {
           (jw.party?.name || "").toLowerCase().includes(q) ||
           (jw.finish || "").toLowerCase().includes(q) ||
           (jw.chitthiNo || "").toLowerCase().includes(q) ||
+          (jw.jobWorkLabel || "").toLowerCase().includes(q) ||
+          (jw.size?.itemName || "").toLowerCase().includes(q) ||
+          (jw.size?.category || "").toLowerCase().includes(q) ||
           sizeLabel.includes(q) ||
           String(jw.id).includes(q)
         );

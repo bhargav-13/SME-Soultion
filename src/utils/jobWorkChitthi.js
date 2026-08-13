@@ -127,7 +127,15 @@ function buildCss(k, pageW, pageH) {
     .net-aavak .fv { color: #10653F; font-size: ${px(12.5)}; }
     .ghati { background: #FBEDEB; border-top: ${pt(1.2)} solid #241C17; padding: ${mm(1.8)} ${mm(2.5)};
       font-size: ${px(11)}; font-weight: 700; color: #A63325; }
+    .ghati.positive { background: #E8F5E9; color: #2E7D32; }
     .ghati .gk { color: #6B6259; font-weight: 500; font-size: ${px(9.5)}; }
+    table.info.rate-block { border-top: ${pt(1.2)} solid #241C17; }
+    table.info tr.rate-row td { background: #FFF3D6; border-bottom: ${pt(1)} solid #E8A736; }
+    table.info tr.rate-row td.k { color: #8A5A12; background: #FBE7BC; }
+    table.info tr.rate-row td.v { color: #A5620A; font-size: ${px(12.5)}; }
+    table.info tr.total-row td { background: #FDF3E0; }
+    table.info tr.total-row td.k { color: #241C17; font-weight: 700; }
+    table.info tr.total-row td.v { color: #B87813; font-size: ${px(13.5)}; font-weight: 700; }
     .footer { background: #E8A736; border-top: ${pt(1.2)} solid #241C17; text-align: center;
       padding: ${mm(1.4)} 0; font-size: ${px(8.5)}; font-weight: 700; color: #241C17; letter-spacing: ${px(0.3)}; }
   `;
@@ -167,8 +175,19 @@ function buildBody(jw, formType, ctx) {
          <tr><td class="col c-javak">${javakCol}</td></tr>
        </table>`;
 
-  const ghatiRow = isAavak
-    ? `<tr><td class="ghati"><span class="gk">Ghati :-</span> ${esc(dec3(sumReturns(returns, "ghati"), ""))}</td></tr>`
+  const ghatiVal = sumReturns(returns, "ghati");
+  const ghatiPositive = ghatiVal != null && ghatiVal > 0;
+  const ghatiRow = isAavak && ghatiVal != null
+    ? `<tr><td class="ghati${ghatiPositive ? ' positive' : ''}"><span class="gk">Ghati :-</span> ${esc(dec3(ghatiVal, ""))}</td></tr>`
+    : "";
+
+  const hasRate = jw.ratePerKg != null && jw.ratePerKg !== "" && !isNaN(Number(jw.ratePerKg));
+  const totalRate = jw.totalRate != null && jw.totalRate !== "" && !isNaN(Number(jw.totalRate))
+    ? Number(jw.totalRate)
+    : hasRate && jw.qtyKg != null ? Math.round(Number(jw.qtyKg) * Number(jw.ratePerKg)) : null;
+  const rateRow = hasRate
+    ? `<tr class="rate-row"><td class="k">Rate / Kg :-</td><td class="v">${esc(Number(jw.ratePerKg).toFixed(2))}</td></tr>
+       <tr class="rate-row total-row"><td class="k">Total Rate :-</td><td class="v">${esc(totalRate != null ? String(Math.round(totalRate)) : "—")}</td></tr>`
     : "";
 
   const chipsRow = isInside
@@ -213,6 +232,7 @@ function buildBody(jw, formType, ctx) {
         ${chipsRow}
         <tr><td style="padding:0;">${jaTable}</td></tr>
         ${ghatiRow}
+        ${rateRow ? `<tr><td style="padding:0;"><table class="info rate-block">${rateRow}</table></td></tr>` : ""}
         <tr><td class="footer">ISHITA INDUSTRIES &nbsp;•&nbsp; Precision Customise Components &amp; Fasteners</td></tr>
       </table>
     </div>`;

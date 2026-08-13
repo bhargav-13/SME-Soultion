@@ -67,9 +67,9 @@ const GresCard = ({
     // Total Return = gross weight returned; Total Net = net after tare.
     const totalReturn = round3(returns.reduce((sum, item) => sum + (Number(item.grossKg) || 0), 0));
     const totalNet = round3(returns.reduce((sum, item) => sum + (Number(item.netKg) || 0), 0));
-    // Ghati (process loss) is a job-level figure: what was sent (job net) minus all net returned.
+    // Ghati: totalReturned - jobNet (positive = returned more, negative = shortfall).
     const jobNet = Number(primaryItem.qtyKg) || 0;
-    const totalGhati = returns.length ? round3(jobNet - totalNet) : 0;
+    const totalGhati = returns.length ? round3(totalNet - jobNet) : 0;
     return { totalReturn, totalNet, totalGhati };
   }, [returns, primaryItem.qtyKg]);
 

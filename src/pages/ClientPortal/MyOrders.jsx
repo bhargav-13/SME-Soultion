@@ -246,7 +246,7 @@ const MyOrders = () => {
                             Pending (Pc)
                           </th>
                           <th className="px-6 py-3 text-center text-sm font-[550] text-black">
-                            Job Work
+                            In Plating
                           </th>
                         </>
                       )}

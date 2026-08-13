@@ -124,6 +124,7 @@ function buildCss(k, pageW, pageH) {
     .net-aavak .fv { color: #10653F; font-size: ${px(12.5)}; }
     .ghati { background: #FBEDEB; border-top: ${pt(1.2)} solid #241C17; padding: ${mm(1.8)} ${mm(2.5)};
       font-size: ${px(11)}; font-weight: 700; color: #A63325; }
+    .ghati.positive { background: #E8F5E9; color: #2E7D32; }
     .ghati .gk { color: #6B6259; font-weight: 500; font-size: ${px(9.5)}; }
     .footer { background: #E8A736; border-top: ${pt(1.2)} solid #241C17; text-align: center;
       padding: ${mm(1.4)} 0; font-size: ${px(8.5)}; font-weight: 700; color: #241C17; letter-spacing: ${px(0.3)}; }
@@ -165,9 +166,11 @@ function buildBody(gres, ctx) {
     </table>`;
 
   // Driven by the data rather than the form type, to match the always-present Aavak column.
+  const ghatiVal = sumField(returns, "ghati");
+  const ghatiPositive = ghatiVal != null && ghatiVal > 0;
   const ghatiRow =
-    sumField(returns, "ghati") != null
-      ? `<tr><td class="ghati"><span class="gk">Ghati :-</span> ${esc(dec3(sumField(returns, "ghati"), ""))}</td></tr>`
+    ghatiVal != null
+      ? `<tr><td class="ghati${ghatiPositive ? ' positive' : ''}"><span class="gk">Ghati :-</span> ${esc(dec3(ghatiVal, ""))}</td></tr>`
       : "";
 
   const hasRate = item.ratePerKg != null && item.ratePerKg !== "" && !isNaN(Number(item.ratePerKg));

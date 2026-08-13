@@ -136,7 +136,6 @@ const Gres = () => {
     const apiPayload = {
       grossKg: payload.grossKg,
       petiWeightKg: payload.petiWeightKg,
-      // returnKg + ghati are recomputed server-side, but sending them keeps optimistic UI honest.
       returnKg: payload.returnKg,
       ghati: payload.ghati,
       returnElementCount: payload.returnElement ? Number(payload.returnElement) || undefined : undefined,
@@ -150,9 +149,30 @@ const Gres = () => {
         await gresFillingReturnApi.createGresFillingReturn(returnTarget.id, apiPayload);
       }
       toast.success("Return saved!");
+      const gresId = returnTarget.id;
       setReturnTarget(null);
       setEditingReturn(null);
       await refreshRecords();
+
+      // Auto-complete: if all Kg have been returned, mark the gres as COMPLETE.
+      try {
+        const freshRes = await gresFillingApi.getGresFillingById(gresId);
+        const freshGres = freshRes.data;
+        const item = freshGres?.items?.[0];
+        const jobNet = item?.netWeight || 0;
+        const totalReturned = round3(
+          (freshGres.returns || []).reduce((s, r) => s + (Number(r.returnKg) || 0), 0)
+        );
+        if (jobNet > 0 && totalReturned >= jobNet && freshGres.status !== "COMPLETE") {
+          const statusPayload = buildUpdatePayload(
+            normalizeGresRecord(freshGres),
+            "COMPLETE"
+          );
+          await gresFillingApi.updateGresFilling(gresId, statusPayload);
+          toast.success("All Kg returned — Gres auto-marked as Complete!");
+          await refreshRecords();
+        }
+      } catch { /* ignore — main data already reloaded */ }
     } catch {
       toast.error("Failed to save return");
     }
