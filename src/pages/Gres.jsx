@@ -14,8 +14,6 @@ import { printGresChitthi } from "../utils/gresChitthi";
 import PrimaryActionButton from "../components/PrimaryActionButton";
 import DownloadStatementModal from "../components/DownloadStatementModal";
 
-const round3 = (n) => Math.round(n * 1000) / 1000;
-
 /** Display Ch. No. as the zero-padded monthly serial. Falls back to whatever's in
  *  the legacy chitthiNo column only for pre-migration rows that have no serial. */
 const displayChNo = (apiRecord) =>
@@ -149,30 +147,11 @@ const Gres = () => {
         await gresFillingReturnApi.createGresFillingReturn(returnTarget.id, apiPayload);
       }
       toast.success("Return saved!");
-      const gresId = returnTarget.id;
       setReturnTarget(null);
       setEditingReturn(null);
+      // The server marks the record Complete as soon as a return exists (and back to Pending when
+      // the last one is deleted), so the reload below already carries the right status.
       await refreshRecords();
-
-      // Auto-complete: if all Kg have been returned, mark the gres as COMPLETE.
-      try {
-        const freshRes = await gresFillingApi.getGresFillingById(gresId);
-        const freshGres = freshRes.data;
-        const item = freshGres?.items?.[0];
-        const jobNet = item?.netWeight || 0;
-        const totalReturned = round3(
-          (freshGres.returns || []).reduce((s, r) => s + (Number(r.returnKg) || 0), 0)
-        );
-        if (jobNet > 0 && totalReturned >= jobNet && freshGres.status !== "COMPLETE") {
-          const statusPayload = buildUpdatePayload(
-            normalizeGresRecord(freshGres),
-            "COMPLETE"
-          );
-          await gresFillingApi.updateGresFilling(gresId, statusPayload);
-          toast.success("All Kg returned — Gres auto-marked as Complete!");
-          await refreshRecords();
-        }
-      } catch { /* ignore — main data already reloaded */ }
     } catch {
       toast.error("Failed to save return");
     }

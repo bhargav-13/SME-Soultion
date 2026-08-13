@@ -12,6 +12,8 @@ servers:
 tags:
   - name: Admin
     description: Admin endpoints to manage client portal accounts (list parties with credentials, export, reset credentials)
+  - name: PartyGroup
+    description: Admin endpoints to manage party groups (a single login shared across several member companies/parties)
   - name: Client
     description: Client-facing endpoints (profile, change password, own orders)
   - name: ClientInvoices
@@ -105,6 +107,178 @@ paths:
           description: Unauthorized
         '403':
           description: Forbidden - Admin access required
+      security:
+        - oauth2: [ ]
+
+  /api/v1/client-portal/admin/party-groups:
+    get:
+      tags:
+        - PartyGroup
+      operationId: getAllPartyGroups
+      summary: List all party groups with their member companies and login info (Admin only)
+      responses:
+        '200':
+          description: List of party groups
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PartyGroup'
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden - Admin access required
+      security:
+        - oauth2: [ ]
+    post:
+      tags:
+        - PartyGroup
+      operationId: createPartyGroup
+      summary: Create a party group and provision its single shared client login (Admin only)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NewPartyGroup'
+      responses:
+        '201':
+          description: Party group created, including the generated initial login credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PartyGroup'
+        '400':
+          description: Bad request (validation error)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden - Admin access required
+      security:
+        - oauth2: [ ]
+
+  /api/v1/client-portal/admin/party-groups/{groupId}/parties:
+    put:
+      tags:
+        - PartyGroup
+      operationId: setPartyGroupParties
+      summary: Set the member companies/parties of a group (Admin only)
+      description: Replaces the group's membership with the given parties. Each party keeps its own login working; the group login is an additional shared way to reach all member companies.
+      parameters:
+        - name: groupId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SetGroupPartiesRequest'
+      responses:
+        '200':
+          description: Updated party group
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PartyGroup'
+        '404':
+          description: Party group not found
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden - Admin access required
+      security:
+        - oauth2: [ ]
+
+  /api/v1/client-portal/admin/parties/{partyId}/group:
+    put:
+      tags:
+        - PartyGroup
+      operationId: assignPartyGroup
+      summary: Assign a party to a group, or remove it from its group (Admin only)
+      description: When a groupId is given, the party joins that group so it can also be reached via the shared group login. When groupId is null, the party leaves its group. The party's own login keeps working either way.
+      parameters:
+        - name: partyId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AssignPartyGroupRequest'
+      responses:
+        '204':
+          description: Party group membership updated
+        '404':
+          description: Party or group not found
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden - Admin access required
+      security:
+        - oauth2: [ ]
+
+  /api/v1/client-portal/admin/party-groups/{groupId}/reset-credentials:
+    post:
+      tags:
+        - PartyGroup
+      operationId: resetPartyGroupCredentials
+      summary: Regenerate the shared login credentials for a party group (Admin only)
+      parameters:
+        - name: groupId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: New credentials generated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClientCredentials'
+        '404':
+          description: Party group or linked login not found
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden - Admin access required
+      security:
+        - oauth2: [ ]
+
+  /api/v1/client-portal/me/companies:
+    get:
+      tags:
+        - Client
+      operationId: getMyCompanies
+      summary: List the companies/parties the authenticated client can act as
+      description: For a standalone client this is their single party; for a group login it is all the group's member companies. The client selects one and sends its id via the X-Party-Id header on subsequent requests.
+      responses:
+        '200':
+          description: List of companies the client can act as
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Company'
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden - Client access required
       security:
         - oauth2: [ ]
 
@@ -546,6 +720,78 @@ components:
           type: string
           description: Plain-text password (only ever returned once, on generation/reset)
 
+    Company:
+      type: object
+      description: A company/party the authenticated client can act as
+      properties:
+        partyId:
+          type: integer
+          format: int64
+        partyName:
+          type: string
+
+    NewPartyGroup:
+      type: object
+      required:
+        - name
+      properties:
+        name:
+          type: string
+        email:
+          type: string
+        contactNo:
+          type: string
+
+    PartyGroup:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        name:
+          type: string
+        email:
+          type: string
+        contactNo:
+          type: string
+        username:
+          type: string
+          description: Login username for the group's shared client account
+        credentialsPending:
+          type: boolean
+          description: True if the initial password has not yet been changed
+        initialPassword:
+          type: string
+          description: Auto-generated initial password, only present while credentialsPending is true
+        parties:
+          type: array
+          description: Member companies/parties in this group
+          items:
+            $ref: '#/components/schemas/Company'
+        createdAt:
+          type: string
+          format: date-time
+
+    SetGroupPartiesRequest:
+      type: object
+      required:
+        - partyIds
+      properties:
+        partyIds:
+          type: array
+          items:
+            type: integer
+            format: int64
+
+    AssignPartyGroupRequest:
+      type: object
+      properties:
+        groupId:
+          type: integer
+          format: int64
+          description: Group to assign the party to; null/omitted removes the party from its group
+          nullable: true
+
     PartyType:
       type: string
       enum:
@@ -701,6 +947,12 @@ components:
           type: string
         sizeInMm:
           type: string
+        pcsPerBox:
+          type: integer
+          description: Number of pieces per box (from inventory master)
+        pcsPerCarton:
+          type: integer
+          description: Total pieces per carton (from inventory master)
 
     CatalogItem:
       type: object
@@ -723,13 +975,31 @@ components:
 
     OrderRequestStatus:
       type: string
-      description: Lifecycle status of a client order request
+      description: >-
+        Lifecycle status of a client order request. PENDING_APPROVAL / APPROVED / REJECTED are set
+        by an admin; IN_PLATING, READY_TO_DISPATCH and DISPATCHED are derived from the order created
+        on approval as it moves through job work and dispatch. IN_PROGRESS is legacy and is no longer
+        derived.
       enum:
         - PENDING_APPROVAL
         - APPROVED
+        - IN_PLATING
+        - READY_TO_DISPATCH
+        - DISPATCHED
         - IN_PROGRESS
         - COMPLETED
         - REJECTED
+
+    OrderItemStage:
+      type: string
+      description: >-
+        Stage a single requested line item is at in the works. An order request as a whole reports
+        the stage of its least advanced item.
+      enum:
+        - APPROVED
+        - IN_PLATING
+        - READY_TO_DISPATCH
+        - DISPATCHED
 
     NewOrderRequestItem:
       type: object
@@ -809,6 +1079,26 @@ components:
         pendingPc:
           type: number
           format: double
+        stage:
+          $ref: '#/components/schemas/OrderItemStage'
+        sentKg:
+          type: number
+          format: double
+          description: Net Kg sent out for job work / plating for this line, if any.
+        returnedKg:
+          type: number
+          format: double
+          description: >-
+            Net Kg already returned from the job worker. On a partial return this is exactly the
+            weight that is ready to dispatch.
+        remainingKg:
+          type: number
+          format: double
+          description: Net Kg still lying with the job worker (sent - returned - ghati).
+        dispatchedPc:
+          type: number
+          format: double
+          description: Pieces dispatched against this line so far.
 
     OrderRequest:
       type: object

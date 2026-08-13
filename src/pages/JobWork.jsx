@@ -106,7 +106,6 @@ const JobWorkCardItem = ({ jw, onStatusChange, onTypeChange, onReturnRecord, onE
   const sentKg = jw.qtyKg || 0;
   const remainingKg = round3(Math.max(0, sentKg - totalReturnWithGhati));
   const isFullyReturned = sentKg > 0 && totalReturnWithGhati >= sentKg;
-  const isCompleted = jw.status === "COMPLETE";
   const processLabel = /sartin/i.test(String(jw.finish || "")) ? "Sartin" : "Emrey";
 
   return (
@@ -273,7 +272,9 @@ const JobWorkCardItem = ({ jw, onStatusChange, onTypeChange, onReturnRecord, onE
 
       {/* Footer actions */}
       <div className="flex flex-wrap items-center gap-3">
-        <StatusDropdown value={jw.status} onChange={(v) => onStatusChange(jw, v)} disabled={isCompleted} />
+        {/* Not locked once Complete: the server auto-completes on the first return and reverts to
+            Pending when the last one is deleted, so the dropdown stays available for corrections. */}
+        <StatusDropdown value={jw.status} onChange={(v) => onStatusChange(jw, v)} />
         <TypeDropdown   value={jw.jobWorkType} onChange={(v) => onTypeChange(jw, v)} />
         <button type="button" onClick={onReturnRecord}
           className="inline-flex items-center gap-2 px-5 py-1.5 rounded-md bg-[#b9d8e9] text-black text-sm font-medium hover:bg-[#a6cde3] transition">
@@ -442,26 +443,10 @@ const JobWork = () => {
     }
   };
 
-  // â”€â”€ Auto-complete after return saved â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const handleReturnSaved = async () => {
+    // The server marks the job work Complete as soon as a return exists (and back to Pending when
+    // the last one is deleted), so a plain reload already carries the right status.
     await loadJobWorks();
-    // After reload, we need to check the fresh data â€” but loadJobWorks sets state async.
-    // So we do the check using the returnTarget (the jw we just saved a return for).
-    // Re-fetch this specific job work to get updated returns.
-    if (returnTarget) {
-      try {
-        const res = await jobWorkApi.getJobWorkById(returnTarget.orderItemId ?? 0, returnTarget.id);
-        const freshJw = res.data;
-        const returns = freshJw?.jobWorkReturns || [];
-        const totalReturned = Math.round(returns.reduce((sum, r) => sum + (r.returnKg || 0) + (r.ghati || 0), 0) * 1000) / 1000;
-        const sentKg = freshJw?.qtyKg || 0;
-        if (sentKg > 0 && totalReturned >= sentKg && freshJw?.status !== "COMPLETE") {
-          await jobWorkApi.updateJobWorkStatus(returnTarget.orderItemId ?? 0, returnTarget.id, { status: "COMPLETE" });
-          toast.success("All Kg returned â€” Job work auto-marked as Complete!");
-          loadJobWorks();
-        }
-      } catch { /* ignore â€” main data already reloaded */ }
-    }
   };
 
   // â”€â”€ Delete Return â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€

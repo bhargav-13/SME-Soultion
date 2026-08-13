@@ -216,7 +216,9 @@ const GresCard = ({
       </div>
 
       <div className="flex flex-wrap items-center gap-3">
-        <GresStatusDropdown value={gres.status} onChange={(value) => onStatusChange(gres, value)} disabled={gres.status === "COMPLETE"} />
+        {/* Not locked once Complete: the server auto-completes on the first return and reverts to
+            Pending when the last one is deleted, so the dropdown stays available for corrections. */}
+        <GresStatusDropdown value={gres.status} onChange={(value) => onStatusChange(gres, value)} />
         <button
           type="button"
           onClick={onReturnRecord}

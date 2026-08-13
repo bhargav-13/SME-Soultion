@@ -8,14 +8,14 @@ import StatsCard from "../../components/StatsCard";
 import ConfirmationDialog from "../../components/ConfirmationDialog";
 import OrderStatusBadge from "../../components/ClientPortal/OrderStatusBadge";
 import { clientPortalAdminApi } from "../../services/apiService";
+import { ITEM_STAGE, ORDER_STATUS, ORDER_STATUS_TABS, formatKg } from "../../utils/clientShop";
 
 const PAGE_SIZE = 20;
 
+// The server keeps every request in exactly one pipeline status, so these tabs partition the list.
 const TABS = [
   { key: "ALL", label: "All" },
-  { key: "PENDING_APPROVAL", label: "Pending Approval" },
-  { key: "APPROVED", label: "Approved" },
-  { key: "REJECTED", label: "Rejected" },
+  ...ORDER_STATUS_TABS.map((key) => ({ key, label: ORDER_STATUS[key].label })),
 ];
 
 const ClientOrderApprovals = () => {
@@ -241,18 +241,49 @@ const ClientOrderApprovals = () => {
                         <th className="px-6 py-2.5 text-center text-xs font-[550] text-black">Size (mm)</th>
                         <th className="px-6 py-2.5 text-center text-xs font-[550] text-black">Plating</th>
                         <th className="px-6 py-2.5 text-center text-xs font-[550] text-black">Qty (Pc)</th>
+                        <th className="px-6 py-2.5 text-center text-xs font-[550] text-black">Stage</th>
+                        <th className="px-6 py-2.5 text-center text-xs font-[550] text-black">Ready / At Plater (Kg)</th>
+                        <th className="px-6 py-2.5 text-center text-xs font-[550] text-black">Dispatched (Pc)</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {(req.items || []).map((item) => (
-                        <tr key={item.id} className="border-b border-gray-100 last:border-0">
-                          <td className="px-6 py-2.5 text-sm text-gray-700 text-center">{item.itemName || "-"}</td>
-                          <td className="px-6 py-2.5 text-sm text-gray-700 text-center">{item.sizeInInch || "-"}</td>
-                          <td className="px-6 py-2.5 text-sm text-gray-700 text-center">{item.sizeInMm || "-"}</td>
-                          <td className="px-6 py-2.5 text-sm text-gray-700 text-center">{item.plating || "-"}</td>
-                          <td className="px-6 py-2.5 text-sm text-gray-700 text-center">{item.qtyPc ?? "-"}</td>
-                        </tr>
-                      ))}
+                      {(req.items || []).map((item) => {
+                        const stage = ITEM_STAGE[item.stage];
+                        return (
+                          <tr key={item.id} className="border-b border-gray-100 last:border-0">
+                            <td className="px-6 py-2.5 text-sm text-gray-700 text-center">{item.itemName || "-"}</td>
+                            <td className="px-6 py-2.5 text-sm text-gray-700 text-center">{item.sizeInInch || "-"}</td>
+                            <td className="px-6 py-2.5 text-sm text-gray-700 text-center">{item.sizeInMm || "-"}</td>
+                            <td className="px-6 py-2.5 text-sm text-gray-700 text-center">{item.plating || "-"}</td>
+                            <td className="px-6 py-2.5 text-sm text-gray-700 text-center">{item.qtyPc ?? "-"}</td>
+                            <td className="px-6 py-2.5 text-sm text-center">
+                              {stage ? (
+                                <span className={`px-2.5 py-1 rounded-full text-xs font-medium whitespace-nowrap ${stage.className}`}>
+                                  {stage.label}
+                                </span>
+                              ) : (
+                                <span className="text-gray-400">-</span>
+                              )}
+                            </td>
+                            {/* On a partial return it is exactly the returned Kg that is ready to go
+                                out; the rest is still with the plater. */}
+                            <td className="px-6 py-2.5 text-sm text-gray-700 text-center">
+                              {item.sentKg == null ? (
+                                "-"
+                              ) : (
+                                <>
+                                  <span className="font-medium text-teal-700">{formatKg(item.returnedKg)}</span>
+                                  <span className="text-gray-400"> / </span>
+                                  <span className="text-gray-600">{formatKg(item.remainingKg)}</span>
+                                </>
+                              )}
+                            </td>
+                            <td className="px-6 py-2.5 text-sm text-gray-700 text-center">
+                              {item.dispatchedPc == null ? "-" : `${item.dispatchedPc} / ${item.qtyPc ?? "-"}`}
+                            </td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 )}

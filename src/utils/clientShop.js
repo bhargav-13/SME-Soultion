@@ -42,16 +42,30 @@ export const ORDER_STATUS = {
   IN_PROGRESS: { label: "In Progress", className: "bg-indigo-100 text-indigo-800" },
 };
 
-/** Statuses offered as filter tabs, in pipeline order. */
+/**
+ * Statuses offered as filter tabs, in pipeline order. The server keeps a request in exactly one of
+ * these, so the tabs partition the list rather than overlap: an order sent for plating leaves
+ * "Approved" for "In Plating", and one fully dispatched leaves "Ready to Dispatch".
+ *
+ * COMPLETED and IN_PROGRESS are omitted — nothing derives them any more, so their tabs would
+ * always be empty. They stay in ORDER_STATUS so legacy rows still render a sensible badge.
+ */
 export const ORDER_STATUS_TABS = [
   "PENDING_APPROVAL",
   "APPROVED",
   "IN_PLATING",
   "READY_TO_DISPATCH",
   "DISPATCHED",
-  "COMPLETED",
   "REJECTED",
 ];
+
+/** Per-line stage the server reports on an order request item. */
+export const ITEM_STAGE = {
+  APPROVED: { label: "Not started", className: "bg-gray-100 text-gray-700" },
+  IN_PLATING: { label: "In Plating", className: "bg-indigo-100 text-indigo-800" },
+  READY_TO_DISPATCH: { label: "Ready to Dispatch", className: "bg-teal-100 text-teal-800" },
+  DISPATCHED: { label: "Dispatched", className: "bg-purple-100 text-purple-800" },
+};
 
 // ─── Job work (per order item) ─────────────────────────────────────────────
 export const JOB_WORK_STATUS = {
@@ -62,23 +76,25 @@ export const JOB_WORK_STATUS = {
 
 /**
  * The stage a single order item sits at. Ordered least → most advanced, since
- * an order is only as far along as its least advanced item.
+ * an order is only as far along as its least advanced item. Same names and
+ * ordering as the server's OrderItemStage, so the two never disagree.
  */
 export const ITEM_STAGE_RANK = {
-  NOT_STARTED: 0,
+  APPROVED: 0,
   IN_PLATING: 1,
-  RETURNED: 2,
+  READY_TO_DISPATCH: 2,
   DISPATCHED: 3,
 };
 
 /**
- * Work out which stage an order item is at.
+ * Work out which stage an order item is at. Mirrors the server's
+ * ClientOrderFulfillmentService so an order request and a plain ERP order read
+ * the same way.
  *
- * Job work status is set by hand in the works (nobody flips it automatically
- * when the last return is recorded), so a fully returned job work can still
- * read PENDING. The returned weight is therefore treated as an equally valid
- * signal that the item is back in house — otherwise the client would see
- * "In Plating" indefinitely on work that has actually come back.
+ * Any return at all advances the item: on a partial return it is the returned
+ * Kg that is ready to dispatch, with the rest still at the plater. The job
+ * work's own status is an equally valid signal — the server flips it to
+ * COMPLETE the moment a return is recorded.
  *
  * A job work rejected at the plater counts as still outstanding: the pieces are
  * not back, so the item has not advanced past plating.
@@ -89,15 +105,11 @@ export const deriveItemStage = (item) => {
   if (qtyPc > 0 && dispatchedPc >= qtyPc) return "DISPATCHED";
 
   const jobWork = item?.jobWork;
-  if (!jobWork) return "NOT_STARTED";
-  if (jobWork.status === "COMPLETE") return "RETURNED";
+  if (!jobWork) return "APPROVED";
   if (jobWork.status === "REJECT") return "IN_PLATING";
+  if (jobWork.status === "COMPLETE") return "READY_TO_DISPATCH";
 
-  const returnedKg = Number(jobWork.returnedKg) || 0;
-  const remainingKg = Number(jobWork.remainingKg) || 0;
-  if (returnedKg > 0 && remainingKg <= 0) return "RETURNED";
-
-  return "IN_PLATING";
+  return (Number(jobWork.returnedKg) || 0) > 0 ? "READY_TO_DISPATCH" : "IN_PLATING";
 };
 
 /** Kg values come back as doubles; show at most 2 decimals and drop trailing zeros. */
@@ -118,9 +130,8 @@ export const formatKg = (value) => {
  * Returns an object: { status, dispatchedPc, totalPc }
  *  - APPROVED: order created, nothing sent for plating or dispatched yet
  *  - IN_PLATING: at least one item is still out for plating (outside/in-house)
- *  - READY_TO_DISPATCH: everything is back from plating, nothing dispatched yet
- *  - DISPATCHED: some pieces have gone out, but not all (includes counts)
- *  - COMPLETED: all pieces have been dispatched
+ *  - READY_TO_DISPATCH: something is back from plating and waiting to go out
+ *  - DISPATCHED: every piece ordered has gone out (includes counts)
  */
 export const deriveErpOrderStatus = (order) => {
   const items = order?.items || [];
@@ -130,20 +141,13 @@ export const deriveErpOrderStatus = (order) => {
   const dispatchedPc = items.reduce((sum, it) => sum + (Number(it.dispatchedPc) || 0), 0);
   const counts = { dispatchedPc, totalPc };
 
-  if (totalPc > 0 && dispatchedPc >= totalPc) return { status: "COMPLETED", ...counts };
-
   const bottleneck = items
     .map(deriveItemStage)
     .reduce((slowest, stage) =>
       ITEM_STAGE_RANK[stage] < ITEM_STAGE_RANK[slowest] ? stage : slowest
     );
 
-  // Anything still at the plater outranks partial dispatch: that is the wait.
-  if (bottleneck === "IN_PLATING") return { status: "IN_PLATING", ...counts };
-  if (dispatchedPc > 0) return { status: "DISPATCHED", ...counts };
-  if (bottleneck === "RETURNED") return { status: "READY_TO_DISPATCH", ...counts };
-
-  return { status: "APPROVED", ...counts };
+  return { status: bottleneck, ...counts };
 };
 
 // ─── localStorage-backed cart ──────────────────────────────────────────────

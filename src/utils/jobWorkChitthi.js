@@ -74,8 +74,11 @@ function buildCss(k, pageW, pageH) {
       -webkit-print-color-adjust: exact; print-color-adjust: exact;
     }
     @page { margin: 0; size: ${pageW}mm ${pageH}mm; }
+    /* The chitthi is a fixed-size label — pin the page box and clip, so a tall ticket can never
+       spill a second (mostly blank) page out of the printer. fitTicketToPage below scales the
+       content so nothing is actually lost to that clip. */
     html, body {
-      width: ${pageW}mm; background: #fff;
+      width: ${pageW}mm; height: ${pageH}mm; overflow: hidden; background: #fff;
       -webkit-print-color-adjust: exact; print-color-adjust: exact;
     }
     body {
@@ -139,6 +142,41 @@ function buildCss(k, pageW, pageH) {
     .footer { background: #E8A736; border-top: ${pt(1.2)} solid #241C17; text-align: center;
       padding: ${mm(1.4)} 0; font-size: ${px(8.5)}; font-weight: 700; color: #241C17; letter-spacing: ${px(0.3)}; }
   `;
+}
+
+/**
+ * Shrinks the ticket to fit the label in one page.
+ *
+ * How much a chitthi carries varies — In-Side adds a party row and the Pcs/Sti chips, an Aavak
+ * print adds the returns column and a Ghati band, and a job work with a rate adds two more rows —
+ * so a layout tuned for the shortest variant overflows on the longest. Rather than pick a font
+ * size that suits neither, measure what actually rendered: lay the ticket out proportionally
+ * WIDER and scale it back down by the same factor, which leaves the printed width at exactly the
+ * label width while the height comes down to fit.
+ */
+function fitTicketToPage(doc, ticketWidthMm) {
+  const ticket = doc.querySelector(".ticket");
+  if (!ticket) return;
+
+  const pageHeight = doc.documentElement.clientHeight;
+  // .ticket's own margin, resolved to px — it frames the ticket on all four sides.
+  const margin = ticket.getBoundingClientRect().top;
+  const budget = pageHeight - margin * 2;
+  if (!(budget > 0)) return;
+
+  let scale = 1;
+  // Widening the ticket re-wraps its text, so its natural height moves with the scale. A few
+  // passes converge on the largest scale that still fits.
+  for (let pass = 0; pass < 4; pass++) {
+    const naturalHeight = ticket.getBoundingClientRect().height / scale;
+    if (!(naturalHeight > 0)) return;
+    const next = Math.min(1, budget / naturalHeight);
+    if (Math.abs(next - scale) < 0.005) break;
+    scale = next;
+    ticket.style.width = `${ticketWidthMm / scale}mm`;
+    ticket.style.transformOrigin = "top left";
+    ticket.style.transform = `scale(${scale})`;
+  }
 }
 
 function buildBody(jw, formType, ctx) {
@@ -286,6 +324,9 @@ export const printJobWorkChitthi = async (jw, formType, paperSize, setLoadingKey
         img.complete ? Promise.resolve() : new Promise((res) => { img.onload = img.onerror = res; })
       )
     );
+
+    // Only now is the ticket at its final height (fonts and logo settled), so measure and fit.
+    fitTicketToPage(doc, a8 ? 49 : 100);
 
     // Download a PNG snapshot alongside printing. html2canvas rasterizes the already-shaped DOM,
     // so Hindi/Gujarati and the band colors are baked into the image correctly. Best-effort —
