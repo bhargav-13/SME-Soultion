@@ -874,8 +874,10 @@ components:
       description: >-
         An order line's quantity split across the stages of the works. A single line is normally in
         several at once -- 100 Kg ordered, 50 Kg sent to the plater of which 30 Kg is back, reads as
-        approved 50, inPlating 20, readyToDispatch 30. The four stages always add up to ordered,
-        less any ghati burnt off in the process.
+        approved 50, inPlating 20, readyToDispatch 30. On a line whose books balance the stages add
+        up to ordered, less any ghati burnt off in the process; they can exceed it where the works
+        recorded more movement than was ordered (for instance dispatching a full line while part of
+        it is still with the plater), since each figure reports what was actually booked.
       properties:
         ordered:
           $ref: '#/components/schemas/StageQuantity'
