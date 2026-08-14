@@ -43,9 +43,11 @@ export const ORDER_STATUS = {
 };
 
 /**
- * Statuses offered as filter tabs, in pipeline order. The server keeps a request in exactly one of
- * these, so the tabs partition the list rather than overlap: an order sent for plating leaves
- * "Approved" for "In Plating", and one fully dispatched leaves "Ready to Dispatch".
+ * Statuses offered as filter tabs, in pipeline order.
+ *
+ * PENDING_APPROVAL and REJECTED are whole-request states — a request is either awaiting a decision
+ * or it isn't. The four in between are NOT: they are quantity buckets (see STAGE_BUCKETS), and one
+ * order normally has quantity in several of them at once, so it shows under several tabs.
  *
  * COMPLETED and IN_PROGRESS are omitted — nothing derives them any more, so their tabs would
  * always be empty. They stay in ORDER_STATUS so legacy rows still render a sensible badge.
@@ -59,6 +61,68 @@ export const ORDER_STATUS_TABS = [
   "REJECTED",
 ];
 
+// ─── Stage quantity buckets ────────────────────────────────────────────────
+/**
+ * The stages are buckets of QUANTITY, not of orders. A line of 100 Kg with 50 Kg sent to the plater
+ * of which 30 Kg is back reads:
+ *
+ *   approved 50 · in plating 20 · ready to dispatch 30 · dispatched 0
+ *
+ * so that one line appears under three different tabs, each showing only its own share. `field` is
+ * the key inside an item's `stages` object as the server sends it.
+ */
+export const STAGE_BUCKETS = [
+  { key: "APPROVED", field: "approved" },
+  { key: "IN_PLATING", field: "inPlating" },
+  { key: "READY_TO_DISPATCH", field: "readyToDispatch" },
+  { key: "DISPATCHED", field: "dispatched" },
+];
+
+/** The `stages` field name for a tab key, or null for the whole-request tabs. */
+export const stageFieldFor = (tabKey) =>
+  STAGE_BUCKETS.find((bucket) => bucket.key === tabKey)?.field ?? null;
+
+/** Weights are carried to 3 decimals; anything under half a gram is nothing. */
+const QTY_EPSILON = 0.0005;
+
+/** The {kg, pc} sitting at one stage of a line, or null when the line has no stage data yet. */
+export const stageQty = (item, field) => item?.stages?.[field] ?? null;
+
+/** Does this line actually have something at this stage? Drives which rows a tab shows. */
+export const hasQtyAt = (item, field) => {
+  const qty = stageQty(item, field);
+  if (!qty) return false;
+  return Math.abs(Number(qty.kg) || 0) > QTY_EPSILON || Math.abs(Number(qty.pc) || 0) > QTY_EPSILON;
+};
+
+/** Sums one stage across an order's lines, so a card can show its own total for that tab. */
+export const sumStage = (items, field) =>
+  (items || []).reduce(
+    (total, item) => {
+      const qty = stageQty(item, field);
+      return {
+        kg: total.kg + (Number(qty?.kg) || 0),
+        pc: total.pc + (Number(qty?.pc) || 0),
+      };
+    },
+    { kg: 0, pc: 0 }
+  );
+
+/**
+ * Renders a {kg, pc} as "54.600 Kg" with the piece count alongside when known. Kg leads because
+ * that is the unit the plater actually works in; pc is absent whenever the size has no 1-pc weight
+ * on the item master, and is then simply left off rather than guessed.
+ */
+export const formatStageQty = (qty) => {
+  const kg = Number(qty?.kg);
+  const pc = Number(qty?.pc);
+  if (!Number.isFinite(kg)) {
+    return Number.isFinite(pc) ? `${Math.round(pc)} pc` : "-";
+  }
+  const kgText = `${kg.toFixed(3)} Kg`;
+  return Number.isFinite(pc) && pc > 0 ? `${kgText} (${Math.round(pc)} pc)` : kgText;
+};
+
 /** Per-line stage the server reports on an order request item. */
 export const ITEM_STAGE = {
   APPROVED: { label: "Not started", className: "bg-gray-100 text-gray-700" },
@@ -67,92 +131,11 @@ export const ITEM_STAGE = {
   DISPATCHED: { label: "Dispatched", className: "bg-purple-100 text-purple-800" },
 };
 
-// ─── Job work (per order item) ─────────────────────────────────────────────
-export const JOB_WORK_STATUS = {
-  PENDING: { label: "In Plating", className: "bg-amber-100 text-amber-800" },
-  COMPLETE: { label: "Returned", className: "bg-green-100 text-green-800" },
-  REJECT: { label: "Rejected", className: "bg-red-100 text-red-800" },
-};
-
-/**
- * The stage a single order item sits at. Ordered least → most advanced, since
- * an order is only as far along as its least advanced item. Same names and
- * ordering as the server's OrderItemStage, so the two never disagree.
- */
-export const ITEM_STAGE_RANK = {
-  APPROVED: 0,
-  IN_PLATING: 1,
-  READY_TO_DISPATCH: 2,
-  DISPATCHED: 3,
-};
-
-/**
- * Work out which stage an order item is at. Mirrors the server's
- * ClientOrderFulfillmentService so an order request and a plain ERP order read
- * the same way.
- *
- * Any return at all advances the item: on a partial return it is the returned
- * Kg that is ready to dispatch, with the rest still at the plater. The job
- * work's own status is an equally valid signal — the server flips it to
- * COMPLETE the moment a return is recorded.
- *
- * A job work rejected at the plater counts as still outstanding: the pieces are
- * not back, so the item has not advanced past plating.
- */
-export const deriveItemStage = (item) => {
-  const qtyPc = Number(item?.qtyPc) || 0;
-  const dispatchedPc = Number(item?.dispatchedPc) || 0;
-  if (qtyPc > 0 && dispatchedPc >= qtyPc) return "DISPATCHED";
-
-  const jobWork = item?.jobWork;
-  if (!jobWork) return "APPROVED";
-  if (jobWork.status === "REJECT") return "IN_PLATING";
-  if (jobWork.status === "COMPLETE") return "READY_TO_DISPATCH";
-
-  return (Number(jobWork.returnedKg) || 0) > 0 ? "READY_TO_DISPATCH" : "IN_PLATING";
-};
-
 /** Kg values come back as doubles; show at most 2 decimals and drop trailing zeros. */
 export const formatKg = (value) => {
   const num = Number(value);
   if (!Number.isFinite(num)) return "-";
   return String(Number(num.toFixed(2)));
-};
-
-/**
- * Derive a display status for an order coming from the existing ERP order API.
- *
- * The order takes the *furthest* stage any of its items has reached, matching
- * the server's ClientOrderFulfillmentService. A real order runs a dozen lines
- * that move at different speeds, so rolling up the least advanced line would
- * pin the order in "Approved" until the last line was sent for plating. Which
- * lines are where is in the Job Work column of the order table.
- *
- * Returns an object: { status, dispatchedPc, totalPc }
- *  - APPROVED: order created, nothing sent for plating or dispatched yet
- *  - IN_PLATING: something is out for plating (outside/in-house), nothing back
- *  - READY_TO_DISPATCH: something is back from plating and waiting to go out
- *  - DISPATCHED: every piece ordered has gone out (includes counts)
- */
-export const deriveErpOrderStatus = (order) => {
-  const items = order?.items || [];
-  if (items.length === 0) return { status: "APPROVED" };
-
-  const totalPc = items.reduce((sum, it) => sum + (Number(it.qtyPc) || 0), 0);
-  const dispatchedPc = items.reduce((sum, it) => sum + (Number(it.dispatchedPc) || 0), 0);
-  const counts = { dispatchedPc, totalPc };
-
-  const stages = items.map(deriveItemStage);
-
-  // DISPATCHED is the one all-or-nothing stage: while any line is still to go out, the order is
-  // not dispatched — a line already gone counts as (at least) ready.
-  if (stages.every((stage) => stage === "DISPATCHED")) return { status: "DISPATCHED", ...counts };
-
-  const furthest = stages.reduce((best, stage) =>
-    ITEM_STAGE_RANK[stage] > ITEM_STAGE_RANK[best] ? stage : best
-  );
-
-  return { status: furthest === "DISPATCHED" ? "READY_TO_DISPATCH" : furthest, ...counts };
 };
 
 // ─── localStorage-backed cart ──────────────────────────────────────────────

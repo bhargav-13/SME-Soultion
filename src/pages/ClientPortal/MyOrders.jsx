@@ -2,10 +2,17 @@ import React, { useEffect, useMemo, useState } from "react";
 import { Download } from "lucide-react";
 import SidebarLayout from "../../components/SidebarLayout";
 import PageHeader from "../../components/PageHeader";
-import OrderStatusBadge from "../../components/ClientPortal/OrderStatusBadge";
-import JobWorkProgress from "../../components/ClientPortal/JobWorkProgress";
 import { clientPortalClientApi, clientPortalInvoicesApi } from "../../services/apiService";
-import { deriveErpOrderStatus, ORDER_STATUS, ORDER_STATUS_TABS } from "../../utils/clientShop";
+import {
+  ORDER_STATUS,
+  ORDER_STATUS_TABS,
+  STAGE_BUCKETS,
+  formatStageQty,
+  hasQtyAt,
+  stageFieldFor,
+  stageQty,
+  sumStage,
+} from "../../utils/clientShop";
 import toast from "react-hot-toast";
 
 const PAGE_SIZE = 10;
@@ -16,6 +23,11 @@ const TABS = [
   { key: "ALL", label: "All" },
   ...ORDER_STATUS_TABS.map((key) => ({ key, label: ORDER_STATUS[key].label })),
 ];
+
+/** Tabs that select whole requests by their approval state rather than by quantity. */
+const REQUEST_STATE_TABS = new Set(["PENDING_APPROVAL", "REJECTED"]);
+
+const formatDate = (value) => (value ? new Date(value).toLocaleDateString() : "-");
 
 const MyOrders = () => {
   const [orders, setOrders] = useState([]);
@@ -89,57 +101,67 @@ const MyOrders = () => {
   }, [invoicePage]);
 
   // Combine ERP orders with the client's own order requests into a single display list.
-  const combinedOrders = useMemo(() => {
+  const allOrders = useMemo(() => {
     const ordersById = new Map(orders.map((order) => [order.id, order]));
     const linkedOrderIds = new Set(
       orderRequests.map((req) => req.orderId).filter((id) => id != null)
     );
 
-    // Once a request is approved and an order is created in Order Management
-    // (req.orderId set), keep showing the request card under its familiar
-    // "Request N" label, but reflect the live job-work/dispatch status of
-    // the order it spawned instead of the static "Approved" status. The lines
-    // shown are then the order's own items, so they carry the live per-item
-    // dispatch and job-work progress rather than the frozen request lines.
+    // Once a request is approved an order exists behind it (req.orderId). Keep the familiar
+    // "Request N" label, but show the ORDER's lines from then on — those are the ones carrying the
+    // live stage split. Until approval the request has no order, so its own frozen lines are all
+    // there is and it can only appear under Pending Approval / Rejected.
     const requests = orderRequests.map((req) => {
       const linkedOrder = req.orderId != null ? ordersById.get(req.orderId) : null;
-      const derived = linkedOrder ? deriveErpOrderStatus(linkedOrder) : null;
       return {
         key: `req-${req.id}`,
-        id: req.id,
         label: `Request ${req.id}`,
         orderDate: req.orderDate,
-        status: derived ? derived.status : req.status,
-        dispatchedPc: derived?.dispatchedPc,
-        totalPc: derived?.totalPc,
+        requestStatus: req.status,
         items: (linkedOrder ? linkedOrder.items : req.items) || [],
-        isRequest: !linkedOrder,
+        hasStages: Boolean(linkedOrder),
       };
     });
 
-    // Orders already represented above via their linked request card don't
-    // need a separate "Order #X" card.
+    // Orders already represented above via their linked request card don't need a second card.
     const erpOrders = orders
       .filter((order) => !linkedOrderIds.has(order.id))
-      .map((order) => {
-        const derived = deriveErpOrderStatus(order);
-        return {
-          key: `erp-${order.id}`,
-          id: order.id,
-          label: `Order #${order.id}`,
-          orderDate: order.orderDate,
-          status: derived.status,
-          dispatchedPc: derived.dispatchedPc,
-          totalPc: derived.totalPc,
-          items: order.items || [],
-          isRequest: false,
-        };
-      });
+      .map((order) => ({
+        key: `erp-${order.id}`,
+        label: `Order #${order.id}`,
+        orderDate: order.orderDate,
+        requestStatus: "APPROVED",
+        items: order.items || [],
+        hasStages: true,
+      }));
 
-    const combined = [...requests, ...erpOrders];
-    if (tab === "ALL") return combined;
-    return combined.filter((o) => o.status === tab);
-  }, [orders, orderRequests, tab]);
+    return [...requests, ...erpOrders];
+  }, [orders, orderRequests]);
+
+  /**
+   * What the selected tab shows.
+   *
+   * The four middle tabs are quantity buckets, so an order is included when ANY of its lines has
+   * quantity at that stage, and only those lines are listed — the same order legitimately shows
+   * under In Plating and Ready to Dispatch at once, each time with its own share.
+   */
+  const visibleOrders = useMemo(() => {
+    if (tab === "ALL") return allOrders;
+
+    if (REQUEST_STATE_TABS.has(tab)) {
+      return allOrders.filter((order) => order.requestStatus === tab);
+    }
+
+    const field = stageFieldFor(tab);
+    if (!field) return allOrders;
+
+    return allOrders
+      .filter((order) => order.hasStages)
+      .map((order) => ({ ...order, items: order.items.filter((item) => hasQtyAt(item, field)) }))
+      .filter((order) => order.items.length > 0);
+  }, [allOrders, tab]);
+
+  const stageField = stageFieldFor(tab);
 
   const handleDownloadInvoice = async (invoice) => {
     try {
@@ -164,20 +186,20 @@ const MyOrders = () => {
     }
   };
 
+  const orderCount = totalElements + orderRequests.length;
+
   return (
     <SidebarLayout>
       <div className="mx-auto">
         <div className="mb-8">
           <PageHeader
             title="My Orders"
-            description={`You have ${totalElements + orderRequests.length} order${
-              totalElements + orderRequests.length === 1 ? "" : "s"
-            }.`}
+            description={`You have ${orderCount} order${orderCount === 1 ? "" : "s"}.`}
           />
         </div>
 
-        {/* Status filter tabs */}
-        <div className="flex flex-wrap gap-2 mb-6 border-b border-gray-200">
+        {/* Stage filter tabs */}
+        <div className="flex flex-wrap gap-2 mb-4 border-b border-gray-200">
           {TABS.map((t) => (
             <button
               key={t.key}
@@ -193,102 +215,30 @@ const MyOrders = () => {
           ))}
         </div>
 
+        {stageField && (
+          <p className="text-sm text-gray-500 mb-6">
+            Showing the quantity of each order that is currently{" "}
+            <span className="font-medium text-gray-700">{ORDER_STATUS[tab].label.toLowerCase()}</span>. An
+            order can appear under more than one tab while different parts of it are at different
+            stages.
+          </p>
+        )}
+
         {loading ? (
           <div className="text-center text-gray-500 py-10">Loading...</div>
-        ) : combinedOrders.length === 0 ? (
+        ) : visibleOrders.length === 0 ? (
           <div className="bg-white rounded-lg border border-gray-200 p-10 text-center text-gray-500">
             No orders found
           </div>
         ) : (
           <div className="space-y-6">
-            {combinedOrders.map((order) => (
-              <div key={order.key} className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-                <div className="bg-gray-100 border-b border-gray-200 px-6 py-3 flex items-center justify-between flex-wrap gap-2">
-                  <div className="flex items-center gap-3">
-                    <p className="text-sm font-semibold text-gray-900">{order.label}</p>
-                    <OrderStatusBadge
-                      status={order.status}
-                      dispatchedPc={order.dispatchedPc}
-                      totalPc={order.totalPc}
-                    />
-                  </div>
-                  <div className="flex items-center gap-4">
-                    <p className="text-sm text-gray-500">
-                      {order.orderDate ? new Date(order.orderDate).toLocaleDateString() : "-"}
-                    </p>
-                  </div>
-                </div>
-                <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead>
-                    <tr className="border-b border-gray-200">
-                      <th className="px-6 py-3 text-center text-sm font-[550] text-black">
-                        Item
-                      </th>
-                      <th className="px-6 py-3 text-center text-sm font-[550] text-black">
-                        Size (Inch)
-                      </th>
-                      <th className="px-6 py-3 text-center text-sm font-[550] text-black">
-                        Size (mm)
-                      </th>
-                      <th className="px-6 py-3 text-center text-sm font-[550] text-black">
-                        Plating
-                      </th>
-                      <th className="px-6 py-3 text-center text-sm font-[550] text-black">
-                        Qty (Pc)
-                      </th>
-                      {!order.isRequest && (
-                        <>
-                          <th className="px-6 py-3 text-center text-sm font-[550] text-black">
-                            Qty (Kg)
-                          </th>
-                          <th className="px-6 py-3 text-center text-sm font-[550] text-black">
-                            Pending (Pc)
-                          </th>
-                          <th className="px-6 py-3 text-center text-sm font-[550] text-black">
-                            In Plating
-                          </th>
-                        </>
-                      )}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {(order.items || []).map((item) => (
-                      <tr key={item.id} className="border-b border-gray-100 last:border-0">
-                        <td className="px-6 py-3 text-sm text-gray-700 text-center">
-                          {item.itemName || "-"}
-                        </td>
-                        <td className="px-6 py-3 text-sm text-gray-700 text-center">
-                          {item.sizeInInch || "-"}
-                        </td>
-                        <td className="px-6 py-3 text-sm text-gray-700 text-center">
-                          {item.sizeInMm || "-"}
-                        </td>
-                        <td className="px-6 py-3 text-sm text-gray-700 text-center">
-                          {item.plating || "-"}
-                        </td>
-                        <td className="px-6 py-3 text-sm text-gray-700 text-center">
-                          {item.qtyPc ?? "-"}
-                        </td>
-                        {!order.isRequest && (
-                          <>
-                            <td className="px-6 py-3 text-sm text-gray-700 text-center">
-                              {item.qtyKg ?? "-"}
-                            </td>
-                            <td className="px-6 py-3 text-sm text-gray-700 text-center">
-                              {item.pendingPc ?? "-"}
-                            </td>
-                            <td className="px-6 py-3 text-center">
-                              <JobWorkProgress jobWork={item.jobWork} />
-                            </td>
-                          </>
-                        )}
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-                </div>
-              </div>
+            {visibleOrders.map((order) => (
+              <OrderCard
+                key={order.key}
+                order={order}
+                stageField={stageField}
+                stageLabel={stageField ? ORDER_STATUS[tab].label : null}
+              />
             ))}
           </div>
         )}
@@ -347,7 +297,7 @@ const MyOrders = () => {
                     <tr key={invoice.id} className="border-b border-gray-100 last:border-0">
                       <td className="px-6 py-3 text-sm text-gray-700">{invoice.invoiceNo || "-"}</td>
                       <td className="px-6 py-3 text-sm text-gray-700 text-center">
-                        {invoice.invoiceDate ? new Date(invoice.invoiceDate).toLocaleDateString() : "-"}
+                        {formatDate(invoice.invoiceDate)}
                       </td>
                       <td className="px-6 py-3 text-sm text-gray-700 text-center">
                         {invoice.invoiceType || "-"}
@@ -398,5 +348,127 @@ const MyOrders = () => {
     </SidebarLayout>
   );
 };
+
+/**
+ * One order. On a stage tab it lists only the lines with quantity at that stage and shows that one
+ * figure; on All / Pending Approval / Rejected it lists every line with the full split, so the
+ * client can see where the whole order stands at a glance.
+ */
+const OrderCard = ({ order, stageField, stageLabel }) => {
+  const cardTotal = stageField ? sumStage(order.items, stageField) : null;
+
+  return (
+    <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+      <div className="bg-gray-100 border-b border-gray-200 px-6 py-3 flex items-center justify-between flex-wrap gap-2">
+        <div className="flex items-center gap-3 flex-wrap">
+          <p className="text-sm font-semibold text-gray-900">{order.label}</p>
+          {stageField ? (
+            <span className="px-2.5 py-1 rounded-full text-xs font-medium whitespace-nowrap bg-gray-900 text-white">
+              {stageLabel} · {formatStageQty(cardTotal)}
+            </span>
+          ) : (
+            <span
+              className={`px-2.5 py-1 rounded-full text-xs font-medium whitespace-nowrap ${
+                ORDER_STATUS[order.requestStatus]?.className || "bg-gray-100 text-gray-700"
+              }`}
+            >
+              {ORDER_STATUS[order.requestStatus]?.label || order.requestStatus}
+            </span>
+          )}
+        </div>
+        <p className="text-sm text-gray-500">{formatDate(order.orderDate)}</p>
+      </div>
+
+      <div className="overflow-x-auto">
+        {stageField ? (
+          <StageTable items={order.items} field={stageField} stageLabel={stageLabel} />
+        ) : (
+          <BreakdownTable items={order.items} showStages={order.hasStages} />
+        )}
+      </div>
+    </div>
+  );
+};
+
+/** A single stage tab: one row per line, one quantity column. */
+const StageTable = ({ items, field, stageLabel }) => (
+  <table className="w-full">
+    <thead>
+      <tr className="border-b border-gray-200">
+        <Th>Item</Th>
+        <Th>Size (Inch)</Th>
+        <Th>Size (mm)</Th>
+        <Th>Plating</Th>
+        <Th>{stageLabel}</Th>
+      </tr>
+    </thead>
+    <tbody>
+      {items.map((item) => (
+        <tr key={item.id} className="border-b border-gray-100 last:border-0">
+          <Td>{item.itemName || "-"}</Td>
+          <Td>{item.sizeInInch || "-"}</Td>
+          <Td>{item.sizeInMm || "-"}</Td>
+          <Td>{item.plating || "-"}</Td>
+          <td className="px-6 py-3 text-sm font-semibold text-gray-900 text-center whitespace-nowrap">
+            {formatStageQty(stageQty(item, field))}
+          </td>
+        </tr>
+      ))}
+    </tbody>
+  </table>
+);
+
+/** The All tab: every line with its quantity across all four stages side by side. */
+const BreakdownTable = ({ items, showStages }) => (
+  <table className="w-full">
+    <thead>
+      <tr className="border-b border-gray-200">
+        <Th>Item</Th>
+        <Th>Size (Inch)</Th>
+        <Th>Size (mm)</Th>
+        <Th>Plating</Th>
+        <Th>Ordered</Th>
+        {showStages &&
+          STAGE_BUCKETS.map((bucket) => <Th key={bucket.key}>{ORDER_STATUS[bucket.key].label}</Th>)}
+      </tr>
+    </thead>
+    <tbody>
+      {items.map((item) => (
+        <tr key={item.id} className="border-b border-gray-100 last:border-0">
+          <Td>{item.itemName || "-"}</Td>
+          <Td>{item.sizeInInch || "-"}</Td>
+          <Td>{item.sizeInMm || "-"}</Td>
+          <Td>{item.plating || "-"}</Td>
+          <Td>
+            {showStages
+              ? formatStageQty(stageQty(item, "ordered"))
+              : item.qtyPc != null
+                ? `${item.qtyPc} pc`
+                : "-"}
+          </Td>
+          {showStages &&
+            STAGE_BUCKETS.map((bucket) => (
+              <td
+                key={bucket.key}
+                className={`px-6 py-3 text-sm text-center whitespace-nowrap ${
+                  hasQtyAt(item, bucket.field) ? "font-semibold text-gray-900" : "text-gray-300"
+                }`}
+              >
+                {hasQtyAt(item, bucket.field) ? formatStageQty(stageQty(item, bucket.field)) : "—"}
+              </td>
+            ))}
+        </tr>
+      ))}
+    </tbody>
+  </table>
+);
+
+const Th = ({ children }) => (
+  <th className="px-6 py-3 text-center text-sm font-[550] text-black whitespace-nowrap">{children}</th>
+);
+
+const Td = ({ children }) => (
+  <td className="px-6 py-3 text-sm text-gray-700 text-center">{children}</td>
+);
 
 export default MyOrders;

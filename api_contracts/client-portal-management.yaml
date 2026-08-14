@@ -855,6 +855,47 @@ components:
           type: string
           format: date-time
 
+    StageQuantity:
+      type: object
+      description: >-
+        How much of one order line is sitting at one stage of the works, in Kg with the piece
+        equivalent alongside. pc is derived from kg via the size's 1-pc weight, so it is absent when
+        that weight is not set on the item master.
+      properties:
+        kg:
+          type: number
+          format: double
+        pc:
+          type: number
+          format: double
+
+    OrderLineStages:
+      type: object
+      description: >-
+        An order line's quantity split across the stages of the works. A single line is normally in
+        several at once -- 100 Kg ordered, 50 Kg sent to the plater of which 30 Kg is back, reads as
+        approved 50, inPlating 20, readyToDispatch 30. The four stages always add up to ordered,
+        less any ghati burnt off in the process.
+      properties:
+        ordered:
+          $ref: '#/components/schemas/StageQuantity'
+        approved:
+          $ref: '#/components/schemas/StageQuantity'
+          description: Ordered but not yet sent out for plating.
+        inPlating:
+          $ref: '#/components/schemas/StageQuantity'
+          description: Out with the job worker and not yet returned.
+        readyToDispatch:
+          $ref: '#/components/schemas/StageQuantity'
+          description: Returned from the job worker and not yet dispatched.
+        dispatched:
+          $ref: '#/components/schemas/StageQuantity'
+          description: Already gone out to the client.
+        ghatiKg:
+          type: number
+          format: double
+          description: Weight lost in the process; it leaves plating but never becomes dispatchable.
+
     ClientOrderItem:
       type: object
       properties:
@@ -885,6 +926,8 @@ components:
           type: boolean
         jobWork:
           $ref: '#/components/schemas/ClientItemJobWork'
+        stages:
+          $ref: '#/components/schemas/OrderLineStages'
 
     ClientItemJobWork:
       type: object
@@ -1100,6 +1143,8 @@ components:
           type: number
           format: double
           description: Pieces dispatched against this line so far.
+        stages:
+          $ref: '#/components/schemas/OrderLineStages'
 
     OrderRequest:
       type: object
