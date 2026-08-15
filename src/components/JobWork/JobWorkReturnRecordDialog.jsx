@@ -1,16 +1,24 @@
-import React, { useEffect, useState } from "react";
-import { ChevronDown } from "lucide-react";
-import toast from "react-hot-toast";
-import { jobWorkReturnApi } from "../../services/apiService";
+import { useEffect, useState } from 'react';
+import toast from 'react-hot-toast';
+import { FormDialog } from '@/components/form-dialog';
+import { Field } from '@/components/form-field';
+import { Input } from '@/components/ui/input';
+import { SearchableSelect } from '@/components/ui/searchable-select';
+import { jobWorkReturnApi } from '@/services/apiService';
 
 const EMPTY_FORM = {
-  returnElementCount: "",
-  elementType: "PETI",
-  petiWeightKg: "",
-  grossKg: "",
-  ghati: "",
-  jobReturnDate: "",
+  returnElementCount: '',
+  elementType: 'PETI',
+  petiWeightKg: '',
+  grossKg: '',
+  ghati: '',
+  jobReturnDate: '',
 };
+
+const TYPE_OPTIONS = [
+  { value: 'PETI', label: 'Peti' },
+  { value: 'DRUM', label: 'Drum' },
+];
 
 const round3 = (n) => Math.round(n * 1000) / 1000;
 
@@ -31,21 +39,19 @@ const getNetKg = (form) => {
 const JobWorkReturnRecordDialog = ({ isOpen, jobWork, editingReturn, onClose, onSaved }) => {
   const [form, setForm] = useState(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
-  const [isTypeOpen, setIsTypeOpen] = useState(false);
   const [ghatiTouched, setGhatiTouched] = useState(false);
 
   useEffect(() => {
     if (!isOpen) return;
-    setIsTypeOpen(false);
     setGhatiTouched(false);
     if (editingReturn) {
       setForm({
-        returnElementCount: String(editingReturn.returnElementCount ?? ""),
-        elementType: editingReturn.elementType || "PETI",
-        petiWeightKg: editingReturn.petiWeightKg != null ? String(editingReturn.petiWeightKg) : "",
-        grossKg: editingReturn.grossKg != null ? String(editingReturn.grossKg) : "",
-        ghati: editingReturn.ghati != null ? String(editingReturn.ghati) : "",
-        jobReturnDate: editingReturn.jobReturnDate ? editingReturn.jobReturnDate.substring(0, 10) : "",
+        returnElementCount: String(editingReturn.returnElementCount ?? ''),
+        elementType: editingReturn.elementType || 'PETI',
+        petiWeightKg: editingReturn.petiWeightKg != null ? String(editingReturn.petiWeightKg) : '',
+        grossKg: editingReturn.grossKg != null ? String(editingReturn.grossKg) : '',
+        ghati: editingReturn.ghati != null ? String(editingReturn.ghati) : '',
+        jobReturnDate: editingReturn.jobReturnDate ? editingReturn.jobReturnDate.substring(0, 10) : '',
       });
       setGhatiTouched(true);
     } else {
@@ -57,7 +63,7 @@ const JobWorkReturnRecordDialog = ({ isOpen, jobWork, editingReturn, onClose, on
   const alreadyReturnedKg = round3(
     returns
       .filter((r) => r.id !== editingReturn?.id)
-      .reduce((sum, r) => sum + (r.returnKg || 0) + (r.ghati || 0), 0)
+      .reduce((sum, r) => sum + (r.returnKg || 0) + (r.ghati || 0), 0),
   );
   const sentKg = jobWork?.qtyKg || 0;
   const remainingBeforeThisReturn = round3(Math.max(0, sentKg - alreadyReturnedKg));
@@ -69,27 +75,25 @@ const JobWorkReturnRecordDialog = ({ isOpen, jobWork, editingReturn, onClose, on
     if (ghatiTouched) return;
     if (netKg === null) return;
     const suggested = round3(Math.max(0, remainingBeforeThisReturn - netKg));
-    setForm((prev) => ({ ...prev, ghati: suggested > 0 ? String(suggested) : "" }));
+    setForm((prev) => ({ ...prev, ghati: suggested > 0 ? String(suggested) : '' }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [form.grossKg, form.returnElementCount, form.petiWeightKg]);
-
-  if (!isOpen || !jobWork) return null;
 
   const handleSave = async () => {
     const grossKg = parseFloat(form.grossKg);
     if (!form.grossKg || Number.isNaN(grossKg) || grossKg <= 0) {
-      toast.error("Gross Kg is required and must be greater than 0");
+      toast.error('Gross Kg is required and must be greater than 0');
       return;
     }
 
     if (netKg === null || netKg < 0) {
-      toast.error("Net Kg could not be calculated");
+      toast.error('Net Kg could not be calculated');
       return;
     }
 
     const ghatiVal = form.ghati ? parseFloat(form.ghati) : 0;
     if (Number.isNaN(ghatiVal) || ghatiVal < 0) {
-      toast.error("Ghati must be a valid non-negative number");
+      toast.error('Ghati must be a valid non-negative number');
       return;
     }
 
@@ -101,7 +105,7 @@ const JobWorkReturnRecordDialog = ({ isOpen, jobWork, editingReturn, onClose, on
 
     const elemCount = form.returnElementCount ? parseFloat(form.returnElementCount) : undefined;
     if (elemCount !== undefined && (Number.isNaN(elemCount) || elemCount < 0 || !Number.isInteger(elemCount))) {
-      toast.error("Peti/Drum count must be a valid non-negative integer");
+      toast.error('Peti/Drum count must be a valid non-negative integer');
       return;
     }
 
@@ -123,148 +127,130 @@ const JobWorkReturnRecordDialog = ({ isOpen, jobWork, editingReturn, onClose, on
       const orderItemPathId = jobWork.orderItemId ?? 0;
       if (editingReturn?.id) {
         await jobWorkReturnApi.updateJobWorkReturn(orderItemPathId, jobWork.id, editingReturn.id, payload);
-        toast.success("Return record updated!");
+        toast.success('Return record updated!');
       } else {
         await jobWorkReturnApi.createJobWorkReturn(orderItemPathId, jobWork.id, payload);
-        toast.success("Return record saved!");
+        toast.success('Return record saved!');
       }
 
       onSaved?.();
       onClose();
     } catch (err) {
-      toast.error(err?.response?.data?.message || "Failed to save return");
+      toast.error(err?.response?.data?.message || 'Failed to save return');
     } finally {
       setSaving(false);
     }
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/30 flex items-center justify-center p-4">
-      <div className="bg-white rounded-xl w-full max-w-xl border border-gray-200 shadow-xl">
-        <div className="px-6 py-5 border-b border-gray-200 flex items-center justify-between">
-          <h2 className="w-full text-center text-xl font-medium text-black">Job Work Return</h2>
-          <button type="button" onClick={onClose} aria-label="Close dialog" className="text-gray-400 hover:text-gray-600">
-            x
-          </button>
-        </div>
-        <div className="px-10 py-6 space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-black mb-1">Peti / Drum Count</label>
-            <div className="flex items-center gap-2">
-              <input
-                type="number"
-                step="1"
-                value={form.returnElementCount}
-                onChange={(e) => setForm((prev) => ({ ...prev, returnElementCount: e.target.value }))}
-                placeholder="Enter count"
-                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-500 outline-none placeholder:text-sm placeholder:text-gray-400"
-              />
-              <div className="relative w-28">
-                <button
-                  type="button"
-                  onClick={() => setIsTypeOpen((prev) => !prev)}
-                  className="w-full h-10 px-3 border border-gray-300 rounded-lg bg-white text-sm flex items-center justify-between"
-                >
-                  <span>{form.elementType === "PETI" ? "Peti" : "Drum"}</span>
-                  <ChevronDown className={`w-4 h-4 text-gray-500 transition-transform ${isTypeOpen ? "rotate-180" : ""}`} />
-                </button>
-                {isTypeOpen && (
-                  <div className="absolute z-20 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden">
-                    {["PETI", "DRUM"].map((opt) => (
-                      <button
-                        key={opt}
-                        type="button"
-                        onClick={() => {
-                          setForm((prev) => ({ ...prev, elementType: opt }));
-                          setIsTypeOpen(false);
-                        }}
-                        className="w-full text-left px-3 py-2 text-sm hover:bg-gray-100"
-                      >
-                        {opt === "PETI" ? "Peti" : "Drum"}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-              <input
-                type="number"
-                step="0.001"
-                min="0"
-                value={form.petiWeightKg}
-                onChange={(e) => setForm((prev) => ({ ...prev, petiWeightKg: e.target.value }))}
-                placeholder="Kg each"
-                className="w-28 px-3 py-2 border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-gray-500 outline-none placeholder:text-sm placeholder:text-gray-400"
-              />
-            </div>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-black mb-1">Gross Kg (weighed) <span className="text-red-400">*</span></label>
-            <input
+    <FormDialog
+      open={isOpen && Boolean(jobWork)}
+      onOpenChange={(open) => {
+        if (!open) onClose();
+      }}
+      title="Job work return"
+      description="Record what came back against this chitthi."
+      size="md"
+      submitLabel="Save return"
+      busyLabel="Saving…"
+      isPending={saving}
+      onSubmit={handleSave}
+    >
+      <div className="space-y-4">
+        <Field label="Peti / Drum count" htmlFor="jwr-count">
+          <div className="flex items-center gap-2">
+            <Input
+              id="jwr-count"
               type="number"
-              step="0.001"
-              value={form.grossKg}
-              onChange={(e) => setForm((prev) => ({ ...prev, grossKg: e.target.value }))}
-              placeholder="Enter Kg."
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-500 outline-none placeholder:text-sm placeholder:text-gray-400"
+              step="1"
+              value={form.returnElementCount}
+              onChange={(e) => setForm((prev) => ({ ...prev, returnElementCount: e.target.value }))}
+              placeholder="Count"
+              className="min-w-0 flex-1 font-mono"
             />
-            {sentKg > 0 && (
-              <p className="mt-1 text-xs text-gray-400">
-                Remaining (incl. Ghati): <span className="font-medium text-gray-600">{remainingBeforeThisReturn} Kg</span> of {sentKg} Kg
-              </p>
-            )}
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-black mb-1">Net Kg</label>
-            <input
-              type="number"
-              step="0.001"
-              value={netKg ?? ""}
-              readOnly
-              placeholder="Auto calculated"
-              className="w-full px-4 py-2 border border-gray-200 rounded-lg bg-gray-50 text-gray-700 outline-none placeholder:text-sm placeholder:text-gray-400 cursor-not-allowed"
+            <SearchableSelect
+              ariaLabel="Element type"
+              options={TYPE_OPTIONS}
+              value={form.elementType}
+              onChange={(value) => setForm((prev) => ({ ...prev, elementType: value }))}
+              className="w-24 shrink-0"
+              contentClassName="min-w-[8rem]"
             />
-            <p className="mt-1 text-xs text-gray-400">
-              Net Kg = Gross Kg − (Peti/Drum count × weight each).
-            </p>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-black mb-1">Ghati</label>
-            <input
+            <Input
               type="number"
               step="0.001"
               min="0"
-              value={form.ghati}
-              onChange={(e) => {
-                setGhatiTouched(true);
-                setForm((prev) => ({ ...prev, ghati: e.target.value }));
-              }}
-              placeholder="Auto suggested, editable"
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-500 outline-none placeholder:text-sm placeholder:text-gray-400"
+              value={form.petiWeightKg}
+              onChange={(e) => setForm((prev) => ({ ...prev, petiWeightKg: e.target.value }))}
+              placeholder="Kg each"
+              aria-label="Weight per peti or drum, in kg"
+              className="w-24 shrink-0 font-mono"
             />
-            <p className="mt-1 text-xs text-gray-400">
-              Auto-suggested as the remaining shortfall after this return — adjust if the actual process loss differs.
-            </p>
           </div>
-          <div className="pt-4 flex items-center justify-center gap-4">
-            <button
-              type="button"
-              onClick={handleSave}
-              disabled={saving}
-              className="w-28 h-10 bg-black text-white rounded-lg hover:bg-gray-700 transition text-sm disabled:opacity-60"
-            >
-              {saving ? "Saving..." : "Save"}
-            </button>
-            <button
-              type="button"
-              onClick={onClose}
-              className="w-28 h-10 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition text-sm"
-            >
-              Cancel
-            </button>
-          </div>
-        </div>
+        </Field>
+
+        <Field
+          label="Gross Kg (weighed)"
+          htmlFor="jwr-gross"
+          required
+          hint={
+            sentKg > 0
+              ? `Remaining (incl. ghati): ${remainingBeforeThisReturn} Kg of ${sentKg} Kg`
+              : undefined
+          }
+        >
+          <Input
+            id="jwr-gross"
+            type="number"
+            step="0.001"
+            value={form.grossKg}
+            onChange={(e) => setForm((prev) => ({ ...prev, grossKg: e.target.value }))}
+            placeholder="Enter Kg."
+            className="font-mono"
+          />
+        </Field>
+
+        <Field label="Net Kg" hint="Net Kg = Gross Kg − (Peti/Drum count × weight each).">
+          <Input
+            type="number"
+            step="0.001"
+            value={netKg ?? ''}
+            readOnly
+            placeholder="Auto calculated"
+            className="cursor-not-allowed bg-surface-2 font-mono font-medium text-ink"
+          />
+        </Field>
+
+        <Field
+          label="Ghati"
+          htmlFor="jwr-ghati"
+          hint="Auto-suggested as the remaining shortfall after this return — adjust if the actual process loss differs."
+        >
+          <Input
+            id="jwr-ghati"
+            type="number"
+            step="0.001"
+            min="0"
+            value={form.ghati}
+            onChange={(e) => {
+              setGhatiTouched(true);
+              setForm((prev) => ({ ...prev, ghati: e.target.value }));
+            }}
+            placeholder="Auto suggested, editable"
+            className="font-mono"
+          />
+        </Field>
+
+        <Field label="Return date" htmlFor="jwr-date">
+          <Input
+            id="jwr-date"
+            type="date"
+            value={form.jobReturnDate}
+            onChange={(e) => setForm((prev) => ({ ...prev, jobReturnDate: e.target.value }))}
+          />
+        </Field>
       </div>
-    </div>
+    </FormDialog>
   );
 };
 

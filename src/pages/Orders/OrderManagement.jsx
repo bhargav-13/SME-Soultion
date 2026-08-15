@@ -1,21 +1,50 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Plus, SquarePen, Eye, Trash2, ChevronDown, X, ChevronLeft, ChevronRight, BriefcaseBusiness, Truck } from "lucide-react";
-import { useNavigate } from "react-router-dom";
-import SidebarLayout from "../../components/SidebarLayout";
-import SearchFilter from "../../components/SearchFilter";
-import StatsCard from "../../components/StatsCard";
-import PageHeader from "../../components/PageHeader";
-import PrimaryActionButton from "../../components/PrimaryActionButton";
-import ConfirmationDialog from "../../components/ConfirmationDialog";
-import toast from "react-hot-toast";
-import { axiosInstance, partyApi, orderDispatchApi, orderApi } from "../../services/apiService";
-import Loader from "../../components/Loader";
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  BriefcaseBusiness,
+  ChevronDown,
+  Eye,
+  Package,
+  Plus,
+  SquarePen,
+  Trash2,
+  Truck,
+} from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import toast from 'react-hot-toast';
+import SidebarLayout from '@/components/SidebarLayout';
+import { PageBody, PageHeader } from '@/components/page-header';
+import { StatCard } from '@/components/stat-card';
+import { EmptyState, PageLoader } from '@/components/states';
+import { ConfirmDialog } from '@/components/confirm-dialog';
+import { ViewDialog } from '@/components/form-dialog';
+import { Field, ReadOnlyField } from '@/components/form-field';
+import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Search } from 'lucide-react';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { SearchableSelect } from '@/components/ui/searchable-select';
+import { axiosInstance, partyApi, orderDispatchApi, orderApi } from '@/services/apiService';
 import {
   normalizeJobWorkLabel,
   readOrderJobOverrides,
   upsertOrderJobOverride,
-} from "../../utils/orderJobWorkSync";
-import { normalizeSearch } from "../../utils/search";
+} from '@/utils/orderJobWorkSync';
+import { normalizeSearch } from '@/utils/search';
 
 // ─── Flatten API response into table rows ───────────────────────────────────
 const flattenOrders = (apiData) => {
@@ -24,40 +53,50 @@ const flattenOrders = (apiData) => {
     (partyResp.orders || []).flatMap((order) =>
       (order.orderItems || []).map((item) => ({
         // identifiers
-        id:       item.id,
-        orderId:  order.id,
-        partyId:  partyResp.party?.id,
-        sizeId:   item.itemSize?.id,
+        id: item.id,
+        orderId: order.id,
+        partyId: partyResp.party?.id,
+        sizeId: item.itemSize?.id,
         _createdAt: item.createdAt || null,
         _updatedAt: item.lastUpdatedAt || null,
         // display fields
-        partyName:    partyResp.party?.name || "—",
-        date:         order.orderDate || "—",
-        size:         [item.itemSize?.sizeInInch, item.itemSize?.sizeInMm ? `(${item.itemSize.sizeInMm})` : ""].filter(Boolean).join(" ") || "—",
-        plating:      item.plating      ?? "_",
-        qtyPc:        item.qtyPc        ?? "—",
+        partyName: partyResp.party?.name || '—',
+        date: order.orderDate || '—',
+        size:
+          [item.itemSize?.sizeInInch, item.itemSize?.sizeInMm ? `(${item.itemSize.sizeInMm})` : '']
+            .filter(Boolean)
+            .join(' ') || '—',
+        plating: item.plating ?? '_',
+        qtyPc: item.qtyPc ?? '—',
         // Fall back to the item's own master data (weight/pc, pcs-per-box, etc.) whenever the
         // order item itself never captured these — otherwise most rows show "—" even though the
         // Item Master already has everything needed to compute them.
-        qtyKg:        item.qtyKg ?? (item.qtyPc != null && item.itemSize?.pcsWeight != null
-                        ? Number((item.qtyPc * item.itemSize.pcsWeight).toFixed(3))
-                        : "—"),
-        boxPc:        item.pcPerBox      ?? item.itemSize?.pcsPerBox    ?? "—",
-        cartoon:      item.boxPerCartoon ?? item.itemSize?.boxPerCarton ?? "—",
-        pcCartoon:    item.pcPerCartoon  ?? item.itemSize?.pcsPerCarton ?? "—",
-        stickerQty:   item.stickerQty ?? (item.qtyPc != null && item.itemSize?.pcsPerBox
-                        ? Math.ceil(item.qtyPc / item.itemSize.pcsPerBox)
-                        : "—"),
+        qtyKg:
+          item.qtyKg ??
+          (item.qtyPc != null && item.itemSize?.pcsWeight != null
+            ? Number((item.qtyPc * item.itemSize.pcsWeight).toFixed(3))
+            : '—'),
+        boxPc: item.pcPerBox ?? item.itemSize?.pcsPerBox ?? '—',
+        cartoon: item.boxPerCartoon ?? item.itemSize?.boxPerCarton ?? '—',
+        pcCartoon: item.pcPerCartoon ?? item.itemSize?.pcsPerCarton ?? '—',
+        stickerQty:
+          item.stickerQty ??
+          (item.qtyPc != null && item.itemSize?.pcsPerBox
+            ? Math.ceil(item.qtyPc / item.itemSize.pcsPerBox)
+            : '—'),
         dispatchDate: item.lastDispatchDate ?? null,
-        dispatchPcs:  item.totalDispatchedPc != null
-          ? item.totalDispatchedPc
-          : (item.qtyPc != null && item.pendingPc != null ? item.qtyPc - item.pendingPc : null),
-        pendingPc:    item.pendingPc    ?? "—",
-        jobWork:      item.platingType  ?? null,
-        platingStatus:item.jobActionDone ?? false,
-        jobWorkNo:    item.jobWorkNo    ?? "—",
-      }))
-    )
+        dispatchPcs:
+          item.totalDispatchedPc != null
+            ? item.totalDispatchedPc
+            : item.qtyPc != null && item.pendingPc != null
+              ? item.qtyPc - item.pendingPc
+              : null,
+        pendingPc: item.pendingPc ?? '—',
+        jobWork: item.platingType ?? null,
+        platingStatus: item.jobActionDone ?? false,
+        jobWorkNo: item.jobWorkNo ?? '—',
+      })),
+    ),
   );
 };
 
@@ -67,15 +106,20 @@ const toNumeric = (value) => {
 };
 
 const splitHeaderLabel = (label, maxChars = 14) => {
-  const raw = String(label || "").trim().split(/\s+/);
+  const raw = String(label || '')
+    .trim()
+    .split(/\s+/);
   const tokens = [];
   for (let i = 0; i < raw.length; i++) {
-    if (raw[i] === "/" && tokens.length > 0) { tokens[tokens.length - 1] += " /"; }
-    else { tokens.push(raw[i]); }
+    if (raw[i] === '/' && tokens.length > 0) {
+      tokens[tokens.length - 1] += ' /';
+    } else {
+      tokens.push(raw[i]);
+    }
   }
 
   const lines = [];
-  let current = "";
+  let current = '';
 
   tokens.forEach((token) => {
     if (!current) {
@@ -92,10 +136,10 @@ const splitHeaderLabel = (label, maxChars = 14) => {
   });
 
   if (current) lines.push(current);
-  return lines.length ? lines : [String(label || "")];
+  return lines.length ? lines : [String(label || '')];
 };
 
-const renderHeaderLabel = (label, keyPrefix = "header") => (
+const renderHeaderLabel = (label, keyPrefix = 'header') => (
   <span className="inline-flex flex-col items-center leading-tight">
     {splitHeaderLabel(label).map((line, idx) => (
       <span key={`${keyPrefix}-${idx}`}>{line}</span>
@@ -104,58 +148,60 @@ const renderHeaderLabel = (label, keyPrefix = "header") => (
 );
 
 const splitSizeDisplay = (value) => {
-  const text = String(value ?? "—").trim();
+  const text = String(value ?? '—').trim();
   const match = text.match(/^(.*?)(\s*\([^()]+\))$/);
-  if (!match) return { main: text, sub: "" };
+  if (!match) return { main: text, sub: '' };
   return { main: match[1].trim(), sub: match[2].trim() };
 };
+
+const TH = 'px-3 py-2.5 text-center text-[11.5px] font-semibold tracking-[0.02em] text-ink-3 uppercase border-r border-line-2 whitespace-nowrap';
+const TD = 'px-3 py-3 text-[13px] text-ink-2 border-r border-line-2 whitespace-nowrap';
 
 // ─── Component ──────────────────────────────────────────────────────────────
 const OrderManagement = () => {
   const navigate = useNavigate();
 
   // ── Filters ──────────────────────────────────────────────────────────────
-  const [searchTerm, setSearchTerm]   = useState("");
-  const [typeFilter, setTypeFilter]   = useState("");
-  const [sortByFields, setSortByFields] = useState("createdAt");
-  const [direction, setDirection]     = useState("DESC");
+  const [searchTerm, setSearchTerm] = useState('');
+  const [typeFilter, setTypeFilter] = useState('');
+  const [sortByFields, setSortByFields] = useState('createdAt');
+  const [direction, setDirection] = useState('DESC');
 
   // ── Pagination ────────────────────────────────────────────────────────────
-  const [page, setPage]               = useState(0);
-  const PAGE_SIZE                     = 20;
+  const [page, setPage] = useState(0);
+  const PAGE_SIZE = 20;
 
   // ── Data ──────────────────────────────────────────────────────────────────
-  const [orders, setOrders]           = useState([]);
-  const [totalPages, setTotalPages]   = useState(0);
+  const [orders, setOrders] = useState([]);
+  const [totalPages, setTotalPages] = useState(0);
   const [totalElements, setTotalElements] = useState(0);
-  const [loading, setLoading]         = useState(false);
+  const [loading, setLoading] = useState(false);
   const [orderJobOverrides, setOrderJobOverrides] = useState(() => readOrderJobOverrides());
 
   // ── Dialogs ───────────────────────────────────────────────────────────────
-  const [viewOrder, setViewOrder]     = useState(null);
-  const [editOrder, setEditOrder]     = useState(null);
+  const [viewOrder, setViewOrder] = useState(null);
+  const [editOrder, setEditOrder] = useState(null);
   const [expandedGroups, setExpandedGroups] = useState({});
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [moveToJobWorkRow, setMoveToJobWorkRow] = useState(null);
-  const [selectedMoveType, setSelectedMoveType] = useState("OUTSIDE");
+  const [selectedMoveType, setSelectedMoveType] = useState('OUTSIDE');
 
   // ── Parties + Dispatch ────────────────────────────────────────────────────
-  const [parties, setParties]         = useState([]);
-  const [partySearch, setPartySearch] = useState("");
-  const [partyDropOpen, setPartyDropOpen] = useState(false);
-  const partyDropRef                  = useRef(null);
+  const [parties, setParties] = useState([]);
 
   // ── Selected party (orders are shown one party at a time, like Client Management) ──
   const [selectedParty, setSelectedParty] = useState(null);
-  const [pickerOpen, setPickerOpen]   = useState(false);
-  const [pickerSearch, setPickerSearch] = useState("");
-  const pickerRef                     = useRef(null);
   const [dispatchDialog, setDispatchDialog] = useState(null);
-  const [savingEdit, setSavingEdit]   = useState(false);
+  const [savingEdit, setSavingEdit] = useState(false);
 
   // ── Debounce search ───────────────────────────────────────────────────────
   const searchDebounceRef = useRef(null);
-  const debouncedSearch   = useRef("");
+  const debouncedSearch = useRef('');
+
+  const partyOptions = useMemo(
+    () => parties.map((p) => ({ value: String(p.id), label: p.name })),
+    [parties],
+  );
 
   const handleSearchChange = (val) => {
     setSearchTerm(val);
@@ -189,8 +235,8 @@ const OrderManagement = () => {
           undefined,
           searching ? 0 : pageNum,
           searching ? 200 : PAGE_SIZE,
-          sortByFields || "createdAt",
-          direction || "DESC"
+          sortByFields || 'createdAt',
+          direction || 'DESC',
         );
         const body = res.data || {};
         // Per-party endpoint returns { data: { party, orders }, totalPages, ... } — wrap the single
@@ -200,12 +246,12 @@ const OrderManagement = () => {
         setTotalPages(searching ? 1 : (body.totalPages ?? 0));
         setTotalElements(body.totalElements ?? 0);
       } catch (err) {
-        toast.error(err?.response?.data?.message || "Failed to load orders");
+        toast.error(err?.response?.data?.message || 'Failed to load orders');
       } finally {
         setLoading(false);
       }
     },
-    [page, sortByFields, direction, selectedParty]
+    [page, sortByFields, direction, selectedParty],
   );
 
   // re-fetch when the selected party / page / sort / direction changes
@@ -216,48 +262,25 @@ const OrderManagement = () => {
 
   useEffect(() => {
     const reloadOverrides = () => setOrderJobOverrides(readOrderJobOverrides());
-    window.addEventListener("focus", reloadOverrides);
-    window.addEventListener("storage", reloadOverrides);
+    window.addEventListener('focus', reloadOverrides);
+    window.addEventListener('storage', reloadOverrides);
     return () => {
-      window.removeEventListener("focus", reloadOverrides);
-      window.removeEventListener("storage", reloadOverrides);
+      window.removeEventListener('focus', reloadOverrides);
+      window.removeEventListener('storage', reloadOverrides);
     };
   }, []);
 
   useEffect(() => {
-    partyApi.getAllParties()
+    partyApi
+      .getAllParties()
       .then((res) => setParties(Array.isArray(res.data) ? res.data : []))
       .catch(() => {});
   }, []);
-
-  useEffect(() => {
-    if (!partyDropOpen) return;
-    const handler = (e) => {
-      if (partyDropRef.current && !partyDropRef.current.contains(e.target)) {
-        setPartyDropOpen(false);
-      }
-    };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, [partyDropOpen]);
-
-  useEffect(() => {
-    if (!pickerOpen) return;
-    const handler = (e) => {
-      if (pickerRef.current && !pickerRef.current.contains(e.target)) {
-        setPickerOpen(false);
-      }
-    };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, [pickerOpen]);
 
   // Pick a party to view its orders (resets to the first page).
   const handleSelectParty = (p) => {
     setSelectedParty(p);
     setPage(0);
-    setPickerOpen(false);
-    setPickerSearch("");
   };
 
   // ── Client-side search + type filter ──────────────────────────────────────
@@ -280,7 +303,7 @@ const OrderManagement = () => {
             normalizeJobWorkLabel(order.jobWork),
             order.date,
             order.id,
-          ].join(" ")
+          ].join(' '),
         );
         return haystack.includes(q);
       });
@@ -289,7 +312,7 @@ const OrderManagement = () => {
     // Type filter
     if (typeFilter) {
       result = result.filter((order) =>
-        normalizeJobWorkLabel(order.jobWork).toLowerCase().includes(typeFilter.toLowerCase())
+        normalizeJobWorkLabel(order.jobWork).toLowerCase().includes(typeFilter.toLowerCase()),
       );
     }
 
@@ -314,14 +337,13 @@ const OrderManagement = () => {
 
   const totalPendingOrders = useMemo(
     () => filteredOrders.filter((o) => toNumeric(o.pendingPc) > 0).length,
-    [filteredOrders]
+    [filteredOrders],
   );
 
   const totalPice = useMemo(
     () => filteredOrders.reduce((sum, o) => sum + toNumeric(o.qtyPc), 0),
-    [filteredOrders]
+    [filteredOrders],
   );
-
 
   // ── Actions ───────────────────────────────────────────────────────────────
   const requestDelete = (order) => setDeleteTarget(order);
@@ -332,12 +354,12 @@ const OrderManagement = () => {
       // Delete just this order item. The backend removes the parent order only if it was the
       // last item on it.
       await axiosInstance.delete(
-        `/api/v1/parties/${deleteTarget.partyId}/orders/${deleteTarget.orderId}/items/${deleteTarget.id}`
+        `/api/v1/parties/${deleteTarget.partyId}/orders/${deleteTarget.orderId}/items/${deleteTarget.id}`,
       );
-      toast.success("Order item deleted");
+      toast.success('Order item deleted');
       triggerFetch(debouncedSearch.current, page);
     } catch (err) {
-      toast.error(err?.response?.data?.message || "Failed to delete order item");
+      toast.error(err?.response?.data?.message || 'Failed to delete order item');
     } finally {
       setDeleteTarget(null);
     }
@@ -357,21 +379,21 @@ const OrderManagement = () => {
     const override = getRowOverride(row);
     const currentJobWork = normalizeJobWorkLabel(override?.jobWork ?? row.jobWork);
     setMoveToJobWorkRow(row);
-    setSelectedMoveType(currentJobWork === "In-House" ? "INHOUSE" : "OUTSIDE");
+    setSelectedMoveType(currentJobWork === 'In-House' ? 'INHOUSE' : 'OUTSIDE');
   };
 
   const handleMoveToJobWorkSave = () => {
     if (!moveToJobWorkRow) return;
-    if (selectedMoveType === "MANUAL") {
+    if (selectedMoveType === 'MANUAL') {
       // Manual job work is not tied to this order — open the blank manual form.
-      navigate("/job-work/move", { state: { mode: "create", jobWorkMode: "MANUAL" } });
+      navigate('/job-work/move', { state: { mode: 'create', jobWorkMode: 'MANUAL' } });
       setMoveToJobWorkRow(null);
       return;
     }
-    const selectedLabel = selectedMoveType === "INHOUSE" ? "In-House" : "Outside";
-    navigate("/job-work/move", {
+    const selectedLabel = selectedMoveType === 'INHOUSE' ? 'In-House' : 'Outside';
+    navigate('/job-work/move', {
       state: {
-        mode: "create",
+        mode: 'create',
         prefillOrderRow: { ...moveToJobWorkRow, jobWork: selectedLabel },
       },
     });
@@ -379,9 +401,9 @@ const OrderManagement = () => {
   };
 
   const normalizeToISO = (dateStr) => {
-    if (!dateStr || dateStr === "—") return null;
-    if (dateStr.includes("/")) {
-      const [d, m, y] = dateStr.split("/");
+    if (!dateStr || dateStr === '—') return null;
+    if (dateStr.includes('/')) {
+      const [d, m, y] = dateStr.split('/');
       return `${y}-${m}-${d}`;
     }
     return dateStr;
@@ -393,44 +415,46 @@ const OrderManagement = () => {
     try {
       // Fetch full order to preserve all items
       const orderRes = await axiosInstance.get(
-        `/api/v1/parties/${editOrder.partyId}/orders/${editOrder.orderId}`
+        `/api/v1/parties/${editOrder.partyId}/orders/${editOrder.orderId}`,
       );
       const fullOrder = orderRes.data;
       const updatedItems = (fullOrder.orderItems || []).map((item) => {
         const isTarget = item.id === editOrder.id;
         return {
-          itemSizeId:    item.itemSize?.id,
-          plating:       isTarget ? editOrder.plating        : item.plating,
-          qtyPc:         isTarget ? (parseFloat(editOrder.qtyPc)       || 0) : item.qtyPc,
-          qtyKg:         isTarget ? (parseFloat(editOrder.qtyKg)       || null) : item.qtyKg,
-          pcPerBox:      isTarget ? (parseFloat(editOrder.boxPc)       || null) : item.pcPerBox,
-          boxPerCartoon: isTarget ? (parseFloat(editOrder.cartoon)     || null) : item.boxPerCartoon,
-          pcPerCartoon:  isTarget ? (parseFloat(editOrder.pcCartoon)   || null) : item.pcPerCartoon,
-          stickerQty:    isTarget ? (parseFloat(editOrder.stickerQty)  || null) : item.stickerQty,
-          pendingPc:     isTarget ? (parseFloat(editOrder.pendingPc)   || null) : item.pendingPc,
+          itemSizeId: item.itemSize?.id,
+          plating: isTarget ? editOrder.plating : item.plating,
+          qtyPc: isTarget ? parseFloat(editOrder.qtyPc) || 0 : item.qtyPc,
+          qtyKg: isTarget ? parseFloat(editOrder.qtyKg) || null : item.qtyKg,
+          pcPerBox: isTarget ? parseFloat(editOrder.boxPc) || null : item.pcPerBox,
+          boxPerCartoon: isTarget ? parseFloat(editOrder.cartoon) || null : item.boxPerCartoon,
+          pcPerCartoon: isTarget ? parseFloat(editOrder.pcCartoon) || null : item.pcPerCartoon,
+          stickerQty: isTarget ? parseFloat(editOrder.stickerQty) || null : item.stickerQty,
+          pendingPc: isTarget ? parseFloat(editOrder.pendingPc) || null : item.pendingPc,
           jobActionDone: isTarget ? editOrder.platingStatus : item.jobActionDone,
-          platingType:   item.platingType,
+          platingType: item.platingType,
         };
       });
 
-      await axiosInstance.put(
-        `/api/v1/parties/${editOrder.partyId}/orders/${editOrder.orderId}`,
-        { orderDate: normalizeToISO(editOrder.date) || fullOrder.orderDate, items: updatedItems }
-      );
+      await axiosInstance.put(`/api/v1/parties/${editOrder.partyId}/orders/${editOrder.orderId}`, {
+        orderDate: normalizeToISO(editOrder.date) || fullOrder.orderDate,
+        items: updatedItems,
+      });
 
       // Update local state + overrides
       const existingOverride = getRowOverride(editOrder);
       const currentJobWork = normalizeJobWorkLabel(existingOverride?.jobWork ?? editOrder.jobWork);
       const overridePatch = { platingStatus: editOrder.platingStatus, jobWorkNo: editOrder.jobWorkNo };
-      if (currentJobWork !== "—") overridePatch.jobWork = currentJobWork;
+      if (currentJobWork !== '—') overridePatch.jobWork = currentJobWork;
 
       setOrders((prev) => prev.map((row) => (row.id === editOrder.id ? { ...row, ...editOrder } : row)));
-      setOrderJobOverrides(upsertOrderJobOverride({ orderItemId: editOrder.id, orderId: editOrder.orderId, ...overridePatch }));
+      setOrderJobOverrides(
+        upsertOrderJobOverride({ orderItemId: editOrder.id, orderId: editOrder.orderId, ...overridePatch }),
+      );
       setEditOrder(null);
-      toast.success("Order updated");
+      toast.success('Order updated');
       triggerFetch(debouncedSearch.current, page);
     } catch (err) {
-      toast.error(err?.response?.data?.message || "Failed to update order");
+      toast.error(err?.response?.data?.message || 'Failed to update order');
     } finally {
       setSavingEdit(false);
     }
@@ -438,25 +462,38 @@ const OrderManagement = () => {
 
   // ── Dispatch ──────────────────────────────────────────────────────────────
   const fetchDispatches = async (row) => {
-    const res = await orderDispatchApi.getAllOrderDispatches(row.partyId, row.orderId, row.id, undefined, 0, 100);
+    const res = await orderDispatchApi.getAllOrderDispatches(
+      row.partyId,
+      row.orderId,
+      row.id,
+      undefined,
+      0,
+      100,
+    );
     return res.data?.data || [];
   };
 
   const openDispatchDialog = async (row) => {
-    setDispatchDialog({ row, dispatches: [], loading: true, newDate: "", newPcs: "", saving: false });
+    setDispatchDialog({ row, dispatches: [], loading: true, newDate: '', newPcs: '', saving: false });
     try {
       const dispatches = await fetchDispatches(row);
       setDispatchDialog((prev) => ({ ...prev, dispatches, loading: false }));
     } catch {
-      toast.error("Failed to load dispatches");
+      toast.error('Failed to load dispatches');
       setDispatchDialog(null);
     }
   };
 
   const handleAddDispatch = async () => {
     const { row, newDate, newPcs } = dispatchDialog;
-    if (!newDate) { toast.error("Enter dispatch date"); return; }
-    if (!newPcs || parseFloat(newPcs) <= 0) { toast.error("Enter valid pcs"); return; }
+    if (!newDate) {
+      toast.error('Enter dispatch date');
+      return;
+    }
+    if (!newPcs || parseFloat(newPcs) <= 0) {
+      toast.error('Enter valid pcs');
+      return;
+    }
     setDispatchDialog((prev) => ({ ...prev, saving: true }));
     try {
       await orderDispatchApi.createOrderDispatch(row.partyId, row.orderId, row.id, {
@@ -464,11 +501,11 @@ const OrderManagement = () => {
         dispatchPcs: parseFloat(newPcs),
       });
       const dispatches = await fetchDispatches(row);
-      setDispatchDialog((prev) => ({ ...prev, dispatches, newDate: "", newPcs: "", saving: false }));
-      toast.success("Dispatch added");
+      setDispatchDialog((prev) => ({ ...prev, dispatches, newDate: '', newPcs: '', saving: false }));
+      toast.success('Dispatch added');
       triggerFetch(debouncedSearch.current, page);
     } catch (err) {
-      toast.error(err?.response?.data?.message || "Failed to add dispatch");
+      toast.error(err?.response?.data?.message || 'Failed to add dispatch');
       setDispatchDialog((prev) => ({ ...prev, saving: false }));
     }
   };
@@ -477,167 +514,155 @@ const OrderManagement = () => {
     const { row } = dispatchDialog;
     try {
       await orderDispatchApi.deleteOrderDispatch(row.partyId, row.orderId, row.id, dispatchId);
-      setDispatchDialog((prev) => ({ ...prev, dispatches: prev.dispatches.filter((d) => d.id !== dispatchId) }));
-      toast.success("Dispatch deleted");
+      setDispatchDialog((prev) => ({
+        ...prev,
+        dispatches: prev.dispatches.filter((d) => d.id !== dispatchId),
+      }));
+      toast.success('Dispatch deleted');
       triggerFetch(debouncedSearch.current, page);
     } catch (err) {
-      toast.error(err?.response?.data?.message || "Failed to delete dispatch");
+      toast.error(err?.response?.data?.message || 'Failed to delete dispatch');
     }
   };
 
-  const renderMoveOption = (value, label, description) => {
+  const MoveOption = ({ value, label, description }) => {
     const isSelected = selectedMoveType === value;
-
     return (
       <button
         type="button"
         onClick={() => setSelectedMoveType(value)}
         aria-pressed={isSelected}
-        className={`w-full rounded-xl border p-4 transition flex items-start gap-3 text-left ${
+        className={`flex w-full items-start gap-3 rounded-xl border p-4 text-left transition ${
           isSelected
-            ? "border-gray-900 bg-gray-50 ring-1 ring-gray-900 shadow-sm"
-            : "border-gray-200 bg-white hover:border-gray-400 hover:bg-gray-50"
+            ? 'border-primary bg-primary-soft ring-1 ring-primary/40'
+            : 'border-line bg-surface hover:border-primary/40 hover:bg-surface-2'
         }`}
       >
         <span
-          className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 ${
-            isSelected ? "border-gray-900" : "border-gray-300"
+          className={`mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full border-2 ${
+            isSelected ? 'border-primary' : 'border-line'
           }`}
         >
-          {isSelected ? <span className="h-2.5 w-2.5 rounded-full bg-gray-900" /> : null}
+          {isSelected ? <span className="size-2.5 rounded-full bg-primary" /> : null}
         </span>
         <span className="flex flex-col">
-          <span className={`text-sm font-semibold ${isSelected ? "text-gray-900" : "text-gray-800"}`}>{label}</span>
-          <span className="text-xs text-gray-500 mt-0.5">{description}</span>
+          <span className={`text-[13.5px] font-semibold ${isSelected ? 'text-primary' : 'text-ink'}`}>
+            {label}
+          </span>
+          <span className="mt-0.5 text-[12px] text-ink-3">{description}</span>
         </span>
       </button>
     );
   };
 
   const convertToDateInput = (dateString) => {
-    if (!dateString || dateString === "—") return "";
-    const parts = dateString.split("/");
+    if (!dateString || dateString === '—') return '';
+    const parts = dateString.split('/');
     if (parts.length === 3) return `${parts[2]}-${parts[1]}-${parts[0]}`;
     return dateString;
   };
 
-  const convertFromDateInput = (val) => {
-    if (!val) return "";
-    const [year, month, day] = val.split("-");
-    return `${day}/${month}/${year}`;
-  };
-
   const renderOrderDetails = (order, isEditable = false) => {
     const fields = [
-      ["Party Name", "partyName"],
-      ["Date", "date"],
-      ["Size", "size"],
-      ["Plating", "plating"],
-      ["Qty Pc", "qtyPc"],
-      ["Qty Kg", "qtyKg"],
-      ["Pc/Box", "boxPc"],
-      ["Cartoon", "cartoon"],
-      ["Pc/Cartoon", "pcCartoon"],
-      ["Sticker Qty.", "stickerQty"],
-      ["Dispatch Date", "dispatchDate"],
-      ["Dispatch Pcs", "dispatchPcs"],
-      ["Pending Pc", "pendingPc"],
-      ["Job Action", "jobWork"],
-      ["Job Work No", "jobWorkNo"],
-      ["Plating Status", "platingStatus"],
+      ['Party Name', 'partyName'],
+      ['Date', 'date'],
+      ['Size', 'size'],
+      ['Plating', 'plating'],
+      ['Qty Pc', 'qtyPc'],
+      ['Qty Kg', 'qtyKg'],
+      ['Pc/Box', 'boxPc'],
+      ['Cartoon', 'cartoon'],
+      ['Pc/Cartoon', 'pcCartoon'],
+      ['Sticker Qty.', 'stickerQty'],
+      ['Dispatch Date', 'dispatchDate'],
+      ['Dispatch Pcs', 'dispatchPcs'],
+      ['Pending Pc', 'pendingPc'],
+      ['Job Action', 'jobWork'],
+      ['Job Work No', 'jobWorkNo'],
+      ['Plating Status', 'platingStatus'],
     ];
 
-    const filteredParties = parties.filter((p) =>
-      (p.name || "").toLowerCase().includes(partySearch.toLowerCase())
-    );
-
     return (
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {fields.map(([label, key]) => (
-          <div key={key}>
-            <p className="text-xs text-gray-500 mb-1">{label}</p>
-            {isEditable ? (
-              key === "partyName" ? (
-                <div ref={partyDropRef} className="relative">
-                  <div
-                    className={`flex items-center border rounded-md overflow-hidden transition ${partyDropOpen ? "ring-1 ring-gray-400 border-gray-400" : "border-gray-300"}`}
-                  >
-                    <input
-                      type="text"
-                      value={partyDropOpen ? partySearch : (editOrder?.partyName ?? "")}
-                      onChange={(e) => setPartySearch(e.target.value)}
-                      onClick={() => { setPartySearch(""); setPartyDropOpen(true); }}
-                      placeholder="Search party…"
-                      className="flex-1 px-3 py-2 text-sm focus:outline-none bg-transparent"
-                    />
-                    <ChevronDown
-                      onClick={() => { setPartySearch(""); setPartyDropOpen((o) => !o); }}
-                      className={`w-4 h-4 text-gray-400 mr-2 cursor-pointer transition-transform ${partyDropOpen ? "rotate-180" : ""}`}
-                    />
-                  </div>
-                  {partyDropOpen && (
-                    <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-48 overflow-y-auto">
-                      {filteredParties.length === 0 ? (
-                        <div className="px-3 py-2 text-sm text-gray-400">No parties found</div>
-                      ) : (
-                        filteredParties.map((p) => (
-                          <button
-                            key={p.id}
-                            type="button"
-                            onMouseDown={(e) => {
-                              e.preventDefault();
-                              setEditOrder((prev) => ({ ...prev, partyName: p.name, partyId: p.id }));
-                              setPartyDropOpen(false);
-                            }}
-                            className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-50 ${editOrder?.partyId === p.id ? "font-medium" : "text-gray-700"}`}
-                          >
-                            {p.name}
-                          </button>
-                        ))
-                      )}
-                    </div>
-                  )}
-                </div>
-              ) : key === "platingStatus" ? (
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
+        {fields.map(([label, key]) => {
+          if (!isEditable) {
+            return (
+              <ReadOnlyField
+                key={key}
+                label={label}
+                value={key === 'platingStatus' ? (order?.[key] ? 'Enabled' : 'Disabled') : order?.[key]}
+              />
+            );
+          }
+
+          if (key === 'partyName') {
+            return (
+              <Field key={key} label={label}>
+                <SearchableSelect
+                  ariaLabel="Party"
+                  placeholder="Select party"
+                  searchPlaceholder="Search party…"
+                  options={partyOptions}
+                  value={editOrder?.partyId != null ? String(editOrder.partyId) : undefined}
+                  onChange={(v) => {
+                    const p = parties.find((x) => String(x.id) === v);
+                    if (p) setEditOrder((prev) => ({ ...prev, partyName: p.name, partyId: p.id }));
+                  }}
+                />
+              </Field>
+            );
+          }
+
+          if (key === 'platingStatus') {
+            return (
+              <Field key={key} label={label}>
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
                     onClick={() => setEditOrder((prev) => ({ ...prev, [key]: !prev[key] }))}
-                    className={`w-10 h-6 rounded-full relative transition ${editOrder?.[key] ? "bg-emerald-600" : "bg-gray-300"}`}
+                    className={`relative h-6 w-10 rounded-full transition ${editOrder?.[key] ? 'bg-success' : 'bg-line'}`}
                   >
-                    <span className={`w-4 h-4 bg-white rounded-full absolute top-1 transition ${editOrder?.[key] ? "right-1" : "left-1"}`} />
+                    <span
+                      className={`absolute top-1 size-4 rounded-full bg-white transition ${editOrder?.[key] ? 'right-1' : 'left-1'}`}
+                    />
                   </button>
-                  <span className="text-sm text-gray-600">{editOrder?.[key] ? "Enabled" : "Disabled"}</span>
+                  <span className="text-[13px] text-ink-2">{editOrder?.[key] ? 'Enabled' : 'Disabled'}</span>
                 </div>
-              ) : key === "date" ? (
-                <input
+              </Field>
+            );
+          }
+
+          if (key === 'date') {
+            return (
+              <Field key={key} label={label}>
+                <Input
                   type="date"
-                  value={convertToDateInput(editOrder?.[key] ?? "")}
+                  value={convertToDateInput(editOrder?.[key] ?? '')}
                   onChange={(e) => setEditOrder((prev) => ({ ...prev, [key]: e.target.value }))}
-                  className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-gray-400"
                 />
-              ) : key === "dispatchDate" || key === "dispatchPcs" ? (
-                <p className="text-sm text-gray-500 border border-gray-200 rounded-md px-3 py-2 bg-gray-50 italic">
+              </Field>
+            );
+          }
+
+          if (key === 'dispatchDate' || key === 'dispatchPcs') {
+            return (
+              <Field key={key} label={label}>
+                <p className="rounded-md border border-line bg-surface-2 px-3 py-2 text-[13px] text-ink-3 italic">
                   Manage via Dispatch button in table
                 </p>
-              ) : (
-                <input
-                  value={editOrder?.[key] ?? ""}
-                  onChange={(e) => setEditOrder((prev) => ({ ...prev, [key]: e.target.value }))}
-                  className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-gray-400"
-                />
-              )
-            ) : key === "platingStatus" ? (
-              <p className="text-sm text-gray-800 border border-gray-200 rounded-md px-3 py-2 bg-gray-50">
-                {order?.[key] ? "Enabled" : "Disabled"}
-              </p>
-            ) : (
-              <p className="text-sm text-gray-800 border border-gray-200 rounded-md px-3 py-2 bg-gray-50">
-                {order?.[key] ?? "—"}
-              </p>
-            )}
-          </div>
-        ))}
+              </Field>
+            );
+          }
+
+          return (
+            <Field key={key} label={label}>
+              <Input
+                value={editOrder?.[key] ?? ''}
+                onChange={(e) => setEditOrder((prev) => ({ ...prev, [key]: e.target.value }))}
+              />
+            </Field>
+          );
+        })}
       </div>
     );
   };
@@ -645,500 +670,523 @@ const OrderManagement = () => {
   // ── Render ────────────────────────────────────────────────────────────────
   return (
     <SidebarLayout>
-      <div className="mx-auto">
-        <div className="mb-8">
-          <PageHeader
-            title="Order Management"
-            description="Simplifying Order Processing from Start to Delivery"
-            action={
-              <div className="flex items-center gap-2">
-                
-                <PrimaryActionButton onClick={() => navigate("/job-work")} icon={BriefcaseBusiness}>
-                  All Job Works
-                </PrimaryActionButton>
-                <PrimaryActionButton onClick={() => navigate("/order/select")} icon={Plus}>
-                  Add Order
-                </PrimaryActionButton>
-              </div>
-            }
+      <PageHeader
+        title="Order management"
+        subtitle="Simplifying order processing from start to delivery"
+        actions={
+          <>
+            <Button variant="outline" size="sm" onClick={() => navigate('/job-work')}>
+              <BriefcaseBusiness className="size-4" />
+              <span className="hidden md:inline">All job works</span>
+            </Button>
+            <Button size="sm" onClick={() => navigate('/order/select')}>
+              <Plus className="size-4" />
+              <span className="hidden sm:inline">Add order</span>
+            </Button>
+          </>
+        }
+      />
+
+      <PageBody className="space-y-5">
+        {/* Party picker — choose a party to view its orders (newest first by create time) */}
+        <div className="max-w-md">
+          <label className="mb-1.5 block text-[12.5px] font-medium text-ink-2">Party</label>
+          <SearchableSelect
+            ariaLabel="Party"
+            placeholder="Select a party to view its orders"
+            searchPlaceholder="Search party…"
+            options={partyOptions}
+            value={selectedParty?.id != null ? String(selectedParty.id) : undefined}
+            onChange={(v) => {
+              const p = parties.find((x) => String(x.id) === v);
+              if (p) handleSelectParty(p);
+            }}
           />
         </div>
 
-        {/* Party picker — choose a party to view its orders (newest first by create time) */}
-        <div className="mb-6 max-w-md" ref={pickerRef}>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Party</label>
-          <div className="relative">
-            <button
-              type="button"
-              onClick={() => { setPickerSearch(""); setPickerOpen((o) => !o); }}
-              className={`w-full flex items-center justify-between px-3 py-2.5 border rounded-lg bg-white text-sm transition ${pickerOpen ? "ring-1 ring-gray-400 border-gray-400" : "border-gray-300 hover:border-gray-400"}`}
-            >
-              <span className={selectedParty ? "text-gray-900" : "text-gray-400"}>
-                {selectedParty?.name || "Select a party to view its orders"}
-              </span>
-              <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${pickerOpen ? "rotate-180" : ""}`} />
-            </button>
-            {pickerOpen && (
-              <div className="absolute z-40 top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden">
-                <div className="p-2 border-b border-gray-100">
-                  <input
-                    type="text"
-                    autoFocus
-                    value={pickerSearch}
-                    onChange={(e) => setPickerSearch(e.target.value)}
-                    placeholder="Search party…"
-                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-gray-400"
-                  />
-                </div>
-                <div className="max-h-64 overflow-y-auto">
-                  {parties.filter((p) => (p.name || "").toLowerCase().includes(pickerSearch.toLowerCase())).length === 0 ? (
-                    <div className="px-3 py-3 text-sm text-gray-400">No parties found</div>
-                  ) : (
-                    parties
-                      .filter((p) => (p.name || "").toLowerCase().includes(pickerSearch.toLowerCase()))
-                      .map((p) => (
-                        <button
-                          key={p.id}
-                          type="button"
-                          onClick={() => handleSelectParty(p)}
-                          className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-50 ${selectedParty?.id === p.id ? "font-semibold bg-gray-50" : "text-gray-700"}`}
-                        >
-                          {p.name}
-                        </button>
-                      ))
-                  )}
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-
         {!selectedParty ? (
-          <div className="flex flex-col items-center justify-center rounded-lg border border-dashed border-gray-300 bg-gray-50 py-20 text-center">
-            <p className="text-sm text-gray-500">Select a party above to view its orders.</p>
-          </div>
+          <EmptyState
+            icon={Package}
+            title="Select a party"
+            description="Choose a party above to view its orders."
+          />
         ) : (
-        <>
-        <div className="grid grid-cols-3 gap-6 mb-8">
-          <StatsCard label="Total Order" value={totalFilteredOrders} className="h-[90px] rounded-md" />
-          <StatsCard label="Total Pending Order" value={totalPendingOrders} className="h-[90px] rounded-md" />
-          <StatsCard label="Total Pice" value={totalPice} className="h-[90px] rounded-md" />
-        </div>
+          <>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+              <StatCard label="Total orders" value={totalFilteredOrders} tone="primary" />
+              <StatCard label="Total pending orders" value={totalPendingOrders} tone="warning" />
+              <StatCard label="Total pieces" value={totalPice.toLocaleString()} tone="info" />
+            </div>
 
-        <SearchFilter
-          searchQuery={searchTerm}
-          setSearchQuery={handleSearchChange}
-          typeFilter={typeFilter}
-          setTypeFilter={setTypeFilter}
-          filterOptions={["Type", "Outside", "In-House", "Job Work"]}
-          filterPlaceholder="Type"
-        />
+            {/* Toolbar */}
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+              <div className="relative w-full sm:max-w-sm sm:flex-1">
+                <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-ink-3" />
+                <Input
+                  type="search"
+                  placeholder="Search orders…"
+                  value={searchTerm}
+                  onChange={(e) => handleSearchChange(e.target.value)}
+                  className="bg-surface pl-9"
+                />
+              </div>
+              <Select value={typeFilter || 'ALL'} onValueChange={(v) => setTypeFilter(v === 'ALL' ? '' : v)}>
+                <SelectTrigger className="w-full bg-surface sm:w-44">
+                  <SelectValue placeholder="All types" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ALL">All types</SelectItem>
+                  <SelectItem value="Outside">Outside</SelectItem>
+                  <SelectItem value="In-House">In-House</SelectItem>
+                  <SelectItem value="Job Work">Job Work</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
 
-        <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-          <div className="max-h-[520px] overflow-auto scrollbar-thin">
-            <table className="w-max min-w-full table-auto">
-              <thead>
-                <tr className="bg-gray-100 border-b border-gray-200">
-                  <th rowSpan={2} className="px-3 py-3 text-center text-sm font-[550] border-r border-gray-200 whitespace-normal">{renderHeaderLabel("Party Name", "party-name")}</th>
-                  <th rowSpan={2} className="px-3 py-3 text-center text-sm font-[550] border-r border-gray-200 whitespace-normal">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setSortByFields("createdAt");
-                        setDirection((d) => d === "ASC" ? "DESC" : "ASC");
-                        setPage(0);
-                      }}
-                      className="flex items-center gap-1 mx-auto"
-                    >
-                      {renderHeaderLabel("Date", "date")}
-                      <ChevronDown className={`w-3 h-3 transition-transform ${sortByFields === "createdAt" && direction === "ASC" ? "rotate-180" : ""}`} />
-                    </button>
-                  </th>
-                  <th rowSpan={2} className="px-3 py-3 text-center text-sm font-[550] border-r border-gray-200 whitespace-normal">{renderHeaderLabel("Size", "size")}</th>
-                  <th rowSpan={2} className="px-3 py-3 text-center text-sm font-[550] border-r border-gray-200 whitespace-normal">{renderHeaderLabel("Plating", "plating")}</th>
-                  <th rowSpan={2} className="px-3 py-3 text-center text-sm font-[550] border-r border-gray-200 whitespace-normal">{renderHeaderLabel("Qty. Pc", "qty-pc")}</th>
-                  <th rowSpan={2} className="px-3 py-3 text-center text-sm font-[550] border-r border-gray-200 whitespace-normal">{renderHeaderLabel("Qty Kg", "qty-kg")}</th>
-                  <th rowSpan={2} className="px-3 py-3 text-center text-sm font-[550] border-r border-gray-200 whitespace-normal">{renderHeaderLabel("Pc/Box.", "pc-box")}</th>
-                  <th rowSpan={2} className="px-3 py-3 text-center text-sm font-[550] border-r border-gray-200 whitespace-normal">{renderHeaderLabel("Box/Cartoon.", "box-cartoon")}</th>
-                  <th rowSpan={2} className="px-3 py-3 text-center text-sm font-[550] border-r border-gray-200 whitespace-normal">{renderHeaderLabel("Pc/Cartoon", "pc-cartoon")}</th>
-                  <th rowSpan={2} className="px-3 py-3 text-center text-sm font-[550] border-r border-gray-200 whitespace-normal">{renderHeaderLabel("Sticker Qty.", "sticker-qty")}</th>
-                  <th colSpan={2} className="px-3 py-2 text-center text-sm font-[550] border-r border-gray-200 whitespace-normal">{renderHeaderLabel("Dispatch", "dispatch")}</th>
-                  <th rowSpan={2} className="px-3 py-3 text-center text-sm font-[550] border-r border-gray-200 whitespace-normal">{renderHeaderLabel("Pending Pc.", "pending-pc")}</th>
-                  <th rowSpan={2} className="px-3 py-3 text-center text-sm font-[550] border-r border-gray-200 whitespace-normal">{renderHeaderLabel("Job Update", "job-update")}</th>
-                  <th rowSpan={2} className="px-3 py-3 text-center text-sm font-[550] whitespace-normal">{renderHeaderLabel("Action", "action")}</th>
-                </tr>
-                <tr className="bg-gray-100 border-b border-gray-200">
-                  <th className="px-3 py-2 text-center text-sm font-[550] border-r border-gray-200 whitespace-normal">{renderHeaderLabel("Date", "dispatch-date")}</th>
-                  <th className="px-3 py-2 text-center text-sm font-[550] border-r border-gray-200 whitespace-normal">{renderHeaderLabel("Pcs.", "dispatch-pcs")}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {loading ? (
-                  <tr>
-                    <td colSpan={15}>
-                      <Loader text="Loading orders..." />
-                    </td>
-                  </tr>
-                ) : groupedFilteredOrders.length === 0 ? (
-                  <tr>
-                    <td colSpan={15} className="px-3 py-6 text-sm text-center text-gray-500">
-                      No orders found.
-                    </td>
-                  </tr>
-                ) : (
-                  groupedFilteredOrders.flatMap((group) => {
-                    const groupKey = group[0]?.orderId ?? group[0]?.id;
-                    const isExpanded = Boolean(expandedGroups[groupKey]);
-                    const visibleRows = group.length > 1 && !isExpanded ? [group[0]] : group;
-
-                    return visibleRows.map((row, rowIndex) => {
-                      const showGroupedColumns = rowIndex === 0;
-                      const groupRowSpan = visibleRows.length;
-                      const isMultiItem = group.length > 1;
-                      const sizeParts = splitSizeDisplay(row.size);
-                      const rowOverride = getRowOverride(row);
-                      const effectivePlatingStatus = rowOverride?.platingStatus ?? row.platingStatus;
-                      const effectiveJobWork = normalizeJobWorkLabel(rowOverride?.jobWork ?? row.jobWork);
-                      const effectiveJobWorkNo = rowOverride?.jobWorkNo ?? row.jobWorkNo;
-                      const effectiveStickerQty = row.stickerQty ?? "—";
-                      const effectiveJobWorkKey = String(effectiveJobWork || "").toLowerCase().replace(/[\s-]/g, "");
-
-                      return (
-                        <tr
-                          key={row.id}
-                          onDoubleClick={() => setViewOrder(row)}
-                          className={`border-b border-gray-200 cursor-pointer ${
-                            row._updatedAt && row._createdAt && row._updatedAt !== row._createdAt
-                              ? "bg-yellow-50"
-                              : "hover:bg-gray-50"
-                          }`}
+            <Card className="gap-0 overflow-hidden py-0">
+              <div className="max-h-[560px] w-full overflow-auto scrollbar-thin">
+                <table className="w-max min-w-full table-auto border-collapse">
+                  <thead className="sticky top-0 z-10">
+                    <tr className="border-b border-line bg-surface-2">
+                      <th rowSpan={2} className={TH}>
+                        {renderHeaderLabel('Party Name', 'party-name')}
+                      </th>
+                      <th rowSpan={2} className={TH}>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSortByFields('createdAt');
+                            setDirection((d) => (d === 'ASC' ? 'DESC' : 'ASC'));
+                            setPage(0);
+                          }}
+                          className="mx-auto flex items-center gap-1"
                         >
-                          {showGroupedColumns && (
-                            <td rowSpan={groupRowSpan} className="px-3 py-4 text-sm text-gray-700 border-r border-gray-200 whitespace-nowrap align-top">
-                              <div className="inline-flex items-center gap-1 cursor-pointer">
-                                <span>{row.partyName}</span>
-                                {isMultiItem ? (
+                          {renderHeaderLabel('Date', 'date')}
+                          <ChevronDown
+                            className={`size-3 transition-transform ${sortByFields === 'createdAt' && direction === 'ASC' ? 'rotate-180' : ''}`}
+                          />
+                        </button>
+                      </th>
+                      <th rowSpan={2} className={TH}>
+                        {renderHeaderLabel('Size', 'size')}
+                      </th>
+                      <th rowSpan={2} className={TH}>
+                        {renderHeaderLabel('Plating', 'plating')}
+                      </th>
+                      <th rowSpan={2} className={TH}>
+                        {renderHeaderLabel('Qty. Pc', 'qty-pc')}
+                      </th>
+                      <th rowSpan={2} className={TH}>
+                        {renderHeaderLabel('Qty Kg', 'qty-kg')}
+                      </th>
+                      <th rowSpan={2} className={TH}>
+                        {renderHeaderLabel('Pc/Box.', 'pc-box')}
+                      </th>
+                      <th rowSpan={2} className={TH}>
+                        {renderHeaderLabel('Box/Cartoon.', 'box-cartoon')}
+                      </th>
+                      <th rowSpan={2} className={TH}>
+                        {renderHeaderLabel('Pc/Cartoon', 'pc-cartoon')}
+                      </th>
+                      <th rowSpan={2} className={TH}>
+                        {renderHeaderLabel('Sticker Qty.', 'sticker-qty')}
+                      </th>
+                      <th colSpan={2} className={`${TH} py-2`}>
+                        {renderHeaderLabel('Dispatch', 'dispatch')}
+                      </th>
+                      <th rowSpan={2} className={TH}>
+                        {renderHeaderLabel('Pending Pc.', 'pending-pc')}
+                      </th>
+                      <th rowSpan={2} className={TH}>
+                        {renderHeaderLabel('Job Update', 'job-update')}
+                      </th>
+                      <th rowSpan={2} className={`${TH} border-r-0`}>
+                        {renderHeaderLabel('Action', 'action')}
+                      </th>
+                    </tr>
+                    <tr className="border-b border-line bg-surface-2">
+                      <th className={`${TH} py-2`}>{renderHeaderLabel('Date', 'dispatch-date')}</th>
+                      <th className={`${TH} py-2`}>{renderHeaderLabel('Pcs.', 'dispatch-pcs')}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {loading ? (
+                      <tr>
+                        <td colSpan={15}>
+                          <PageLoader text="Loading orders…" />
+                        </td>
+                      </tr>
+                    ) : groupedFilteredOrders.length === 0 ? (
+                      <tr>
+                        <td colSpan={15} className="px-3 py-8 text-center text-[13px] text-ink-3">
+                          No orders found.
+                        </td>
+                      </tr>
+                    ) : (
+                      groupedFilteredOrders.flatMap((group) => {
+                        const groupKey = group[0]?.orderId ?? group[0]?.id;
+                        const isExpanded = Boolean(expandedGroups[groupKey]);
+                        const visibleRows = group.length > 1 && !isExpanded ? [group[0]] : group;
+
+                        return visibleRows.map((row, rowIndex) => {
+                          const showGroupedColumns = rowIndex === 0;
+                          const groupRowSpan = visibleRows.length;
+                          const isMultiItem = group.length > 1;
+                          const sizeParts = splitSizeDisplay(row.size);
+                          const rowOverride = getRowOverride(row);
+                          const effectivePlatingStatus = rowOverride?.platingStatus ?? row.platingStatus;
+                          const effectiveJobWork = normalizeJobWorkLabel(rowOverride?.jobWork ?? row.jobWork);
+                          const effectiveJobWorkNo = rowOverride?.jobWorkNo ?? row.jobWorkNo;
+                          const effectiveStickerQty = row.stickerQty ?? '—';
+                          const effectiveJobWorkKey = String(effectiveJobWork || '')
+                            .toLowerCase()
+                            .replace(/[\s-]/g, '');
+
+                          return (
+                            <tr
+                              key={row.id}
+                              onDoubleClick={() => setViewOrder(row)}
+                              className={`cursor-pointer border-b border-line-2 ${
+                                row._updatedAt && row._createdAt && row._updatedAt !== row._createdAt
+                                  ? 'bg-warning-soft'
+                                  : 'hover:bg-surface-2'
+                              }`}
+                            >
+                              {showGroupedColumns && (
+                                <td rowSpan={groupRowSpan} className={`${TD} align-top text-ink`}>
+                                  <div className="inline-flex cursor-pointer items-center gap-1">
+                                    <span>{row.partyName}</span>
+                                    {isMultiItem ? (
+                                      <button
+                                        type="button"
+                                        onClick={() => toggleGroupExpand(groupKey)}
+                                        aria-label={isExpanded ? 'Collapse' : 'Expand'}
+                                      >
+                                        <ChevronDown
+                                          className={`size-3.5 text-ink-3 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
+                                        />
+                                      </button>
+                                    ) : null}
+                                  </div>
+                                </td>
+                              )}
+                              {showGroupedColumns && (
+                                <td rowSpan={groupRowSpan} className={`${TD} align-top`}>
+                                  {row.date}
+                                </td>
+                              )}
+                              <td className={`${TD} whitespace-normal`}>
+                                <span className="inline-flex flex-col leading-tight">
+                                  <span className="whitespace-nowrap">{sizeParts.main}</span>
+                                  {sizeParts.sub ? (
+                                    <span className="text-center whitespace-nowrap">{sizeParts.sub}</span>
+                                  ) : null}
+                                </span>
+                              </td>
+                              <td className={`${TD} text-center`}>{row.plating}</td>
+                              <td className={`${TD} text-center font-mono text-ink`}>{row.qtyPc}</td>
+                              <td className={`${TD} text-center font-mono`}>{row.qtyKg}</td>
+                              <td className={`${TD} text-center font-mono`}>{row.boxPc}</td>
+                              <td className={`${TD} text-center font-mono`}>{row.cartoon}</td>
+                              <td className={`${TD} text-center font-mono`}>{row.pcCartoon}</td>
+                              <td className={`${TD} text-center font-mono`}>{effectiveStickerQty}</td>
+                              <td className={`${TD} text-center`}>
+                                <button
+                                  type="button"
+                                  onClick={() => openDispatchDialog(row)}
+                                  className="group inline-flex flex-col items-center gap-0.5"
+                                  title="Manage dispatches"
+                                >
+                                  <Truck className="size-3.5 text-ink-3 group-hover:text-ink" />
+                                  <span className="text-[12px] text-ink-2">
+                                    {row.dispatchDate ?? <span className="text-ink-3">+ Add</span>}
+                                  </span>
+                                </button>
+                              </td>
+                              <td className={`${TD} text-center`}>
+                                <button
+                                  type="button"
+                                  onClick={() => openDispatchDialog(row)}
+                                  className="font-mono hover:text-ink"
+                                >
+                                  {row.dispatchPcs != null ? (
+                                    <span className="font-medium text-ink">
+                                      {row.dispatchPcs}{' '}
+                                      <span className="text-[11px] text-ink-3">/ {row.qtyPc}</span>
+                                    </span>
+                                  ) : (
+                                    <span className="text-[12px] text-ink-3">+ Add</span>
+                                  )}
+                                </button>
+                              </td>
+                              <td className={`${TD} text-center font-mono`}>{row.pendingPc}</td>
+
+                              <td className={`${TD}`}>
+                                <div className="flex flex-col items-center gap-1.5">
+                                  <span className="font-mono text-[12px] text-ink-2">{effectiveJobWorkNo}</span>
                                   <button
                                     type="button"
-                                    onClick={() => toggleGroupExpand(groupKey)}
-                                    aria-label={isExpanded ? "Collapse" : "Expand"}
+                                    onClick={() => toggleJobUpdateStatus(row)}
+                                    aria-label="Open job update"
+                                    title="Open job update"
+                                    className={`relative inline-flex h-4 w-7 items-center rounded-full ${effectivePlatingStatus ? 'bg-success' : 'bg-line'} cursor-pointer`}
                                   >
-                                    <ChevronDown className={`w-3.5 h-3.5 text-gray-500 transition-transform ${isExpanded ? "rotate-180" : ""}`} />
+                                    <span
+                                      className={`absolute top-0.5 size-3 rounded-full bg-white ${effectivePlatingStatus ? 'right-0.5' : 'left-0.5'}`}
+                                    />
                                   </button>
-                                ) : null}
-                              </div>
-                            </td>
-                          )}
-                          {showGroupedColumns && (
-                            <td rowSpan={groupRowSpan} className="px-3 py-4 text-sm text-gray-700 border-r border-gray-200 whitespace-nowrap align-top">
-                              {row.date}
-                            </td>
-                          )}
-                          <td className="px-3 py-4 text-sm text-gray-700 border-r border-gray-200 whitespace-normal">
-                            <span className="inline-flex flex-col leading-tight">
-                              <span className="whitespace-nowrap">{sizeParts.main}</span>
-                              {sizeParts.sub ? <span className="whitespace-nowrap text-center">{sizeParts.sub}</span> : null}
-                            </span>
-                          </td>
-                          <td className="px-3 py-4 text-sm text-center text-gray-700 border-r border-gray-200 whitespace-nowrap">{row.plating}</td>
-                          <td className="px-3 py-4 text-sm text-center text-gray-700 border-r border-gray-200 whitespace-nowrap">{row.qtyPc}</td>
-                          <td className="px-3 py-4 text-sm text-center text-gray-700 border-r border-gray-200 whitespace-nowrap">{row.qtyKg}</td>
-                          <td className="px-3 py-4 text-sm text-center text-gray-700 border-r border-gray-200 whitespace-nowrap">{row.boxPc}</td>
-                          <td className="px-3 py-4 text-sm text-center text-gray-700 border-r border-gray-200 whitespace-nowrap">{row.cartoon}</td>
-                          <td className="px-3 py-4 text-sm text-center text-gray-700 border-r border-gray-200 whitespace-nowrap">{row.pcCartoon}</td>
-                          <td className="px-3 py-4 text-sm text-center text-gray-700 border-r border-gray-200 whitespace-nowrap">{effectiveStickerQty}</td>
-                          <td className="px-3 py-4 text-sm text-center text-gray-700 border-r border-gray-200 whitespace-nowrap">
-                            <button
-                              type="button"
-                              onClick={() => openDispatchDialog(row)}
-                              className="inline-flex flex-col items-center gap-0.5 group"
-                              title="Manage dispatches"
-                            >
-                              <Truck className="w-3.5 h-3.5 text-gray-400 group-hover:text-gray-700" />
-                              <span className="text-xs text-gray-600">
-                                {row.dispatchDate ?? <span className="text-gray-400">+ Add</span>}
-                              </span>
-                            </button>
-                          </td>
-                          <td className="px-3 py-4 text-sm text-center text-gray-700 border-r border-gray-200 whitespace-nowrap">
-                            <button type="button" onClick={() => openDispatchDialog(row)} className="hover:text-gray-900">
-                              {row.dispatchPcs != null
-                                ? <span className="font-medium">{row.dispatchPcs} <span className="text-gray-400 text-xs">/ {row.qtyPc}</span></span>
-                                : <span className="text-gray-400 text-xs">+ Add</span>}
-                            </button>
-                          </td>
-                          <td className="px-3 py-4 text-sm text-center text-gray-700 border-r border-gray-200 whitespace-nowrap">{row.pendingPc}</td>
-                        
-                          <td className="px-3 py-4 border-r border-gray-200 whitespace-nowrap">
-                            <div className="flex flex-col items-center gap-1.5">
-                              <span className="text-xs text-gray-700">{effectiveJobWorkNo}</span>
-                              <button
-                                type="button"
-                                onClick={() => toggleJobUpdateStatus(row)}
-                                aria-label="Open job update"
-                                title="Open job update"
-                                className={`w-7 h-4 rounded-full relative inline-flex items-center ${effectivePlatingStatus ? "bg-emerald-600" : "bg-gray-300"} cursor-pointer`}
-                              >
-                                <span className={`w-3 h-3 bg-white rounded-full absolute top-0.5 ${effectivePlatingStatus ? "right-0.5" : "left-0.5"}`} />
-                              </button>
-                              <span
-                                className={`text-xs ${
-                                  effectiveJobWorkKey === "outside"
-                                    ? "text-red-500"
-                                    : effectiveJobWorkKey === "inhouse"
-                                      ? "text-emerald-700"
-                                      : "text-gray-700"
-                                }`}
-                              >
-                                {effectiveJobWork}
-                              </span>
-                            </div>
-                          </td>
-                          <td className="px-3 py-4">
-                            <div className="flex items-center justify-center gap-2">
-                              <button type="button" onClick={() => navigate("/job-work", { state: { orderRow: row } })} aria-label="Open job work">
-                                <BriefcaseBusiness className="w-4 h-4 text-gray-500 cursor-pointer" />
-                              </button>
-                              <button type="button" onClick={() => setEditOrder({ ...row })} aria-label="Edit order">
-                                <SquarePen className="w-4 h-4 text-gray-500 cursor-pointer" />
-                              </button>
-                              <button type="button" onClick={() => setViewOrder(row)} aria-label="View order">
-                                <Eye className="w-4 h-4 text-gray-500 cursor-pointer" />
-                              </button>
-                              <button type="button" onClick={() => requestDelete(row)} aria-label="Delete order">
-                                <Trash2 className="w-4 h-4 text-red-500 cursor-pointer" />
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    });
-                  })
-                )}
-              </tbody>
-            </table>
-          </div>
-
-          {/* Pagination */}
-          {totalPages > 1 && (
-            <div className="flex items-center justify-between px-4 py-3 border-t border-gray-200">
-              <p className="text-sm text-gray-500">
-                Page {page + 1} of {totalPages} &nbsp;·&nbsp; {totalElements} orders
-              </p>
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => setPage((p) => Math.max(0, p - 1))}
-                  disabled={page === 0}
-                  className="p-1.5 rounded border border-gray-300 text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
-                >
-                  <ChevronLeft className="w-4 h-4" />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
-                  disabled={page >= totalPages - 1}
-                  className="p-1.5 rounded border border-gray-300 text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
-                >
-                  <ChevronRight className="w-4 h-4" />
-                </button>
+                                  <span
+                                    className={`text-[12px] ${
+                                      effectiveJobWorkKey === 'outside'
+                                        ? 'text-danger'
+                                        : effectiveJobWorkKey === 'inhouse'
+                                          ? 'text-success'
+                                          : 'text-ink-2'
+                                    }`}
+                                  >
+                                    {effectiveJobWork}
+                                  </span>
+                                </div>
+                              </td>
+                              <td className="px-3 py-3">
+                                <div className="flex items-center justify-center gap-1">
+                                  <Button
+                                    variant="ghost"
+                                    size="icon-sm"
+                                    onClick={() => navigate('/job-work', { state: { orderRow: row } })}
+                                    aria-label="Open job work"
+                                  >
+                                    <BriefcaseBusiness className="size-4 text-ink-3" />
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon-sm"
+                                    onClick={() => setEditOrder({ ...row })}
+                                    aria-label="Edit order"
+                                  >
+                                    <SquarePen className="size-4 text-ink-3" />
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon-sm"
+                                    onClick={() => setViewOrder(row)}
+                                    aria-label="View order"
+                                  >
+                                    <Eye className="size-4 text-ink-3" />
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon-sm"
+                                    onClick={() => requestDelete(row)}
+                                    aria-label="Delete order"
+                                    className="text-danger hover:text-danger"
+                                  >
+                                    <Trash2 className="size-4" />
+                                  </Button>
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        });
+                      })
+                    )}
+                  </tbody>
+                </table>
               </div>
-            </div>
-          )}
-        </div>
-        </>
+
+              {/* Pagination */}
+              {totalPages > 1 && (
+                <div className="flex items-center justify-between border-t border-line px-4 py-3">
+                  <p className="text-[12.5px] text-ink-3">
+                    Page {page + 1} of {totalPages} · {totalElements} orders
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setPage((p) => Math.max(0, p - 1))}
+                      disabled={page === 0}
+                    >
+                      Previous
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
+                      disabled={page >= totalPages - 1}
+                    >
+                      Next
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </Card>
+          </>
         )}
-      </div>
+      </PageBody>
 
       {/* View dialog */}
-      {viewOrder && (
-        <div className="fixed inset-0 z-50 bg-black/30 flex items-center justify-center p-4">
-          <div className="bg-white rounded-lg w-full max-w-3xl border border-gray-200 max-h-[90vh] flex flex-col">
-            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200 flex-shrink-0">
-              <h2 className="text-lg font-medium text-gray-900">View Order</h2>
-              <button type="button" onClick={() => setViewOrder(null)} aria-label="Close">
-                <X className="w-4 h-4 text-gray-600" />
-              </button>
-            </div>
-            <div className="p-5 overflow-y-auto flex-1">{renderOrderDetails(viewOrder, false)}</div>
-          </div>
-        </div>
-      )}
+      <ViewDialog
+        open={Boolean(viewOrder)}
+        onOpenChange={(open) => !open && setViewOrder(null)}
+        title="View order"
+        size="lg"
+      >
+        {viewOrder && renderOrderDetails(viewOrder, false)}
+      </ViewDialog>
 
       {/* Edit dialog */}
-      {editOrder && (
-        <div className="fixed inset-0 z-50 bg-black/30 flex items-center justify-center p-4">
-          <div className="bg-white rounded-lg w-full max-w-3xl border border-gray-200 max-h-[90vh] flex flex-col">
-            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200 flex-shrink-0">
-              <h2 className="text-lg font-medium text-gray-900">Edit Order</h2>
-              <button type="button" onClick={() => setEditOrder(null)} aria-label="Close">
-                <X className="w-4 h-4 text-gray-600" />
-              </button>
-            </div>
-            <div className="p-5 overflow-y-auto flex-1">{renderOrderDetails(editOrder, true)}</div>
-            <div className="px-5 py-4 border-t border-gray-200 flex items-center justify-center gap-3 flex-shrink-0">
-              <button
-                type="button"
-                onClick={handleEditOrderSave}
-                disabled={savingEdit}
-                className="px-8 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition text-sm disabled:opacity-60"
-              >
-                {savingEdit ? "Saving…" : "Save"}
-              </button>
-              <button
-                type="button"
-                onClick={() => setEditOrder(null)}
-                disabled={savingEdit}
-                className="px-8 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition text-sm disabled:opacity-60"
-              >
-                Cancel
-              </button>
-            </div>
+      <Dialog open={Boolean(editOrder)} onOpenChange={(open) => !open && !savingEdit && setEditOrder(null)}>
+        <DialogContent className="max-h-[calc(100dvh-1.5rem)] gap-0 overflow-hidden p-0 sm:max-w-2xl">
+          <DialogHeader className="border-b border-line px-4 py-3.5 text-left sm:px-6">
+            <DialogTitle className="text-[15px] font-semibold text-ink sm:text-[17px]">Edit order</DialogTitle>
+          </DialogHeader>
+          <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-6 sm:py-5">
+            {editOrder && renderOrderDetails(editOrder, true)}
           </div>
-        </div>
-      )}
+          <DialogFooter className="border-t border-line bg-surface-2 px-4 py-3 sm:px-6">
+            <Button variant="outline" onClick={() => setEditOrder(null)} disabled={savingEdit}>
+              Cancel
+            </Button>
+            <Button onClick={handleEditOrderSave} disabled={savingEdit}>
+              {savingEdit ? 'Saving…' : 'Save'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
-      <ConfirmationDialog
-        isOpen={Boolean(deleteTarget)}
-        title="Delete Order Item"
-        message={`Delete this item${deleteTarget?.size ? ` (${deleteTarget.size})` : ""} from ${deleteTarget?.partyName || "this party"}'s order? If it's the only item, the whole order is removed.`}
-        confirmText="Delete"
-        cancelText="Cancel"
-        isDangerous
-        onCancel={() => setDeleteTarget(null)}
+      <ConfirmDialog
+        open={Boolean(deleteTarget)}
+        onOpenChange={(open) => !open && setDeleteTarget(null)}
+        title="Delete order item"
+        description={`Delete this item${deleteTarget?.size ? ` (${deleteTarget.size})` : ''} from ${deleteTarget?.partyName || 'this party'}'s order? If it's the only item, the whole order is removed.`}
+        confirmLabel="Delete"
         onConfirm={confirmDelete}
       />
 
       {/* Dispatch dialog */}
-      {dispatchDialog && (
-        <div className="fixed inset-0 z-50 bg-black/30 flex items-center justify-center p-4">
-          <div className="bg-white rounded-lg w-full max-w-lg border border-gray-200 max-h-[90vh] flex flex-col">
-            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200 flex-shrink-0">
-              <div>
-                <h2 className="text-base font-medium text-gray-900">Dispatch</h2>
-                <p className="text-xs text-gray-500 mt-0.5">
-                  {dispatchDialog.row.partyName} · {dispatchDialog.row.size} · Qty {dispatchDialog.row.qtyPc} pc
-                </p>
-              </div>
-              <button type="button" onClick={() => setDispatchDialog(null)}>
-                <X className="w-4 h-4 text-gray-600" />
-              </button>
-            </div>
+      <Dialog open={Boolean(dispatchDialog)} onOpenChange={(open) => !open && setDispatchDialog(null)}>
+        <DialogContent className="max-h-[calc(100dvh-1.5rem)] gap-0 overflow-hidden p-0 sm:max-w-lg">
+          {dispatchDialog && (
+            <>
+              <DialogHeader className="border-b border-line px-4 py-3.5 text-left sm:px-6">
+                <DialogTitle className="text-[15px] font-semibold text-ink">Dispatch</DialogTitle>
+                <DialogDescription className="text-[12px] text-ink-3">
+                  {dispatchDialog.row.partyName} · {dispatchDialog.row.size} · Qty{' '}
+                  {dispatchDialog.row.qtyPc} pc
+                </DialogDescription>
+              </DialogHeader>
 
-            <div className="flex-1 overflow-y-auto p-5 space-y-4">
-              {/* Existing dispatches */}
-              {dispatchDialog.loading ? (
-                <Loader text="Loading dispatches…" />
-              ) : dispatchDialog.dispatches.length === 0 ? (
-                <p className="text-sm text-gray-400 text-center py-4">No dispatches yet</p>
-              ) : (
-                <div className="border border-gray-200 rounded-lg overflow-hidden">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="bg-gray-50 border-b border-gray-200">
-                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">#</th>
-                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">Date</th>
-                        <th className="px-4 py-2 text-right text-xs font-medium text-gray-500">Pcs</th>
-                        <th className="px-4 py-2 w-8" />
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {dispatchDialog.dispatches.map((d, i) => (
-                        <tr key={d.id} className="border-b border-gray-100 last:border-0">
-                          <td className="px-4 py-2 text-gray-400">{i + 1}</td>
-                          <td className="px-4 py-2 text-gray-700">{d.dispatchDate}</td>
-                          <td className="px-4 py-2 text-right text-gray-700 font-medium">{d.dispatchPcs}</td>
-                          <td className="px-4 py-2">
-                            <button type="button" onClick={() => handleDeleteDispatch(d.id)} className="text-red-400 hover:text-red-600">
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                          </td>
+              <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-4 sm:px-6">
+                {dispatchDialog.loading ? (
+                  <PageLoader text="Loading dispatches…" />
+                ) : dispatchDialog.dispatches.length === 0 ? (
+                  <p className="py-4 text-center text-[13px] text-ink-3">No dispatches yet</p>
+                ) : (
+                  <div className="overflow-hidden rounded-lg border border-line">
+                    <table className="w-full text-[13px]">
+                      <thead>
+                        <tr className="border-b border-line bg-surface-2">
+                          <th className="px-4 py-2 text-left text-[11.5px] font-semibold text-ink-3 uppercase">#</th>
+                          <th className="px-4 py-2 text-left text-[11.5px] font-semibold text-ink-3 uppercase">Date</th>
+                          <th className="px-4 py-2 text-right text-[11.5px] font-semibold text-ink-3 uppercase">Pcs</th>
+                          <th className="w-8 px-4 py-2" />
                         </tr>
-                      ))}
-                    </tbody>
-                    <tfoot>
-                      <tr className="bg-gray-50 border-t border-gray-200">
-                        <td colSpan={2} className="px-4 py-2 text-xs font-medium text-gray-500">Total dispatched</td>
-                        <td className="px-4 py-2 text-right text-sm font-semibold text-gray-800">
-                          {dispatchDialog.dispatches.reduce((s, d) => s + (parseFloat(d.dispatchPcs) || 0), 0)}
-                        </td>
-                        <td />
-                      </tr>
-                    </tfoot>
-                  </table>
-                </div>
-              )}
+                      </thead>
+                      <tbody>
+                        {dispatchDialog.dispatches.map((d, i) => (
+                          <tr key={d.id} className="border-b border-line-2 last:border-0">
+                            <td className="px-4 py-2 text-ink-3">{i + 1}</td>
+                            <td className="px-4 py-2 text-ink-2">{d.dispatchDate}</td>
+                            <td className="px-4 py-2 text-right font-mono font-medium text-ink">{d.dispatchPcs}</td>
+                            <td className="px-4 py-2">
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteDispatch(d.id)}
+                                className="text-ink-3 hover:text-danger"
+                              >
+                                <Trash2 className="size-3.5" />
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                      <tfoot>
+                        <tr className="border-t border-line bg-surface-2">
+                          <td colSpan={2} className="px-4 py-2 text-[11.5px] font-semibold text-ink-3 uppercase">
+                            Total dispatched
+                          </td>
+                          <td className="px-4 py-2 text-right font-mono text-[13px] font-semibold text-ink">
+                            {dispatchDialog.dispatches.reduce((s, d) => s + (parseFloat(d.dispatchPcs) || 0), 0)}
+                          </td>
+                          <td />
+                        </tr>
+                      </tfoot>
+                    </table>
+                  </div>
+                )}
 
-              {/* Add new dispatch */}
-              <div className="border border-gray-200 rounded-lg p-4 space-y-3">
-                <p className="text-xs font-medium text-gray-600 uppercase tracking-wide">Add Dispatch</p>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="text-xs text-gray-500 mb-1 block">Date</label>
-                    <input
-                      type="date"
-                      value={dispatchDialog.newDate}
-                      onChange={(e) => setDispatchDialog((prev) => ({ ...prev, newDate: e.target.value }))}
-                      className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-gray-400"
-                    />
+                {/* Add new dispatch */}
+                <div className="space-y-3 rounded-lg border border-line p-4">
+                  <p className="text-[11.5px] font-semibold tracking-[0.04em] text-ink-3 uppercase">Add dispatch</p>
+                  <div className="grid grid-cols-2 gap-3">
+                    <Field label="Date">
+                      <Input
+                        type="date"
+                        value={dispatchDialog.newDate}
+                        onChange={(e) => setDispatchDialog((prev) => ({ ...prev, newDate: e.target.value }))}
+                      />
+                    </Field>
+                    <Field label="Pcs">
+                      <Input
+                        type="number"
+                        min="1"
+                        placeholder="e.g. 50"
+                        value={dispatchDialog.newPcs}
+                        onChange={(e) => setDispatchDialog((prev) => ({ ...prev, newPcs: e.target.value }))}
+                      />
+                    </Field>
                   </div>
-                  <div>
-                    <label className="text-xs text-gray-500 mb-1 block">Pcs</label>
-                    <input
-                      type="number"
-                      min="1"
-                      placeholder="e.g. 50"
-                      value={dispatchDialog.newPcs}
-                      onChange={(e) => setDispatchDialog((prev) => ({ ...prev, newPcs: e.target.value }))}
-                      className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-gray-400"
-                    />
-                  </div>
+                  <Button className="w-full" onClick={handleAddDispatch} disabled={dispatchDialog.saving}>
+                    {dispatchDialog.saving ? 'Adding…' : 'Add dispatch'}
+                  </Button>
                 </div>
-                <button
-                  type="button"
-                  onClick={handleAddDispatch}
-                  disabled={dispatchDialog.saving}
-                  className="w-full py-2 bg-gray-900 text-white text-sm rounded-md hover:bg-gray-800 transition disabled:opacity-60"
-                >
-                  {dispatchDialog.saving ? "Adding…" : "Add Dispatch"}
-                </button>
               </div>
-            </div>
-          </div>
-        </div>
-      )}
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
 
-      {moveToJobWorkRow && (
-        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
-          <div className="w-full max-w-md rounded-2xl border border-gray-200 bg-white shadow-xl overflow-hidden">
-            <div className="px-6 pt-5 pb-4 border-b border-gray-100">
-              <h3 className="text-lg font-semibold text-gray-900">Move to Job Work</h3>
-              <p className="text-sm text-gray-500 mt-0.5">Choose how this item goes for finishing.</p>
-            </div>
-            <div className="px-6 py-5 space-y-3">
-              {renderMoveOption("OUTSIDE", "Out-Side Job Work", "Sent to an outside vendor you select.")}
-              {renderMoveOption("INHOUSE", "In-Side Job Work", "Finished in-house — party auto-filled from the order.")}
-              {renderMoveOption("MANUAL", "Manual Job Work", "Not tied to this order — enter party & item yourself.")}
-            </div>
-            <div className="px-6 py-4 bg-gray-50 border-t border-gray-100 flex items-center justify-end gap-3">
-              <button
-                type="button"
-                onClick={() => setMoveToJobWorkRow(null)}
-                className="px-5 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-white transition text-sm font-medium"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={handleMoveToJobWorkSave}
-                className="px-6 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition text-sm font-medium"
-              >
-                Continue
-              </button>
-            </div>
+      {/* Move to job work dialog */}
+      <Dialog open={Boolean(moveToJobWorkRow)} onOpenChange={(open) => !open && setMoveToJobWorkRow(null)}>
+        <DialogContent className="gap-0 overflow-hidden p-0 sm:max-w-md">
+          <DialogHeader className="border-b border-line px-6 py-4 text-left">
+            <DialogTitle className="text-[16px] font-semibold text-ink">Move to job work</DialogTitle>
+            <DialogDescription className="text-[13px] text-ink-3">
+              Choose how this item goes for finishing.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 px-6 py-5">
+            <MoveOption value="OUTSIDE" label="Out-Side Job Work" description="Sent to an outside vendor you select." />
+            <MoveOption
+              value="INHOUSE"
+              label="In-Side Job Work"
+              description="Finished in-house — party auto-filled from the order."
+            />
+            <MoveOption
+              value="MANUAL"
+              label="Manual Job Work"
+              description="Not tied to this order — enter party & item yourself."
+            />
           </div>
-        </div>
-      )}
+          <DialogFooter className="border-t border-line bg-surface-2 px-6 py-4">
+            <Button variant="outline" onClick={() => setMoveToJobWorkRow(null)}>
+              Cancel
+            </Button>
+            <Button onClick={handleMoveToJobWorkSave}>Continue</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </SidebarLayout>
   );
 };

@@ -1,34 +1,29 @@
-import { X } from "lucide-react";
-import React from "react";
-import { Navigate, useNavigate } from "react-router-dom";
+import { X } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Card } from '@/components/ui/card';
+import { cn } from '@/lib/utils';
 
-const FormSection = ({ title, children, className = "", action, isClose }) => {
+const FormSection = ({ title, children, className = '', action, isClose }) => {
   const navigate = useNavigate();
   return (
-    <div className={`space-y-4 ${className}`}>
+    <div className={cn('space-y-4', className)}>
       {title && (
         <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-normal text-black mt-2 ml-2">
-              {title}
-            </h1>
-          </div>
+          <h2 className="font-heading text-[18px] font-semibold text-ink">{title}</h2>
           {action ? <div>{action}</div> : null}
           {isClose && (
             <button
               type="button"
-              onClick={() => navigate("/invoices")}
-              className="inline-flex items-center justify-center w-9 h-9 rounded-full border border-gray-300 text-gray-600 hover:text-gray-900 hover:border-gray-400 hover:bg-gray-50 transition"
+              onClick={() => navigate('/invoices')}
+              className="inline-flex size-9 items-center justify-center rounded-full border border-line text-ink-3 transition hover:border-line hover:bg-surface-2 hover:text-ink"
               aria-label="Close and go back to invoices"
             >
-              <X className="w-4 h-4" />
+              <X className="size-4" />
             </button>
           )}
         </div>
       )}
-      <div className="bg-white border border-gray-200 rounded-xl p-5">
-        {children}
-      </div>
+      <Card className="gap-0 p-4 sm:p-5">{children}</Card>
     </div>
   );
 };

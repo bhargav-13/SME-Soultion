@@ -1,7 +1,10 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { Plus, X } from "lucide-react";
-import SidebarLayout from "../../components/SidebarLayout";
+import { Plus } from "lucide-react";
+import SidebarLayout from "@/components/SidebarLayout";
+import { PageBody, PageHeader } from "@/components/page-header";
+import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import toast from "react-hot-toast";
 
 // Reusable UI Components
@@ -410,9 +413,16 @@ const CreateInvoice = () => {
   };
   return (
     <SidebarLayout>
-      <div className="space-y-6">
+      <PageHeader
+        title={mode === 'view' ? 'Invoice' : mode === 'edit' ? 'Edit invoice' : 'Create invoice'}
+        subtitle="Export / commercial invoice and packing list"
+        backTo="/invoices"
+        backLabel="Invoices"
+      />
+
+      <PageBody className="space-y-6">
         {/* Exporter Section */}
-        <FormSection title="Exporter" isClose={true} >
+        <FormSection title="Exporter">
           <ExporterSection formData={formData} onChange={handleChange} />
         </FormSection>
 
@@ -429,14 +439,12 @@ const CreateInvoice = () => {
         <FormSection
           title="Importer (Ship To)"
           action={
-            <label className="inline-flex items-center font-medium gap-2 text-md text-black">
-              <span>Copy to Importer (Bill to)</span>
-              <input
-                type="checkbox"
+            <label className="inline-flex items-center gap-2 text-[13px] font-medium text-ink-2">
+              <span>Copy from Importer (Bill to)</span>
+              <Checkbox
                 checked={copyBillTo}
-                onChange={handleCopyBillToChange}
+                onCheckedChange={(checked) => handleCopyBillToChange({ target: { checked: checked === true } })}
                 disabled={mode === 'view'}
-                className="h-4 w-4 rounded border-black text-black focus:ring-gray-900 disabled:opacity-60"
               />
             </label>
           }
@@ -456,9 +464,10 @@ const CreateInvoice = () => {
 
         <FormSection title="Items Details" action={
             mode !== 'view' && (
-              <button type="button" onClick={handleAddItem} className="inline-flex items-center gap-2 bg-gray-900 text-white px-3 py-2 rounded-lg hover:bg-gray-800 transition">
-                Add Item <Plus className="w-3 h-3" />
-              </button>
+              <Button size="sm" onClick={handleAddItem}>
+                <Plus className="size-4" />
+                Add item
+              </Button>
             )
           }
         >
@@ -496,17 +505,17 @@ const CreateInvoice = () => {
           <TextAreaSection title="Enter REX No." name="rexNo" value={formData.rexNo} onChange={handleChange} placeholder="Enter Something.." disabled={mode === 'view'} />
         </FormSection>
 
-        <div className="flex justify-center gap-4 pt-4">
-           {mode !== 'view' && (
-             <button onClick={handleSubmit} className="px-6 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition">
-              {mode === 'edit' ? 'Update Invoice' : 'Save & Download'}
-             </button>
-           )}
-          <button onClick={() => navigate("/invoices")} className="px-6 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition">
+        <div className="flex justify-center gap-3 pt-2">
+          {mode !== 'view' && (
+            <Button onClick={handleSubmit} className="px-8">
+              {mode === 'edit' ? 'Update invoice' : 'Save & download'}
+            </Button>
+          )}
+          <Button variant="outline" onClick={() => navigate("/invoices")} className="px-8">
             {mode === 'view' ? 'Back' : 'Cancel'}
-          </button>
+          </Button>
         </div>
-      </div>
+      </PageBody>
     </SidebarLayout>
   );
 };

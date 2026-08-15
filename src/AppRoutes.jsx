@@ -32,6 +32,7 @@ import ClientOrderApprovals from "./pages/ClientPortal/ClientOrderApprovals";
 import MyOrders from "./pages/ClientPortal/MyOrders";
 import MyProfile from "./pages/ClientPortal/MyProfile";
 import ProductCatalog from "./pages/ClientPortal/ProductCatalog";
+import Settings from "./pages/Settings";
 
 const AppRoutes = () => {
 
@@ -264,6 +265,16 @@ const AppRoutes = () => {
            <ProtectedRoute allowedRoles={["ADMIN"]}>
             <CreateInvoice />
             </ProtectedRoute>
+        }
+      />
+
+      {/* Settings — reachable by both roles; the page itself shows the sections that apply. */}
+      <Route
+        path="/settings"
+        element={
+          <ProtectedRoute>
+            <Settings />
+          </ProtectedRoute>
         }
       />
 

@@ -1,12 +1,9 @@
-import React from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
+import { useAuth } from '@/context/AuthContext';
 
 /**
- * ProtectedRoute Component
- * 
- * Wraps routes that require authentication.
- * Redirects to login if user is not authenticated.
+ * Wraps routes that require authentication: redirects to login if the visitor has no session, and
+ * to their own landing page if they have one but the wrong role for this route.
  */
 const ProtectedRoute = ({ children, allowedRoles }) => {
   const { isAuthenticated, loading, role } = useAuth();
@@ -15,10 +12,10 @@ const ProtectedRoute = ({ children, allowedRoles }) => {
   // Show loading state while checking authentication
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className="grid min-h-dvh place-items-center bg-paper">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900 mx-auto"></div>
-          <p className="mt-4 text-gray-500">Loading...</p>
+          <span className="mx-auto block size-9 animate-spin rounded-full border-[3px] border-line border-t-primary" />
+          <p className="mt-3 text-[12.5px] text-ink-3">Loading…</p>
         </div>
       </div>
     );
@@ -32,7 +29,7 @@ const ProtectedRoute = ({ children, allowedRoles }) => {
 
   // Redirect if the authenticated user's role isn't allowed for this route
   if (allowedRoles && !allowedRoles.includes(role)) {
-    return <Navigate to={role === "CLIENT" ? "/shop" : "/"} replace />;
+    return <Navigate to={role === 'CLIENT' ? '/shop' : '/'} replace />;
   }
 
   // Render children if authenticated

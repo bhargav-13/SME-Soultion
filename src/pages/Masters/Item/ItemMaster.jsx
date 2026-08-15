@@ -1,44 +1,39 @@
-import React, { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
-import { Plus, Trash2 } from "lucide-react";
-import SidebarLayout from "../../../components/SidebarLayout";
-import ConfirmationDialog from "../../../components/ConfirmationDialog";
-import EditItemDialog from "../../../components/Item/EditItemDialog";
-import ViewItemDialog from "../../../components/Item/ViewItemDialog";
-import ItemsTable from "../../../components/Item/ItemsTable";
-import SearchFilter from "../../../components/SearchFilter";
-import StatsCard from "../../../components/StatsCard";
-import PageHeader from "../../../components/PageHeader";
-import PrimaryActionButton from "../../../components/PrimaryActionButton";
-import { itemApi, categoryApi } from "../../../services/apiService";
-import toast from "react-hot-toast";
-import Loader from "../../../components/Loader";
+import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Boxes, Plus, Search, Trash2, TriangleAlert } from 'lucide-react';
+import toast from 'react-hot-toast';
+import SidebarLayout from '@/components/SidebarLayout';
+import { PageBody, PageHeader } from '@/components/page-header';
+import { StatCard } from '@/components/stat-card';
+import { PageLoader } from '@/components/states';
+import { ConfirmDialog, ConfirmName } from '@/components/confirm-dialog';
+import EditItemDialog from '@/components/Item/EditItemDialog';
+import ViewItemDialog from '@/components/Item/ViewItemDialog';
+import ItemsTable from '@/components/Item/ItemsTable';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { itemApi, categoryApi } from '@/services/apiService';
 
 const ItemMaster = () => {
   const navigate = useNavigate();
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [stats, setStats] = useState({
-    totalItems: 0,
-    lowStockItems: 0,
-  });
-  const [deleteDialog, setDeleteDialog] = useState({
-    isOpen: false,
-    itemId: null,
-    itemName: "",
-  });
+  const [stats, setStats] = useState({ totalItems: 0, lowStockItems: 0 });
+  const [deleteDialog, setDeleteDialog] = useState({ isOpen: false, itemId: null, itemName: '' });
+  const [deleting, setDeleting] = useState(false);
   const [clearAllOpen, setClearAllOpen] = useState(false);
   const [clearingAll, setClearingAll] = useState(false);
-  const [editDialog, setEditDialog] = useState({
-    isOpen: false,
-    data: null,
-  });
-  const [viewDialog, setViewDialog] = useState({
-    isOpen: false,
-    data: null,
-  });
-  const [searchTerm, setSearchTerm] = useState("");
-  const [categoryFilter, setCategoryFilter] = useState("");
+  const [editDialog, setEditDialog] = useState({ isOpen: false, data: null });
+  const [viewDialog, setViewDialog] = useState({ isOpen: false, data: null });
+  const [searchTerm, setSearchTerm] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState('');
   const [categories, setCategories] = useState([]);
 
   useEffect(() => {
@@ -50,14 +45,9 @@ const ItemMaster = () => {
     try {
       const response = await categoryApi.getAllCategories();
       const categoriesData = response.data;
-      setCategories(
-        categoriesData.map((cat) => ({
-          id: cat.id,
-          name: cat.name,
-        }))
-      );
+      setCategories(categoriesData.map((cat) => ({ id: cat.id, name: cat.name })));
     } catch (error) {
-      console.error("Error fetching categories:", error);
+      console.error('Error fetching categories:', error);
     }
   };
 
@@ -72,9 +62,9 @@ const ItemMaster = () => {
 
       const transformedItems = (Array.isArray(rawItems) ? rawItems : []).map((item) => ({
         id: item.id,
-        sizeInch: item.sizeInch || "",
-        sizeMM: item.sizeMm || "",
-        category: item.itemCategory?.name || "",
+        sizeInch: item.sizeInch || '',
+        sizeMM: item.sizeMm || '',
+        category: item.itemCategory?.name || '',
         categoryId: item.itemCategory?.id,
         totalKg: item.itemKg,
         itemKg: item.itemKg,
@@ -82,20 +72,18 @@ const ItemMaster = () => {
         totalPL: item.totalPc,
         dozenWeight: item.dozenWeight,
         lowStockWarning: item.lowStockWarning,
-        lowStock: item.stockStatus === "LOW_STOCK" ? "Low Stock" : "In Stock",
+        lowStock: item.stockStatus === 'LOW_STOCK' ? 'Low Stock' : 'In Stock',
         stockStatus: item.stockStatus,
       }));
 
       setItems(transformedItems);
 
       const totalItems = itemsData.totalElements || transformedItems.length;
-      const lowStockItems = transformedItems.filter(
-        (i) => i.lowStock === "Low Stock"
-      ).length;
+      const lowStockItems = transformedItems.filter((i) => i.lowStock === 'Low Stock').length;
       setStats({ totalItems, lowStockItems });
     } catch (error) {
-      console.error("Error fetching items:", error);
-      toast.error(error.response?.data?.message || "Failed to fetch items");
+      console.error('Error fetching items:', error);
+      toast.error(error.response?.data?.message || 'Failed to fetch items');
     } finally {
       setLoading(false);
     }
@@ -105,22 +93,9 @@ const ItemMaster = () => {
     const matchesSearch =
       item.sizeInch.toLowerCase().includes(searchTerm.toLowerCase()) ||
       item.category.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesCategory =
-      !categoryFilter ||
-      item.category.toLowerCase().includes(categoryFilter.toLowerCase());
+    const matchesCategory = !categoryFilter || item.lowStock === categoryFilter;
     return matchesSearch && matchesCategory;
   });
-
-  const handleAddItem = () => {
-    navigate("/masters/item/add");
-  };
-
-  const handleEditItem = (item) => {
-    setEditDialog({
-      isOpen: true,
-      data: item,
-    });
-  };
 
   const handleSaveEdit = async (formData) => {
     try {
@@ -133,54 +108,42 @@ const ItemMaster = () => {
         totalPc: parseFloat(formData.totalPL) || 0,
         dozenWeight: parseFloat(formData.dozenWeight) || 0,
         lowStockWarning: parseFloat(formData.lowStockWarning) || 0,
-        stockStatus: editDialog.data.stockStatus || "IN_STOCK",
+        stockStatus: editDialog.data.stockStatus || 'IN_STOCK',
       };
 
       await itemApi.updateItem(editDialog.data.id, updateData);
       await fetchItems();
 
       setEditDialog({ isOpen: false, data: null });
-      toast.success("Item updated successfully!");
+      toast.success('Item updated successfully!');
     } catch (error) {
-      console.error("Error updating item:", error);
-      toast.error(error.response?.data?.message || "Failed to update item");
+      console.error('Error updating item:', error);
+      toast.error(error.response?.data?.message || 'Failed to update item');
     }
   };
 
   const handleDeleteClick = (item) => {
-    setDeleteDialog({
-      isOpen: true,
-      itemId: item.id,
-      itemName: item.sizeInch,
-    });
+    setDeleteDialog({ isOpen: true, itemId: item.id, itemName: item.sizeInch });
   };
 
   const handleConfirmDelete = async () => {
     try {
+      setDeleting(true);
       await itemApi.deleteItem(deleteDialog.itemId);
       await fetchItems();
-
-      setDeleteDialog({ isOpen: false, itemId: null, itemName: "" });
-      toast.success("Item deleted successfully!");
+      toast.success('Item deleted successfully!');
     } catch (error) {
-      console.error("Error deleting item:", error);
-      toast.error(error.response?.data?.message || "Failed to delete item");
+      console.error('Error deleting item:', error);
+      toast.error(error.response?.data?.message || 'Failed to delete item');
+    } finally {
+      setDeleting(false);
+      setDeleteDialog({ isOpen: false, itemId: null, itemName: '' });
     }
-  };
-
-  const handleViewItem = (item) => {
-    setViewDialog({
-      isOpen: true,
-      data: item,
-    });
   };
 
   const handleViewEdit = (item) => {
     setViewDialog({ isOpen: false, data: null });
-    setEditDialog({
-      isOpen: true,
-      data: item,
-    });
+    setEditDialog({ isOpen: true, data: item });
   };
 
   const handleViewDelete = (item) => {
@@ -193,10 +156,10 @@ const ItemMaster = () => {
     try {
       await Promise.all(items.map((item) => itemApi.deleteItem(item.id)));
       await fetchItems();
-      toast.success("All items cleared!");
+      toast.success('All items cleared!');
     } catch (error) {
-      console.error("Error clearing items:", error);
-      toast.error(error.response?.data?.message || "Failed to clear all items");
+      console.error('Error clearing items:', error);
+      toast.error(error.response?.data?.message || 'Failed to clear all items');
     } finally {
       setClearingAll(false);
       setClearAllOpen(false);
@@ -205,74 +168,69 @@ const ItemMaster = () => {
 
   return (
     <SidebarLayout>
-      <div className="space-y-6">
-        {/* Header */}
-        <PageHeader
-          title="Item Master"
-          description="Centralised management of all items with sizes, weights, categories, and stock details."
-          action={
-            <div className="flex items-center gap-2">
-              {items.length > 0 && (
-                <button
-                  type="button"
-                  onClick={() => setClearAllOpen(true)}
-                  title="Delete all items"
-                  className="flex items-center gap-1.5 shrink-0 whitespace-nowrap px-3 py-2 border border-red-200 text-red-600 rounded-lg text-sm font-medium hover:bg-red-50 transition"
-                >
-                  <Trash2 className="w-4 h-4" />
-                  Clear All
-                </button>
-              )}
-              <PrimaryActionButton
-                onClick={handleAddItem}
-                icon={Plus}
-                className="border-gray-800 text-black px-4"
-              >
-                Add Item
-              </PrimaryActionButton>
-            </div>
-          }
-        />
+      <PageHeader
+        title="Item master"
+        subtitle="Centralised management of all items with sizes, weights, categories, and stock details."
+        actions={
+          <>
+            {items.length > 0 && (
+              <Button variant="outline" size="sm" onClick={() => setClearAllOpen(true)} className="text-danger hover:text-danger">
+                <Trash2 className="size-4" />
+                <span className="hidden sm:inline">Clear all</span>
+              </Button>
+            )}
+            <Button size="sm" onClick={() => navigate('/masters/item/add')}>
+              <Plus className="size-4" />
+              <span className="hidden sm:inline">Add item</span>
+            </Button>
+          </>
+        }
+      />
 
-        {/* Stats Cards */}
-        <div className="grid grid-cols-2 gap-4 mb-8">
-          <StatsCard
-            label="Total Items"
-            value={stats.totalItems}
-            className="border-gray-200"
-          />
-          <StatsCard
-            label="Total Low Stock Items"
-            value={stats.lowStockItems}
-            className="border-gray-200"
-          />
+      <PageBody className="space-y-5">
+        {/* Stats */}
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <StatCard label="Total items" value={stats.totalItems} icon={Boxes} tone="primary" />
+          <StatCard label="Total low stock items" value={stats.lowStockItems} icon={TriangleAlert} tone="warning" />
         </div>
 
-        {/* Search and Filter */}
-        <SearchFilter
-          className="flex gap-4"
-          searchQuery={searchTerm}
-          setSearchQuery={setSearchTerm}
-          typeFilter={categoryFilter}
-          setTypeFilter={setCategoryFilter}
-          filterOptions={["In Stock", "Low Stock"]}
-          filterPlaceholder="Stock Status"
-        />
+        {/* Search + filter */}
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+          <div className="relative w-full sm:max-w-sm sm:flex-1">
+            <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-ink-3" />
+            <Input
+              type="search"
+              placeholder="Search by size or category…"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="bg-surface pl-9"
+            />
+          </div>
+          <Select value={categoryFilter || 'ALL'} onValueChange={(v) => setCategoryFilter(v === 'ALL' ? '' : v)}>
+            <SelectTrigger className="w-full bg-surface sm:w-48">
+              <SelectValue placeholder="Stock status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="ALL">All stock status</SelectItem>
+              <SelectItem value="In Stock">In stock</SelectItem>
+              <SelectItem value="Low Stock">Low stock</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
 
-        {/* Items Table */}
+        {/* Items table */}
         {loading ? (
-          <Loader text="Loading items..." />
+          <PageLoader text="Loading items…" />
         ) : (
           <ItemsTable
             items={filteredItems}
-            onEdit={handleEditItem}
-            onView={handleViewItem}
+            onEdit={(item) => setEditDialog({ isOpen: true, data: item })}
+            onView={(item) => setViewDialog({ isOpen: true, data: item })}
             onDelete={handleDeleteClick}
           />
         )}
-      </div>
+      </PageBody>
 
-      {/* Edit Item Dialog */}
       <EditItemDialog
         isOpen={editDialog.isOpen}
         onClose={() => setEditDialog({ isOpen: false, data: null })}
@@ -281,7 +239,6 @@ const ItemMaster = () => {
         categories={categories}
       />
 
-      {/* View Item Dialog */}
       <ViewItemDialog
         isOpen={viewDialog.isOpen}
         onClose={() => setViewDialog({ isOpen: false, data: null })}
@@ -290,30 +247,30 @@ const ItemMaster = () => {
         itemData={viewDialog.data}
       />
 
-      {/* Delete Confirmation Dialog */}
-      <ConfirmationDialog
-        isOpen={deleteDialog.isOpen}
-        title="Delete Item"
-        message={`Are you sure you want to delete "${deleteDialog.itemName}"?`}
-        confirmText="Delete"
-        cancelText="Cancel"
-        onConfirm={handleConfirmDelete}
-        onCancel={() =>
-          setDeleteDialog({ isOpen: false, itemId: null, itemName: "" })
+      <ConfirmDialog
+        open={deleteDialog.isOpen}
+        onOpenChange={(open) => !open && setDeleteDialog({ isOpen: false, itemId: null, itemName: '' })}
+        title="Delete item"
+        description={
+          <>
+            Are you sure you want to delete <ConfirmName>{deleteDialog.itemName}</ConfirmName>?
+          </>
         }
-        isDangerous={true}
+        confirmLabel="Delete"
+        busyLabel="Deleting…"
+        isPending={deleting}
+        onConfirm={handleConfirmDelete}
       />
 
-      {/* Clear All Confirmation Dialog */}
-      <ConfirmationDialog
-        isOpen={clearAllOpen}
-        title="Clear All Items"
-        message={`Are you sure you want to delete all ${items.length} item(s)? This action cannot be undone.`}
-        confirmText={clearingAll ? "Clearing…" : "Clear All"}
-        cancelText="Cancel"
+      <ConfirmDialog
+        open={clearAllOpen}
+        onOpenChange={(open) => !open && setClearAllOpen(false)}
+        title="Clear all items"
+        description={`Are you sure you want to delete all ${items.length} item(s)? This action cannot be undone.`}
+        confirmLabel="Clear all"
+        busyLabel="Clearing…"
+        isPending={clearingAll}
         onConfirm={handleConfirmClearAll}
-        onCancel={() => setClearAllOpen(false)}
-        isDangerous={true}
       />
     </SidebarLayout>
   );

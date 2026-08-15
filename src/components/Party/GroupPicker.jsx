@@ -1,40 +1,50 @@
-import React from "react";
+import { useMemo } from 'react';
+import { Field } from '@/components/form-field';
+import { Input } from '@/components/ui/input';
+import { SearchableSelect } from '@/components/ui/searchable-select';
 
-export const NEW_GROUP = "__new__";
+export const NEW_GROUP = '__new__';
 
 /**
  * Group selector for the Party form. Lets the admin put a party into an existing group, leave it
  * ungrouped, or create a brand-new group inline. Controlled via `value` (""=none, a group id, or
  * NEW_GROUP) and `newName` when creating.
  */
-const GroupPicker = ({ groups = [], value, onChange, newName, onNewNameChange }) => (
-  <div>
-    <label className="block text-sm font-medium text-black mb-1">
-      Group <span className="text-gray-400 font-normal">(shared login across companies)</span>
-    </label>
-    <select
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-500 focus:border-transparent outline-none text-sm bg-white"
+const GroupPicker = ({ groups = [], value, onChange, newName, onNewNameChange }) => {
+  const options = useMemo(
+    () => [
+      { value: '', label: 'No group' },
+      ...groups.map((g) => ({ value: String(g.id), label: g.name })),
+      { value: NEW_GROUP, label: '+ New group…' },
+    ],
+    [groups],
+  );
+
+  return (
+    <Field
+      label="Group"
+      hint="A group shares one login across every company in it."
+      className={value === NEW_GROUP ? 'space-y-2' : undefined}
     >
-      <option value="">No group</option>
-      {groups.map((g) => (
-        <option key={g.id} value={String(g.id)}>
-          {g.name}
-        </option>
-      ))}
-      <option value={NEW_GROUP}>+ New group…</option>
-    </select>
-    {value === NEW_GROUP && (
-      <input
-        type="text"
-        placeholder="New group name (e.g. Mahaveer)"
-        value={newName}
-        onChange={(e) => onNewNameChange(e.target.value)}
-        className="mt-2 w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-500 focus:border-transparent outline-none text-sm"
+      <SearchableSelect
+        ariaLabel="Group"
+        options={options}
+        value={value ?? ''}
+        onChange={onChange}
+        placeholder="No group"
+        searchPlaceholder="Search groups…"
+        className="w-full"
       />
-    )}
-  </div>
-);
+      {value === NEW_GROUP && (
+        <Input
+          type="text"
+          placeholder="New group name (e.g. Mahaveer)"
+          value={newName}
+          onChange={(e) => onNewNameChange(e.target.value)}
+        />
+      )}
+    </Field>
+  );
+};
 
 export default GroupPicker;

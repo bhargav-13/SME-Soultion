@@ -1,8 +1,13 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { X } from "lucide-react";
-import SidebarLayout from "../components/SidebarLayout";
-import PageHeader from "../components/PageHeader";
+import SidebarLayout from "@/components/SidebarLayout";
+import { PageBody, PageHeader } from "@/components/page-header";
+import { PageLoader } from "@/components/states";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { SearchableSelect } from "@/components/ui/searchable-select";
+import { cn } from "@/lib/utils";
 import {
   itemBlueprintApi,
   sizeApi,
@@ -11,7 +16,6 @@ import {
   itemApi,
 } from "../services/apiService";
 import toast from "react-hot-toast";
-import Loader from "../components/Loader";
 import { FINISHES } from "../constants/finishes";
 
 // Canonical finish price fields — keys/labels match the backend inventory columns.
@@ -25,18 +29,18 @@ const DEFAULT_PACKING = {
 };
 
 const inputCls =
-  "w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-500 focus:border-transparent outline-none placeholder:text-sm placeholder:text-gray-500";
-const labelCls = "block font-medium text-black mb-2";
+  "w-full rounded-lg border border-line bg-surface px-4 py-2 text-[13px] outline-none transition placeholder:text-ink-3 focus:border-primary focus:ring-2 focus:ring-primary-ring/30";
+const labelCls = "mb-2 block text-[12.5px] font-medium text-ink-2";
 const readonlyCls =
-  "w-full px-4 py-2 border border-gray-300 rounded-lg bg-gray-50 text-black cursor-not-allowed outline-none placeholder:text-sm placeholder:text-gray-500";
+  "w-full cursor-not-allowed rounded-lg border border-line bg-surface-2 px-4 py-2 text-[13px] text-ink-2 outline-none placeholder:text-ink-3";
 
 // ─── Divider with section label ─────────────────────────────────────────────
 const SectionDivider = ({ title }) => (
   <div className="flex items-center gap-4 pt-4 pb-1">
-    <span className="text-xs font-semibold text-gray-400 uppercase tracking-widest whitespace-nowrap">
+    <span className="text-[10.5px] font-semibold tracking-[0.1em] whitespace-nowrap text-ink-3 uppercase">
       {title}
     </span>
-    <div className="flex-1 h-px bg-gray-100" />
+    <div className="h-px flex-1 bg-line" />
   </div>
 );
 
@@ -412,34 +416,26 @@ const AddInventoryPage = () => {
   if (loading) {
     return (
       <SidebarLayout>
-        <Loader text="Loading..." className="h-64" />
+        <PageHeader title="Add inventory" />
+        <PageBody>
+          <PageLoader text="Loading…" />
+        </PageBody>
       </SidebarLayout>
     );
   }
 
   return (
     <SidebarLayout>
-      <div className="mx-auto">
-        {/* ── Page Header ── */}
-        <div className="mb-8">
-          <PageHeader
-            title="Add Inventory"
-            description="Create item blueprint, size, stock entry &amp; packing details in one step."
-            action={
-              <button
-                type="button"
-                onClick={handleCancel}
-                className="inline-flex items-center justify-center w-9 h-9 rounded-full border border-gray-300 text-gray-600 hover:text-gray-900 hover:border-gray-400 hover:bg-gray-50 transition"
-                aria-label="Close"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            }
-          />
-        </div>
+      <PageHeader
+        title="Add inventory"
+        subtitle="Create item blueprint, size, stock entry & packing details in one step."
+        backTo="/inventory"
+        backLabel="Stock master"
+      />
 
-        <form onSubmit={handleSave}>
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-8 mb-8">
+      <PageBody>
+        <form onSubmit={handleSave} className="mx-auto max-w-5xl">
+          <Card className="gap-0 p-6 sm:p-8">
             <div className="space-y-6">
 
               {/* ════ Section 1: Blueprint ════════════════════════════════ */}
@@ -448,12 +444,12 @@ const AddInventoryPage = () => {
               {/* Blueprint mode toggle — inline with label row */}
               <div className="grid grid-cols-2 gap-6">
                 <div>
-                  <div className="flex items-end justify-between mb-2">
-                    <label className="block font-medium text-black">
-                      {blueprintMode === "existing" ? "Item Blueprint" : "Item Name"}<span className="text-black">*</span>
+                  <div className="mb-2 flex items-end justify-between">
+                    <label className="block text-[12.5px] font-medium text-ink-2">
+                      {blueprintMode === "existing" ? "Item Blueprint" : "Item Name"}<span className="text-danger">*</span>
                     </label>
                     {/* Toggle */}
-                    <div className="flex gap-0.5 bg-gray-100 rounded-md p-0.5">
+                    <div className="flex gap-0.5 rounded-md bg-surface-2 p-0.5">
                       {["existing", "new"].map((mode) => (
                         <button
                           key={mode}
@@ -463,10 +459,10 @@ const AddInventoryPage = () => {
                             setSelectedBlueprintId("");
                             setBlueprintSizes([]);
                           }}
-                          className={`px-3 py-1 rounded text-xs font-medium transition ${
+                          className={`rounded px-3 py-1 text-[11.5px] font-medium transition ${
                             blueprintMode === mode
-                              ? "bg-white shadow text-gray-900"
-                              : "text-gray-400 hover:text-gray-600"
+                              ? "bg-surface text-ink shadow-sm"
+                              : "text-ink-3 hover:text-ink-2"
                           }`}
                         >
                           {mode === "existing" ? "Existing" : "Create New"}
@@ -476,49 +472,26 @@ const AddInventoryPage = () => {
                   </div>
 
                   {blueprintMode === "existing" ? (
-                    /* Select existing — dropdown inside the left column */
-                    <div className="relative" ref={bpDropdownRef}>
-                      <button
-                        type="button"
-                        onClick={() => setIsBpOpen(!isBpOpen)}
-                        className="w-full h-[42px] flex items-center justify-between px-4 py-2 border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-gray-500 transition"
-                      >
-                        <span className={selectedBlueprint ? "text-gray-900" : "text-gray-500 text-sm"}>
-                          {selectedBlueprint
-                            ? `${selectedBlueprint.itemName}${selectedBlueprint.category?.name ? ` — ${selectedBlueprint.category.name}` : ""}`
-                            : "Select item blueprint…"}
-                        </span>
-                        <svg className={`w-4 h-4 text-gray-500 transition-transform ${isBpOpen ? "rotate-180" : ""}`}
-                          fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-                        </svg>
-                      </button>
-                      {isBpOpen && (
-                        <div className="absolute z-20 mt-2 w-full bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden max-h-56 overflow-y-auto">
-                          {blueprints.length === 0 ? (
-                            <div className="px-4 py-2 text-sm text-gray-500">No blueprints available</div>
-                          ) : (
-                            blueprints.map((b) => (
-                              <button key={b.id} type="button" onClick={() => handleBlueprintSelect(b)}
-                                className="w-full text-left px-4 py-2 text-sm hover:bg-gray-100 transition">
-                                {b.itemName}
-                                {b.category?.name && (
-                                  <span className="text-gray-400 ml-1">— {b.category.name}</span>
-                                )}
-                              </button>
-                            ))
-                          )}
-                        </div>
-                      )}
-                    </div>
+                    <SearchableSelect
+                      ariaLabel="Item blueprint"
+                      placeholder="Select item blueprint…"
+                      searchPlaceholder="Search blueprint…"
+                      options={blueprints.map((b) => ({
+                        value: String(b.id),
+                        label: b.itemName,
+                        description: b.category?.name || undefined,
+                      }))}
+                      value={selectedBlueprint ? String(selectedBlueprint.id) : undefined}
+                      onChange={(v) => {
+                        const b = blueprints.find((x) => String(x.id) === v);
+                        if (b) handleBlueprintSelect(b);
+                      }}
+                    />
                   ) : (
-                    /* Create new — item name input in left column */
-                    <input
-                      type="text"
+                    <Input
                       value={newBlueprintName}
                       onChange={(e) => setNewBlueprintName(e.target.value)}
                       placeholder="e.g. Butt Hinge, CSK Screw"
-                      className="w-full h-[42px] px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-500 focus:border-transparent outline-none placeholder:text-sm placeholder:text-gray-500"
                     />
                   )}
                 </div>
@@ -527,36 +500,21 @@ const AddInventoryPage = () => {
                 {blueprintMode === "new" && (
                   <div className="flex flex-col">
                     <div className="flex items-end mb-2" style={{ minHeight: "30px" }}>
-                      <label className="block font-medium text-black">
-                        Category<span className="text-black">*</span>
+                      <label className="block text-[12.5px] font-medium text-ink-2">
+                        Category<span className="text-danger">*</span>
                       </label>
                     </div>
-                    <div className="relative" ref={catDropdownRef}>
-                      <button
-                        type="button"
-                        onClick={() => setIsCatOpen(!isCatOpen)}
-                        className="w-full h-[42px] flex items-center justify-between px-4 py-2 border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-gray-500 transition"
-                      >
-                        <span className={selectedCategory ? "text-gray-900" : "text-gray-500 text-sm"}>
-                          {selectedCategory ? selectedCategory.name : "Select Category"}
-                        </span>
-                        <svg className={`w-4 h-4 text-gray-500 transition-transform ${isCatOpen ? "rotate-180" : ""}`}
-                          fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-                        </svg>
-                      </button>
-                      {isCatOpen && (
-                        <div className="absolute z-20 mt-2 w-full bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden max-h-48 overflow-y-auto">
-                          {categories.map((c) => (
-                            <button key={c.id} type="button"
-                              onClick={() => { setNewBlueprintCategoryId(c.id); setIsCatOpen(false); }}
-                              className="w-full text-left px-4 py-2 text-sm hover:bg-gray-100 transition">
-                              {c.name}
-                            </button>
-                          ))}
-                        </div>
-                      )}
-                    </div>
+                    <SearchableSelect
+                      ariaLabel="Category"
+                      placeholder="Select category"
+                      searchPlaceholder="Search category…"
+                      options={categories.map((c) => ({ value: String(c.id), label: c.name }))}
+                      value={selectedCategory ? String(selectedCategory.id) : undefined}
+                      onChange={(v) => {
+                        const c = categories.find((x) => String(x.id) === v);
+                        if (c) setNewBlueprintCategoryId(c.id);
+                      }}
+                    />
                   </div>
                 )}
               </div>
@@ -576,10 +534,10 @@ const AddInventoryPage = () => {
                           key={i}
                           type="button"
                           onClick={() => handleSizeChip(s)}
-                          className={`px-3 py-1.5 text-sm rounded-lg border font-medium transition ${
+                          className={`rounded-lg border px-3 py-1.5 text-[13px] font-medium transition ${
                             active
-                              ? "border-black bg-black text-white"
-                              : "border-gray-300 text-gray-700 hover:border-gray-500"
+                              ? "border-ink bg-ink text-white"
+                              : "border-line text-ink-2 hover:border-primary/40"
                           }`}
                         >
                           {s.sizeInInch} / {s.sizeInMm}
@@ -594,7 +552,7 @@ const AddInventoryPage = () => {
               <div className="grid grid-cols-3 gap-6">
                 <div>
                   <label className={labelCls}>
-                    Size in Inch<span className="text-black">*</span>
+                    Size in Inch<span className="text-danger">*</span>
                   </label>
                   <input type="text" value={sizeInInch}
                     onChange={(e) => setSizeInInch(e.target.value)}
@@ -602,7 +560,7 @@ const AddInventoryPage = () => {
                 </div>
                 <div>
                   <label className={labelCls}>
-                    Size in MM<span className="text-black">*</span>
+                    Size in MM<span className="text-danger">*</span>
                   </label>
                   <input type="text" value={sizeInMm}
                     onChange={(e) => setSizeInMm(e.target.value)}
@@ -631,8 +589,9 @@ const AddInventoryPage = () => {
                 const canSaveSize = blueprintReady && sizeFieldsFilled && !sizeAlreadyExists;
                 return (
                   <div className="flex justify-end">
-                    <button
+                    <Button
                       type="button"
+                      variant="outline"
                       disabled={savingSize || !canSaveSize}
                       onClick={handleSaveSize}
                       title={
@@ -644,10 +603,9 @@ const AddInventoryPage = () => {
                           ? "Select or fill blueprint first"
                           : ""
                       }
-                      className="px-6 py-2 border border-gray-400 text-gray-700 rounded-lg hover:bg-gray-50 transition text-sm font-medium disabled:opacity-40 disabled:cursor-not-allowed"
                     >
-                      {savingSize ? "Saving..." : "Save Size Only"}
-                    </button>
+                      {savingSize ? "Saving…" : "Save size only"}
+                    </Button>
                   </div>
                 );
               })()}
@@ -657,7 +615,7 @@ const AddInventoryPage = () => {
                 ref={stockSectionRef}
                 className={`space-y-6 rounded-lg transition-all duration-700 ${
                   stockHighlight
-                    ? "ring-2 ring-amber-400 bg-amber-50 px-4 pb-4 -mx-4"
+                    ? "-mx-4 bg-warning-soft px-4 pb-4 ring-2 ring-warning/50"
                     : ""
                 }`}
               >
@@ -679,31 +637,14 @@ const AddInventoryPage = () => {
                         placeholder="Enter Weight/Pc."
                         className={inputCls} />
                       {/* Unit dropdown */}
-                      <div className="relative w-28 shrink-0" ref={unitDropdownRef}>
-                        <button
-                          type="button"
-                          onClick={() => setIsWeightUnitOpen(!isWeightUnitOpen)}
-                          className="w-full h-full flex items-center justify-between px-4 py-2 border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-gray-500 transition"
-                        >
-                          <span className={`font-medium ${weightUnit === "" ? "text-gray-500 text-sm" : "text-gray-900"}`}>
-                            {weightUnit === "" ? "Gram/Kg" : weightUnit}
-                          </span>
-                          <svg className={`w-4 h-4 text-gray-500 transition-transform ${isWeightUnitOpen ? "rotate-180" : ""}`}
-                            fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-                          </svg>
-                        </button>
-                        {isWeightUnitOpen && (
-                          <div className="absolute z-20 mt-2 w-full bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden">
-                            {["Kg", "Gram"].map((unit) => (
-                              <button key={unit} type="button"
-                                onClick={() => onWeightUnitChange(unit)}
-                                className="w-full text-left px-4 py-2 text-sm hover:bg-gray-100 transition">
-                                {unit}
-                              </button>
-                            ))}
-                          </div>
-                        )}
+                      <div className="w-28 shrink-0">
+                        <SearchableSelect
+                          ariaLabel="Weight unit"
+                          placeholder="Gram/Kg"
+                          options={["Kg", "Gram"].map((u) => ({ value: u, label: u }))}
+                          value={weightUnit || undefined}
+                          onChange={(v) => onWeightUnitChange(v)}
+                        />
                       </div>
                     </div>
                   </div>
@@ -712,14 +653,14 @@ const AddInventoryPage = () => {
                 <div className="grid grid-cols-3 gap-6">
                   <div>
                     <label className={labelCls}>
-                      Total Pc. <span className="text-gray-400 text-xs">(Auto-calculated)</span>
+                      Total Pc. <span className="text-[11px] text-ink-3">(Auto-calculated)</span>
                     </label>
                     <input type="text" value={totalPc} readOnly
                       placeholder="Auto-calculated" className={readonlyCls} />
                   </div>
                   <div>
                     <label className={labelCls}>
-                      Dozen Weight <span className="text-gray-400 text-xs">(Auto-calculated)</span>
+                      Dozen Weight <span className="text-[11px] text-ink-3">(Auto-calculated)</span>
                     </label>
                     <input type="text" value={stockDozenWeight} readOnly
                       placeholder="Auto-calculated" className={readonlyCls} />
@@ -749,7 +690,7 @@ const AddInventoryPage = () => {
                     <input type="number" step="any" value={packing[f.key]}
                       onChange={(e) => onPackingChange(f.key, e.target.value)}
                       placeholder="—"
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-500 focus:border-transparent outline-none text-center placeholder:text-sm placeholder:text-gray-500" />
+                      className={cn(inputCls, "text-center")} />
                   </div>
                 ))}
               </div>
@@ -764,33 +705,25 @@ const AddInventoryPage = () => {
                     <input type="number" step="any" value={packing[f.key]}
                       onChange={(e) => onPackingChange(f.key, e.target.value)}
                       placeholder="—"
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-500 focus:border-transparent outline-none text-center placeholder:text-sm placeholder:text-gray-500" />
+                      className={cn(inputCls, "text-center")} />
                   </div>
                 ))}
               </div>
 
               {/* ── Action Buttons ── */}
-              <div className="flex gap-4 justify-center pt-2">
-                <button
-                  type="submit"
-                  disabled={saving}
-                  className="px-12 py-2 bg-black text-white rounded-xl hover:bg-gray-800 transition font-medium disabled:opacity-50"
-                >
-                  {saving ? "Saving..." : "Save"}
-                </button>
-                <button
-                  type="button"
-                  onClick={handleCancel}
-                  className="px-12 py-2 border border-black text-black rounded-xl hover:bg-gray-50 transition font-medium"
-                >
+              <div className="flex justify-center gap-3 pt-2">
+                <Button type="submit" disabled={saving} className="px-12">
+                  {saving ? "Saving…" : "Save"}
+                </Button>
+                <Button type="button" variant="outline" onClick={handleCancel} className="px-12">
                   Cancel
-                </button>
+                </Button>
               </div>
 
             </div>
-          </div>
+          </Card>
         </form>
-      </div>
+      </PageBody>
     </SidebarLayout>
   );
 };

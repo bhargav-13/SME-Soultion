@@ -1,12 +1,15 @@
 /* eslint-disable no-unused-vars */
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Calendar, Download, Plus, SquarePen } from "lucide-react";
-import SidebarLayout from "../components/SidebarLayout";
-import PageHeader from "../components/PageHeader";
-import StatsCard from "../components/StatsCard";
-import SearchFilter from "../components/SearchFilter";
-import PackingInvoiceList from "../components/PackingInvoice/PackingInvoiceList";
-import PackingInvoiceDetailDialog from "../components/PackingInvoice/PackingInvoiceDetailDialog";
+import SidebarLayout from "@/components/SidebarLayout";
+import { PageBody, PageHeader } from "@/components/page-header";
+import { StatCard } from "@/components/stat-card";
+import { PageLoader } from "@/components/states";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Search } from "lucide-react";
+import PackingInvoiceList from "@/components/PackingInvoice/PackingInvoiceList";
+import PackingInvoiceDetailDialog from "@/components/PackingInvoice/PackingInvoiceDetailDialog";
 import {
   packingInvoiceApi,
   partyApi,
@@ -16,8 +19,6 @@ import {
   axiosInstance,
 } from "../services/apiService";
 import toast from "react-hot-toast";
-import Loader from "../components/Loader";
-import PrimaryActionButton from "../components/PrimaryActionButton";
 import { useNavigate } from "react-router-dom";
 
 const columns = [
@@ -711,8 +712,8 @@ const PackingInvoice = () => {
       return row.date ? (
         formatDate(row.date)
       ) : (
-        <span className="inline-flex items-center justify-center text-black">
-          <Calendar className="w-4 h-4" />
+        <span className="inline-flex items-center justify-center text-ink">
+          <Calendar className="size-4" />
         </span>
       );
     }
@@ -855,46 +856,39 @@ const PackingInvoice = () => {
 
   return (
     <SidebarLayout>
-      <div className="mx-auto">
-        <PageHeader
-          title="Packing Invoice"
-          description="Add packing Invoice and other details"
-          action={
-            <PrimaryActionButton
-              onClick={() => navigate("/packing-invoice/add")}
-              icon={Plus}
-            >
-              New Invoice
-            </PrimaryActionButton>
-          }
-        />
+      <PageHeader
+        title="Packing invoice"
+        subtitle="Add packing invoice and other details"
+        actions={
+          <Button size="sm" onClick={() => navigate("/packing-invoice/add")}>
+            <Plus className="size-4" />
+            <span className="hidden sm:inline">New invoice</span>
+          </Button>
+        }
+      />
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6 mb-4">
-          <StatsCard label="Today's Invoices" value={stats.todaysInvoices} />
-          <StatsCard label="Total Invoice" value={stats.totalInvoices} />
+      <PageBody className="space-y-5">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <StatCard label="Today's invoices" value={stats.todaysInvoices} tone="info" />
+          <StatCard label="Total invoices" value={stats.totalInvoices} tone="primary" />
         </div>
 
-        <SearchFilter
-          searchQuery={searchQuery}
-          setSearchQuery={setSearchQuery}
-          typeFilter={typeFilter}
-          setTypeFilter={setTypeFilter}
-          filterOptions={["Type"]}
-          filterPlaceholder="Type"
-        />
-
-        <div>
-          <div className="p-1">
-            {loading ? (
-              <Loader text="Loading invoices..." />
-            ) : (
-              <PackingInvoiceList
-                invoices={filteredRows}
-                onOpen={handleOpenInvoice}
-              />
-            )}
-          </div>
+        <div className="relative w-full sm:max-w-sm">
+          <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-ink-3" />
+          <Input
+            type="search"
+            placeholder="Search invoices…"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="bg-surface pl-9"
+          />
         </div>
+
+        {loading ? (
+          <PageLoader text="Loading invoices…" />
+        ) : (
+          <PackingInvoiceList invoices={filteredRows} onOpen={handleOpenInvoice} />
+        )}
 
         <PackingInvoiceDetailDialog
           isOpen={Boolean(selectedInvoice)}
@@ -903,7 +897,7 @@ const PackingInvoice = () => {
           onDownload={handleDownload}
           downloading={downloadingId === selectedInvoice?.id}
         />
-      </div>
+      </PageBody>
     </SidebarLayout>
   );
 };

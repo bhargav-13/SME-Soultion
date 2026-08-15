@@ -2,13 +2,41 @@ import React, { useState, useEffect, useMemo, useRef, useCallback, useDeferredVa
 import { normalizeSearch } from "../utils/search";
 import ReactDOM from "react-dom";
 import { useNavigate, useLocation } from "react-router-dom";
-import { Plus, Pencil, Trash2, X, Eye, Search, Check, ChevronDown, Upload, ChevronsLeft, ChevronsRight } from "lucide-react";
+import {
+  Boxes,
+  Check,
+  ChevronDown,
+  ChevronsLeft,
+  ChevronsRight,
+  Eye,
+  MoreHorizontal,
+  Pencil,
+  Plus,
+  Search,
+  Trash2,
+  Upload,
+  X,
+} from "lucide-react";
 import SidebarLayout from "../components/SidebarLayout";
-import StatsCard from "../components/StatsCard";
-import PageHeader from "../components/PageHeader";
-import PrimaryActionButton from "../components/PrimaryActionButton";
-import ConfirmationDialog from "../components/ConfirmationDialog";
-import BillDropdown from "../components/Bills/BillDropdown";
+import { PageBody, PageHeader } from "../components/page-header";
+import { StatCard } from "../components/stat-card";
+import { ConfirmDialog, ConfirmName } from "../components/confirm-dialog";
+import { FormDialog, ViewDialog } from "../components/form-dialog";
+import { Field, FieldGrid } from "../components/form-field";
+import { EmptyState, ListSkeleton } from "../components/states";
+import { Badge } from "../components/ui/badge";
+import { Button } from "../components/ui/button";
+import { Card } from "../components/ui/card";
+import { Input } from "../components/ui/input";
+import { SearchableSelect } from "../components/ui/searchable-select";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "../components/ui/dropdown-menu";
+import { fmtNumber } from "../lib/format";
 import { itemBlueprintApi, sizeApi, inventoryApi, axiosInstance, categoryApi, itemApi } from "../services/apiService";
 import AddStockDialog from "../components/Inventory/AddStockDialog";
 import DebouncedSearchInput from "../components/DebouncedSearchInput";
@@ -20,7 +48,6 @@ import PricingFormulaDialog from "../components/Client/PricingFormulaDialog";
 import { resolvePricingRules, applyFinish, fallbackRules } from "../services/pricingRulesApi";
 import { FINISHES } from "../constants/finishes";
 import toast from "react-hot-toast";
-import Loader from "../components/Loader";
 
 const columns = [
   { key: "itemName",    label: "Doz.",                 type: "dropdown" },
@@ -76,6 +103,10 @@ const splitHeaderLabel = (label, maxChars = 14) => {
   if (current) lines.push(current);
   return lines.length ? lines : [String(label || "")];
 };
+
+/** The sticky header cell, shared by every column so the row can't end up half-pinned. */
+const HEADER_CELL =
+  "sticky top-0 z-20 whitespace-normal border-r border-line bg-surface-2 px-3 py-2.5 text-center text-[11px] font-semibold uppercase tracking-[0.03em] text-ink-3";
 
 const numericFields = [
   "pcsPerBox", "boxPerCarton", "pcsPerCarton", "cartonWeight",
@@ -193,7 +224,7 @@ const SuggestInput = ({ value: initialValue, suggestions, onChange, onSelect, on
               width: dropdownPos.width,
               zIndex: 9999,
             }}
-            className="bg-white border border-gray-200 rounded-lg shadow-xl max-h-48 overflow-y-auto"
+            className="max-h-48 overflow-y-auto rounded-lg border border-line bg-surface shadow-pop"
           >
             {filtered.map((s, i) => (
               <button
@@ -204,10 +235,10 @@ const SuggestInput = ({ value: initialValue, suggestions, onChange, onSelect, on
                   onSelect(s);
                   setShowSuggestions(false);
                 }}
-                className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 border-b border-gray-100 last:border-b-0 transition"
+                className="w-full border-b border-line-2 px-3 py-2 text-left text-[13px] text-ink-2 transition last:border-b-0 hover:bg-surface-2"
               >
-                <span className="font-medium text-gray-900">{s.label}</span>
-                <span className="ml-2 text-xs text-gray-400">
+                <span className="font-medium text-ink">{s.label}</span>
+                <span className="ml-2 text-[11px] text-ink-3">
                   {s.display.replace(s.label, "").trim()}
                 </span>
               </button>
@@ -304,14 +335,14 @@ const TableDropdown = ({ value, options = [], placeholder = "Select...", onSelec
         type="button"
         disabled={disabled}
         onClick={() => !disabled && setOpen((prev) => !prev)}
-        className={`w-full rounded-md px-2 py-1.5 text-sm bg-white flex items-center justify-between ${
-          disabled ? "bg-gray-50 text-gray-500 cursor-not-allowed" : ""
+        className={`flex w-full items-center justify-between gap-1 rounded-md bg-surface px-2 py-1.5 text-[13px] ${
+          disabled ? "cursor-not-allowed bg-surface-2 text-ink-3" : ""
         }`}
       >
-        <span className={selectedOption ? "text-black" : "text-gray-500"}>
+        <span className={`truncate ${selectedOption ? "text-ink" : "text-ink-3"}`}>
           {selectedOption?.label || placeholder}
         </span>
-        <ChevronDown className={`w-4 h-4 text-gray-500 transition-transform ${open ? "rotate-180" : ""}`} />
+        <ChevronDown className={`size-4 shrink-0 text-ink-3 transition-transform ${open ? "rotate-180" : ""}`} />
       </button>
 
       {open && !disabled && position &&
@@ -324,10 +355,10 @@ const TableDropdown = ({ value, options = [], placeholder = "Select...", onSelec
               width: position.width,
               zIndex: 9999,
             }}
-            className="bg-white border border-gray-200 rounded-lg shadow-xl max-h-60 overflow-y-auto"
+            className="max-h-60 overflow-y-auto rounded-lg border border-line bg-surface shadow-pop"
           >
             {options.length === 0 ? (
-              <p className="px-4 py-2 text-sm text-gray-400">No options found</p>
+              <p className="px-4 py-2 text-[13px] text-ink-3">No options found</p>
             ) : (
               options.map((option) => (
                 <button
@@ -338,8 +369,8 @@ const TableDropdown = ({ value, options = [], placeholder = "Select...", onSelec
                     onSelect(option);
                     setOpen(false);
                   }}
-                  className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-100 transition ${
-                    String(option.value) === String(value) ? "font-semibold bg-gray-50" : ""
+                  className={`w-full px-3.5 py-2 text-left text-[13px] transition-colors hover:bg-surface-2 ${
+                    String(option.value) === String(value) ? "bg-primary-soft font-semibold text-primary" : "text-ink-2"
                   }`}
                 >
                   {option.label}
@@ -355,50 +386,78 @@ const TableDropdown = ({ value, options = [], placeholder = "Select...", onSelec
 
 // Memoized row — only re-renders when its own row data or cell selection changes
 const MemoRow = React.memo(function MemoRow({ row, originalIndex, editingCol, selectedCol, renderCell, handleAddStockRow, handleCancelEditRow, handleEditRow, setDeleteDialog, finishExpanded }) {
+  // A row that has been touched since it was created is tinted, so an operator scanning the sheet
+  // can see at a glance which rows carry edited finish prices.
   const rowBg = row._editing && !row._isNew && hasFinishData(row._backup || row)
-    ? "bg-yellow-50"
+    ? "bg-warning-soft"
     : row._isNew
-    ? "bg-gray-50/30"
+    ? "bg-primary-soft/40"
     : !row._editing && row._updatedAt && row._createdAt && row._updatedAt !== row._createdAt && hasFinishData(row)
-    ? "bg-yellow-50"
-    : "hover:bg-gray-50";
+    ? "bg-warning-soft"
+    : "hover:bg-surface-2";
+
+  // The pinned Actions column needs an opaque fill of its own — `inherit` would be transparent on
+  // the untinted rows and the columns scrolling underneath would read straight through it.
+  const stickyBg = rowBg.startsWith("hover:") ? "bg-surface" : rowBg;
 
   return (
-    <tr className={`border-b border-gray-200 ${rowBg}`}>
+    <tr className={`border-b border-line-2 ${rowBg}`}>
       {columns.map((col, colIndex) => {
         if (!finishExpanded && FINISH_KEYS.includes(col.key)) return null;
         return (
           <React.Fragment key={`${col.key}-${originalIndex}`}>
             {col.key === "stockStatus" && (
-              <td className="h-10 px-2 py-1 text-center w-[60px] border-r border-gray-200">
+              <td className="h-10 w-[60px] border-r border-line-2 px-2 py-1 text-center">
                 {!row._isNew && !row._editing && row._itemId && (
-                  <button type="button" onClick={() => handleAddStockRow(row)} title="View stock details" className="p-1 text-gray-500 hover:bg-gray-100 rounded transition">
-                    <Eye className="w-4 h-4" />
+                  <button
+                    type="button"
+                    onClick={() => handleAddStockRow(row)}
+                    title="View stock details"
+                    className="rounded-md p-1 text-ink-3 transition-colors hover:bg-line-2 hover:text-ink"
+                  >
+                    <Eye className="size-4" />
                   </button>
                 )}
               </td>
             )}
-            {col.key === "ss" && <td className="h-10 px-1 py-1 border-r border-gray-200" />}
+            {col.key === "ss" && <td className="h-10 border-r border-line-2 px-1 py-1" />}
             {renderCell(row, originalIndex, col, colIndex, editingCol === colIndex, selectedCol === colIndex)}
           </React.Fragment>
         );
       })}
-      {!finishExpanded && <td className="h-10 px-1 py-1 border-r border-gray-200" />}
-      <td className="h-10 px-2 py-1 text-center w-[80px]">
-        <div className="flex items-center justify-center gap-1">
+      {!finishExpanded && <td className="h-10 border-r border-line-2 px-1 py-1" />}
+      <td
+        className={`sticky right-0 z-10 h-10 w-[80px] px-2 py-1 text-center shadow-[-6px_0_10px_-8px_rgb(16_24_32_/_0.35)] ${stickyBg}`}
+      >
+        <div className="flex items-center justify-center gap-0.5">
           {row._editing ? (
             !row._isNew && (
-              <button type="button" onClick={() => handleCancelEditRow(originalIndex)} title="Cancel edit" className="p-1 text-gray-500 hover:bg-gray-100 rounded transition">
-                <X className="w-4 h-4" />
+              <button
+                type="button"
+                onClick={() => handleCancelEditRow(originalIndex)}
+                title="Cancel edit"
+                className="rounded-md p-1 text-ink-3 transition-colors hover:bg-line-2 hover:text-ink"
+              >
+                <X className="size-4" />
               </button>
             )
           ) : (
             <>
-              <button type="button" onClick={() => handleEditRow(originalIndex)} title="Edit" className="p-1 text-blue-600 hover:bg-blue-50 rounded transition">
-                <Pencil className="w-4 h-4" />
+              <button
+                type="button"
+                onClick={() => handleEditRow(originalIndex)}
+                title="Edit"
+                className="rounded-md p-1 text-primary transition-colors hover:bg-primary-soft"
+              >
+                <Pencil className="size-4" />
               </button>
-              <button type="button" onClick={() => setDeleteDialog({ open: true, rowIndex: originalIndex })} title="Delete" className="p-1 text-red-600 hover:bg-red-50 rounded transition">
-                <Trash2 className="w-4 h-4" />
+              <button
+                type="button"
+                onClick={() => setDeleteDialog({ open: true, rowIndex: originalIndex })}
+                title="Delete"
+                className="rounded-md p-1 text-danger transition-colors hover:bg-danger-soft"
+              >
+                <Trash2 className="size-4" />
               </button>
             </>
           )}
@@ -1144,8 +1203,8 @@ const Inventory = () => {
       return (
         <td
           key={col.key}
-          className={`h-10 min-w-[140px] px-1 py-1 text-center text-sm text-gray-700 border-r border-gray-200 ${
-            isSelected && isRowEditable ? "ring-2 ring-gray-400 ring-inset" : ""
+          className={`h-10 min-w-[140px] border-r border-line-2 px-1 py-1 text-center text-[13px] text-ink ${
+            isSelected && isRowEditable ? "ring-2 ring-primary/50 ring-inset" : ""
           }`}
           onClick={() => handleCellClick(rowIndex, colIndex, row._editing)}
           onDoubleClick={() => handleCellDoubleClick(rowIndex, colIndex)}
@@ -1161,7 +1220,7 @@ const Inventory = () => {
               onSelect={(option) => handleItemChange(rowIndex, option.value)}
             />
           ) : (
-            <span className="text-gray-700 px-1">{row.itemName || "-"}</span>
+            <span className="px-1 font-medium text-ink">{row.itemName || "—"}</span>
           )}
         </td>
       );
@@ -1174,8 +1233,8 @@ const Inventory = () => {
       return (
         <td
           key={col.key}
-          className={`h-10 min-w-[120px] px-3 py-1 text-center text-sm text-gray-500 border-r border-gray-200 ${
-            isSelected && isRowEditable ? "ring-2 ring-gray-400 ring-inset" : ""
+          className={`h-10 min-w-[120px] border-r border-line-2 px-3 py-1 text-center font-mono text-[12.5px] text-ink-2 ${
+            isSelected && isRowEditable ? "ring-2 ring-primary/50 ring-inset" : ""
           }`}
           onClick={() => handleCellClick(rowIndex, colIndex, row._editing)}
           onDoubleClick={() => handleCellDoubleClick(rowIndex, colIndex)}
@@ -1205,9 +1264,7 @@ const Inventory = () => {
               }}
             />
           ) : (
-            <span className={row[col.key] ? "text-gray-700" : "text-gray-300"}>
-              {row[col.key] || "-"}
-            </span>
+            <span className={row[col.key] ? "text-ink" : "text-ink-3/60"}>{row[col.key] || "—"}</span>
           )}
         </td>
       );
@@ -1216,32 +1273,20 @@ const Inventory = () => {
     // Stock status badge cell (read-only)
     if (col.type === "status") {
       const status = row[col.key] || "";
-      let badge = null;
-      if (status === "IN_STOCK") {
-        badge = (
-          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
-            In Stock
-          </span>
-        );
-      } else if (status === "LOW") {
-        badge = (
-          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200">
-            Low Stock
-          </span>
-        );
-      } else if (status === "OUT_OF_STOCK") {
-        badge = (
-          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-50 text-red-700 border border-red-200">
-            Out of Stock
-          </span>
-        );
-      }
+      const badge =
+        status === "IN_STOCK" ? (
+          <Badge variant="success">In stock</Badge>
+        ) : status === "LOW" ? (
+          <Badge variant="warning">Low stock</Badge>
+        ) : status === "OUT_OF_STOCK" ? (
+          <Badge variant="danger">Out of stock</Badge>
+        ) : null;
       return (
         <td
           key={col.key}
-          className="h-10 min-w-[110px] px-3 py-1 text-center text-sm border-r border-gray-200"
+          className="h-10 min-w-[110px] border-r border-line-2 px-3 py-1 text-center text-[13px]"
         >
-          {badge || <span className="text-gray-300">-</span>}
+          {badge || <span className="text-ink-3/60">—</span>}
         </td>
       );
     }
@@ -1251,11 +1296,9 @@ const Inventory = () => {
       return (
         <td
           key={col.key}
-          className="h-10 min-w-[84px] px-3 py-1 text-center text-sm border-r border-gray-200"
+          className="h-10 min-w-[84px] border-r border-line-2 px-3 py-1 text-center font-mono text-[12.5px]"
         >
-          <span className={row[col.key] ? "text-gray-700" : "text-gray-300"}>
-            {fmtNum(row[col.key])}
-          </span>
+          <span className={row[col.key] ? "text-ink-2" : "text-ink-3/60"}>{fmtNum(row[col.key])}</span>
         </td>
       );
     }
@@ -1264,8 +1307,8 @@ const Inventory = () => {
     return (
       <td
         key={col.key}
-        className={`h-10 min-w-[84px] px-3 py-1 text-center text-sm text-gray-500 border-r border-gray-200 ${
-          isSelected && isRowEditable ? "ring-2 ring-gray-400 ring-inset" : ""
+        className={`h-10 min-w-[84px] border-r border-line-2 px-3 py-1 text-center font-mono text-[12.5px] text-ink-2 ${
+          isSelected && isRowEditable ? "ring-2 ring-primary/50 ring-inset" : ""
         }`}
         onClick={() => handleCellClick(rowIndex, colIndex, row._editing)}
         onDoubleClick={() => handleCellDoubleClick(rowIndex, colIndex)}
@@ -1287,9 +1330,7 @@ const Inventory = () => {
             }}
           />
         ) : (
-          <span className={row[col.key] ? "text-gray-700" : "text-gray-300"}>
-            {fmtNum(row[col.key])}
-          </span>
+          <span className={row[col.key] ? "text-ink" : "text-ink-3/60"}>{fmtNum(row[col.key])}</span>
         )}
       </td>
     );
@@ -1297,105 +1338,108 @@ const Inventory = () => {
 
   return (
     <SidebarLayout>
-      <div className="mx-auto">
-        <div className="">
-          <PageHeader
-            title="Stock Master"
-            description="Manage items, sizes, stock & packing details"
-            action={
-              <div className="flex items-center gap-1.5">
-                <PrimaryActionButton
-                  onClick={() => setViewItemsDialog(true)}
-                  icon={Eye}
-                  size="sm"
-                  className="border-gray-800 text-black"
-                >
-                  View Items
-                </PrimaryActionButton>
-                <PrimaryActionButton
-                  onClick={() => setAddItemDialog(true)}
-                  icon={Plus}
-                  size="sm"
-                  className="border-gray-800 text-black"
-                >
-                  Add Item
-                </PrimaryActionButton>
-                <button
-                  type="button"
-                  onClick={() => navigate("/add-inventory")}
-                  className="flex items-center gap-1.5 whitespace-nowrap bg-gray-900 border border-gray-900 text-white px-3 py-1.5 rounded-lg text-sm hover:bg-gray-700 hover:border-gray-700 transition font-medium"
-                >
-                  <Plus className="w-4 h-4" />
-                  Add Inventory
-                </button>
-                <input
-                  ref={importInputRef}
-                  type="file"
-                  accept=".xlsx,.xls"
-                  onChange={handleImportFileSelect}
-                  className="hidden"
-                />
-                <PrimaryActionButton
-                  onClick={() => importInputRef.current?.click()}
-                  icon={Upload}
-                  size="sm"
-                  className="border-gray-800 text-black"
-                >
+      <PageHeader
+        title="Stock master"
+        subtitle="Items, sizes, stock and packing details"
+        actions={
+          <>
+            <input
+              ref={importInputRef}
+              type="file"
+              accept=".xlsx,.xls"
+              onChange={handleImportFileSelect}
+              className="hidden"
+            />
+            {/* Only the primary action stays a button at this width; the rest live in a menu so a
+                seven-button toolbar can't wrap over the title on a laptop. */}
+            <Button size="sm" onClick={() => navigate("/add-inventory")}>
+              <Plus className="size-4" />
+              <span className="hidden sm:inline">Add inventory</span>
+            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="icon-sm" aria-label="Stock master actions">
+                  <MoreHorizontal className="size-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="min-w-[12rem]">
+                <DropdownMenuItem onSelect={() => setViewItemsDialog(true)}>
+                  <Eye className="size-4" />
+                  View items
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => setAddItemDialog(true)}>
+                  <Plus className="size-4" />
+                  Add item
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => importInputRef.current?.click()}>
+                  <Upload className="size-4" />
                   Upload Excel
-                </PrimaryActionButton>
-                <PrimaryActionButton
-                  onClick={() => setIsFormulaOpen(true)}
-                  icon={Check}
-                  size="sm"
-                  className="border-gray-800 text-black"
-                >
-                  Formula
-                </PrimaryActionButton>
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => setIsFormulaOpen(true)}>
+                  <Check className="size-4" />
+                  Pricing formula
+                </DropdownMenuItem>
                 {items.length > 0 && (
-                  <button
-                    type="button"
-                    onClick={() => setClearAllOpen(true)}
-                    title="Delete all items"
-                    className="flex items-center gap-1.5 shrink-0 whitespace-nowrap px-3 py-1.5 border border-red-200 text-red-600 rounded-lg text-sm font-medium hover:bg-red-50 transition"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                    Clear All
-                  </button>
+                  <>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem variant="destructive" onSelect={() => setClearAllOpen(true)}>
+                      <Trash2 className="size-4" />
+                      Clear all items
+                    </DropdownMenuItem>
+                  </>
                 )}
-              </div>
-            }
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </>
+        }
+      />
+
+      {/* `min-w-0` all the way down is what stops the wide sheet below from pushing the page out
+          from under the navigation rail — a flex child's default `min-width:auto` lets it grow to
+          its content. */}
+      <PageBody className="flex min-w-0 flex-col">
+        <div className="mb-5 grid grid-cols-1 gap-3 sm:max-w-xs">
+          <StatCard
+            label="Total items"
+            value={fmtNumber(items.length)}
+            hint={`${filteredIndices.length} rows shown`}
+            icon={Boxes}
+            tone="primary"
+            isPending={loading}
           />
+        </div>
 
-          <div className="mb-8 mt-6">
-            <StatsCard label="Total Items" value={items.length} />
-          </div>
-
-          <div className="mt-3 mb-6 flex flex-wrap items-center gap-3">
-            {/* Search — isolated + debounced so typing stays instant on this large table */}
+        <div className="mb-4 flex min-w-0 flex-col gap-2 lg:flex-row lg:items-center">
+          {/* Search — isolated + debounced so typing stays instant on this large table */}
+          <div className="relative w-full lg:max-w-sm lg:flex-1">
+            <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-ink-3" />
             <DebouncedSearchInput
               value={searchTerm}
               onDebouncedChange={setSearchTerm}
-              placeholder="Search..."
-              wrapperClassName="flex-1 min-w-[200px]"
-              className="w-full pl-9 pr-4 py-2.5 border border-gray-300 bg-white rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-400 text-sm"
+              placeholder="Search items, sizes…"
+              wrapperClassName="contents"
+              className="h-9 w-full rounded-md border border-input bg-surface py-1 pr-3 pl-9 text-[13px] shadow-xs transition-[color,box-shadow] outline-none placeholder:text-ink-3 focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
             />
-            {/* Stock status radio tabs */}
-            <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1">
+          </div>
+
+          {/* Stock status tabs — the one filter this sheet is scanned by. */}
+          <div className="min-w-0 overflow-x-auto scrollbar-hide">
+            <div className="inline-flex items-center gap-1 rounded-lg bg-surface-2 p-1">
               {[
-                { value: "ALL",          label: "All Items" },
-                { value: "IN_STOCK",     label: "In Stock" },
-                { value: "LOW",          label: "Low Stock" },
-                { value: "OUT_OF_STOCK", label: "Out of Stock" },
-                { value: "NO_ENTRY",     label: "No Entry" },
+                { value: "ALL", label: "All items" },
+                { value: "IN_STOCK", label: "In stock" },
+                { value: "LOW", label: "Low stock" },
+                { value: "OUT_OF_STOCK", label: "Out of stock" },
+                { value: "NO_ENTRY", label: "No entry" },
               ].map((opt) => (
                 <button
                   key={opt.value}
                   type="button"
                   onClick={() => setStockFilter(opt.value)}
-                  className={`px-3 py-1.5 rounded-md text-xs font-medium transition whitespace-nowrap ${
+                  className={`rounded-md px-3 py-1.5 text-[12px] font-medium whitespace-nowrap transition-colors ${
                     stockFilter === opt.value
-                      ? "bg-white shadow text-gray-900"
-                      : "text-gray-500 hover:text-gray-700"
+                      ? "bg-surface text-ink shadow-sm"
+                      : "text-ink-3 hover:text-ink"
                   }`}
                 >
                   {opt.label}
@@ -1403,70 +1447,76 @@ const Inventory = () => {
               ))}
             </div>
           </div>
+        </div>
 
-          {categoryFilter && (
-            <div className="mb-3 flex items-center gap-2">
-              <span className="text-xs text-gray-500">Filtered by category:</span>
-              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-gray-900 text-white text-xs font-medium">
-                {categoryFilter.name}
-                <button
-                  type="button"
-                  onClick={() => setCategoryFilter(null)}
-                  className="hover:text-gray-300 transition"
-                >
-                  <X className="w-3 h-3" />
-                </button>
-              </span>
-            </div>
-          )}
-
-          {/* Formula bar */}
-          <div className="flex items-stretch bg-white border border-gray-200 rounded-lg mb-2 overflow-hidden text-sm">
-            <div className="flex items-center px-3 bg-gray-50 border-r border-gray-200 min-w-[140px] text-xs font-medium text-gray-500 truncate">
-              {formulaCell?.label || ""}
-            </div>
-            <div className="flex items-center px-3 bg-gray-50 border-r border-gray-200 text-gray-400 font-mono text-xs select-none">
-              fx
-            </div>
-            <input
-              type="text"
-              value={formulaCell ? (tableData[formulaCell.rowIndex]?.[formulaCell.key] ?? "") : ""}
-              readOnly={!formulaCell || !tableData[formulaCell?.rowIndex]?._editing}
-              onChange={(e) => {
-                if (!formulaCell) return;
-                formulaCell.key === "ss"
-                  ? handleSsChange(formulaCell.rowIndex, e.target.value)
-                  : updateCell(formulaCell.rowIndex, formulaCell.key, e.target.value);
-              }}
-              onFocus={() => {
-                if (formulaCell && !tableData[formulaCell.rowIndex]?._editing) {
-                  handleEditRow(formulaCell.rowIndex);
-                  const colIdx = columns.findIndex((c) => c.key === formulaCell.key);
-                  const cellId = `${formulaCell.rowIndex}-${colIdx}`;
-                  _setEditingCell(cellId);
-                  _setSelectedCell(cellId);
-                }
-              }}
-              placeholder="Double-click a cell to edit…"
-              className="flex-1 px-3 py-2 text-sm focus:outline-none bg-white disabled:bg-gray-50 disabled:text-gray-400"
-              style={{ background: formulaCell && tableData[formulaCell?.rowIndex]?._editing ? "white" : "#f9fafb" }}
-            />
+        {categoryFilter && (
+          <div className="mb-3 flex items-center gap-2">
+            <span className="text-[12px] text-ink-3">Filtered by category</span>
+            <Badge variant="accent" className="gap-1.5 py-1">
+              {categoryFilter.name}
+              <button
+                type="button"
+                onClick={() => setCategoryFilter(null)}
+                aria-label="Clear category filter"
+                className="transition-opacity hover:opacity-70"
+              >
+                <X className="size-3" />
+              </button>
+            </Badge>
           </div>
+        )}
 
-          {loading ? (
-            <Loader text="Loading inventory..." />
-          ) : (
-            <div className="bg-white rounded-lg overflow-hidden border border-gray-200">
-              <div className="max-h-[460px] overflow-auto scrollbar-thin">
-                <table className="w-max min-w-full table-auto">
+        {/* Formula bar — the sheet's current cell, editable in place like a spreadsheet. */}
+        <div className="mb-2 flex min-w-0 items-stretch overflow-hidden rounded-lg border border-line bg-surface text-[13px]">
+          <div className="flex min-w-[8.5rem] items-center truncate border-r border-line bg-surface-2 px-3 text-[11.5px] font-medium text-ink-3">
+            {formulaCell?.label || ""}
+          </div>
+          <div className="flex items-center border-r border-line bg-surface-2 px-3 font-mono text-[11.5px] text-ink-3 select-none">
+            fx
+          </div>
+          <input
+            type="text"
+            aria-label="Formula bar"
+            value={formulaCell ? (tableData[formulaCell.rowIndex]?.[formulaCell.key] ?? "") : ""}
+            readOnly={!formulaCell || !tableData[formulaCell?.rowIndex]?._editing}
+            onChange={(e) => {
+              if (!formulaCell) return;
+              formulaCell.key === "ss"
+                ? handleSsChange(formulaCell.rowIndex, e.target.value)
+                : updateCell(formulaCell.rowIndex, formulaCell.key, e.target.value);
+            }}
+            onFocus={() => {
+              if (formulaCell && !tableData[formulaCell.rowIndex]?._editing) {
+                handleEditRow(formulaCell.rowIndex);
+                const colIdx = columns.findIndex((c) => c.key === formulaCell.key);
+                const cellId = `${formulaCell.rowIndex}-${colIdx}`;
+                _setEditingCell(cellId);
+                _setSelectedCell(cellId);
+              }
+            }}
+            placeholder="Double-click a cell to edit…"
+            className={`min-w-0 flex-1 px-3 py-2 font-mono text-[13px] outline-none placeholder:font-sans placeholder:text-ink-3 ${
+              formulaCell && tableData[formulaCell?.rowIndex]?._editing
+                ? "bg-surface text-ink"
+                : "bg-surface-2 text-ink-3"
+            }`}
+          />
+        </div>
+
+        {loading ? (
+          <ListSkeleton rows={8} className="h-10" />
+        ) : (
+          <Card className="min-w-0 gap-0 overflow-hidden py-0">
+            <div className="max-h-[min(60vh,460px)] min-w-0 overflow-auto scrollbar-thin">
+              <table className="w-max min-w-full table-auto">
                   <thead>
-                    <tr className="bg-gray-100 border-b border-gray-200">
+                    <tr className="border-b border-line bg-surface-2">
                       {columns.map((col) => {
                         if (!finishExpanded && FINISH_KEYS.includes(col.key)) return null;
                         return (
                           <React.Fragment key={col.key}>
                             {col.key === "stockStatus" && (
-                              <th className="sticky top-0 z-10 whitespace-normal px-3 py-3 text-center text-sm font-[550] text-gray-900 bg-gray-100 min-w-[70px] border-r border-gray-200">
+                              <th className={HEADER_CELL + " min-w-[70px]"}>
                                 <span className="inline-flex flex-col items-center leading-tight">
                                   {splitHeaderLabel("View").map((line, idx) => (
                                     <span key={`view-${idx}`}>{line}</span>
@@ -1475,20 +1525,18 @@ const Inventory = () => {
                               </th>
                             )}
                             {col.key === "ss" && (
-                              <th className="sticky top-0 z-10 px-1 py-3 bg-gray-100 border-r border-gray-200 min-w-[36px]">
+                              <th className="sticky top-0 z-20 min-w-[36px] border-r border-line bg-surface-2 px-1 py-2.5">
                                 <button
                                   type="button"
                                   onClick={() => setFinishExpanded((v) => !v)}
                                   title="Collapse finish columns"
-                                  className="p-1 rounded hover:bg-gray-200 transition text-gray-600"
+                                  className="rounded-md p-1 text-ink-3 transition-colors hover:bg-line-2 hover:text-ink"
                                 >
-                                  <ChevronsLeft className="w-4 h-4" />
+                                  <ChevronsLeft className="size-4" />
                                 </button>
                               </th>
                             )}
-                            <th
-                              className="sticky top-0 z-10 whitespace-normal px-3 py-3 text-center text-sm font-[550] text-gray-900 border-r border-gray-200 bg-gray-100"
-                            >
+                            <th className={HEADER_CELL}>
                               <div className="inline-flex items-center justify-center gap-0.5">
                                 <span className="inline-flex flex-col items-center leading-tight">
                                   {splitHeaderLabel(col.label).map((line, idx) => (
@@ -1508,23 +1556,20 @@ const Inventory = () => {
                         );
                       })}
                       {!finishExpanded && (
-                        <th className="sticky top-0 z-10 px-1 py-3 bg-gray-100 border-r border-gray-200 min-w-[36px]">
+                        <th className="sticky top-0 z-20 min-w-[36px] border-r border-line bg-surface-2 px-1 py-2.5">
                           <button
                             type="button"
                             onClick={() => setFinishExpanded(true)}
                             title="Expand finish columns"
-                            className="p-1 rounded hover:bg-gray-200 transition text-gray-600"
+                            className="rounded-md p-1 text-ink-3 transition-colors hover:bg-line-2 hover:text-ink"
                           >
-                            <ChevronsRight className="w-4 h-4" />
+                            <ChevronsRight className="size-4" />
                           </button>
                         </th>
                       )}
-                      <th className="sticky top-0 z-10 whitespace-normal px-3 py-3 text-center text-sm font-[550] text-gray-900 bg-gray-100 min-w-[86px]">
-                        <span className="inline-flex flex-col items-center leading-tight">
-                          {splitHeaderLabel("Actions").map((line, idx) => (
-                            <span key={`actions-${idx}`}>{line}</span>
-                          ))}
-                        </span>
+                      {/* Pinned to the right so the row controls stay reachable at any scroll offset. */}
+                      <th className="sticky top-0 right-0 z-30 min-w-[86px] bg-surface-2 px-3 py-2.5 text-center text-[11px] font-semibold tracking-[0.03em] whitespace-normal text-ink-3 uppercase shadow-[-6px_0_10px_-8px_rgb(16_24_32_/_0.35)]">
+                        Actions
                       </th>
                     </tr>
                   </thead>
@@ -1555,51 +1600,36 @@ const Inventory = () => {
                   </tbody>
                 </table>
               </div>
-            </div>
+            </Card>
           )}
 
           {filteredIndices.length === 0 && !loading && (
-            <p className="mt-2 text-xs text-gray-500">No matching rows.</p>
+            <p className="mt-3 text-center text-[12.5px] text-ink-3">No matching rows.</p>
           )}
 
-          <div className="mt-4">
-            <p className="text-xs text-gray-500 text-right mb-2">
-              Press Tab on last cell to add a new row.
-            </p>
-            <div className="flex items-center justify-center gap-4">
-              <button
-                type="button"
-                onClick={handleSaveAll}
-                disabled={saving || !hasEditingRows}
-                className={`px-10 py-2 rounded-lg transition text-sm font-medium ${
-                  hasEditingRows
-                    ? "bg-gray-900 text-white hover:bg-gray-800"
-                    : "bg-gray-300 text-gray-500 cursor-not-allowed"
-                }`}
-              >
-                {saving ? "Saving..." : "Save"}
-              </button>
-              <button
-                type="button"
+          {/* Sticky action bar — the sheet scrolls for a long time, and Save must never be
+              somewhere you have to hunt for. */}
+          <div className="sticky bottom-0 z-10 mt-4 flex flex-col gap-2 border-t border-line bg-[color-mix(in_oklab,var(--paper)_88%,transparent)] py-3 backdrop-blur-md sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-[11.5px] text-ink-3">Press Tab on the last cell to add a new row.</p>
+            <div className="flex flex-wrap items-center gap-2">
+              <Button variant="outline" onClick={handleRefresh}>
+                Refresh
+              </Button>
+              <Button
+                variant="outline"
                 onClick={() => {
                   setTableData((prev) => [...prev, createEmptyRow()]);
                 }}
-                className="flex items-center gap-2 px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition text-sm"
               >
-                <Plus className="w-4 h-4" />
-                Add Row
-              </button>
-              <button
-                type="button"
-                onClick={handleRefresh}
-                className="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition text-sm"
-              >
-                Refresh
-              </button>
+                <Plus className="size-4" />
+                Add row
+              </Button>
+              <Button onClick={handleSaveAll} disabled={saving || !hasEditingRows}>
+                {saving ? "Saving…" : "Save"}
+              </Button>
             </div>
           </div>
-        </div>
-      </div>
+      </PageBody>
 
       {/* ── Add Inventory Dialog ── */}
       {addInventoryDialog && (() => {
@@ -1613,223 +1643,218 @@ const Inventory = () => {
           ...FINISHES,
         ];
         return (
-          <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50">
-            <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl mx-4 flex flex-col max-h-[90vh]">
-              {/* Header */}
-              <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between shrink-0">
-                <div>
-                  <h2 className="text-lg font-semibold text-gray-900">Add Inventory</h2>
-                  <p className="text-xs text-gray-400 mt-0.5">Create blueprint + size + stock entry in one go</p>
-                </div>
-                <button type="button" onClick={() => setAddInventoryDialog(false)} className="text-gray-400 hover:text-gray-600 transition">
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-
-              <div className="overflow-y-auto flex-1 px-6 py-5 space-y-6">
-
-                {/* ── Section 1: Blueprint ── */}
-                <div>
-                  <div className="flex items-center justify-between mb-3">
-                    <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">1 · Blueprint</h3>
-                    <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-0.5 text-xs">
-                      <button type="button"
-                        onClick={() => setInvForm(prev => ({ ...prev, blueprintMode: "existing", selectedBlueprintId: "" }))}
-                        className={`px-3 py-1 rounded-md transition font-medium ${!isNew ? "bg-white shadow text-gray-900" : "text-gray-500"}`}
-                      >Select Existing</button>
-                      <button type="button"
-                        onClick={() => setInvForm(prev => ({ ...prev, blueprintMode: "new", selectedBlueprintId: "" }))}
-                        className={`px-3 py-1 rounded-md transition font-medium ${isNew ? "bg-white shadow text-gray-900" : "text-gray-500"}`}
-                      >Create New</button>
-                    </div>
-                  </div>
-                  {!isNew ? (
-                    <select
-                      value={invForm.selectedBlueprintId}
-                      onChange={e => handleInvBlueprintSelect(e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-400 bg-white"
+          <FormDialog
+            open={addInventoryDialog}
+            onOpenChange={(open) => {
+              if (!open) setAddInventoryDialog(false);
+            }}
+            title="Add inventory"
+            description="Create the blueprint, the size and the stock entry in one go."
+            size="lg"
+            submitLabel="Save inventory"
+            busyLabel="Saving…"
+            isPending={addingInventory}
+            onSubmit={handleSaveInventory}
+          >
+            <div className="space-y-6">
+              {/* ── Section 1: Blueprint ── */}
+              <section className="space-y-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <h3 className="text-[11px] font-semibold tracking-[0.06em] text-ink-3 uppercase">1 · Blueprint</h3>
+                  <div className="inline-flex items-center gap-1 rounded-lg bg-surface-2 p-0.5">
+                    <button
+                      type="button"
+                      onClick={() => setInvForm((prev) => ({ ...prev, blueprintMode: "existing", selectedBlueprintId: "" }))}
+                      className={`rounded-md px-3 py-1 text-[12px] font-medium transition-colors ${
+                        !isNew ? "bg-surface text-ink shadow-sm" : "text-ink-3 hover:text-ink"
+                      }`}
                     >
-                      <option value="">Select item blueprint…</option>
-                      {items.map(item => (
-                        <option key={item.id} value={item.id}>
-                          {item.itemName}{item.category?.name ? ` — ${item.category.name}` : ""}
-                        </option>
-                      ))}
-                    </select>
-                  ) : (
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <label className="block text-xs font-medium text-gray-600 mb-1">Item Name <span className="text-red-500">*</span></label>
-                        <input
-                          type="text" autoFocus
-                          value={invForm.newBlueprintName}
-                          onChange={e => setInvForm(prev => ({ ...prev, newBlueprintName: e.target.value }))}
-                          placeholder="e.g. Butt Hinge"
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-400"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-xs font-medium text-gray-600 mb-1">Category <span className="text-red-500">*</span></label>
-                        <select
-                          value={invForm.newBlueprintCategoryId}
-                          onChange={e => setInvForm(prev => ({ ...prev, newBlueprintCategoryId: e.target.value }))}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-400 bg-white"
-                        >
-                          <option value="">Select category…</option>
-                          {categories.map(cat => (
-                            <option key={cat.id} value={cat.id}>{cat.name}</option>
-                          ))}
-                        </select>
-                      </div>
-                    </div>
-                  )}
+                      Select existing
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setInvForm((prev) => ({ ...prev, blueprintMode: "new", selectedBlueprintId: "" }))}
+                      className={`rounded-md px-3 py-1 text-[12px] font-medium transition-colors ${
+                        isNew ? "bg-surface text-ink shadow-sm" : "text-ink-3 hover:text-ink"
+                      }`}
+                    >
+                      Create new
+                    </button>
+                  </div>
                 </div>
 
-                {/* ── Section 2: Size ── */}
-                <div>
-                  <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wide mb-3">2 · Size</h3>
-                  {invBlueprintSizes.length > 0 && (
-                    <div className="mb-3">
-                      <label className="block text-xs font-medium text-gray-500 mb-1.5">Quick-fill from existing sizes</label>
-                      <div className="flex flex-wrap gap-1.5">
-                        {invBlueprintSizes.map((s, i) => (
-                          <button key={i} type="button" onClick={() => handleInvSizeSelect(s)}
-                            className={`px-2.5 py-1 text-xs rounded-full border transition ${
-                              invForm.sizeInInch === s.sizeInInch && invForm.sizeInMm === s.sizeInMm
-                                ? "border-gray-800 bg-gray-900 text-white" : "border-gray-300 text-gray-700 hover:border-gray-500"
+                {!isNew ? (
+                  <Field label="Item blueprint" required>
+                    <SearchableSelect
+                      ariaLabel="Item blueprint"
+                      options={items.map((item) => ({
+                        value: String(item.id),
+                        label: item.itemName,
+                        description: item.category?.name,
+                      }))}
+                      value={String(invForm.selectedBlueprintId || "")}
+                      onChange={(value) => handleInvBlueprintSelect(value)}
+                      placeholder="Select item blueprint…"
+                      searchPlaceholder="Search blueprints…"
+                      className="w-full"
+                    />
+                  </Field>
+                ) : (
+                  <FieldGrid columns={2}>
+                    <Field label="Item name" htmlFor="inv-item-name" required>
+                      <Input
+                        id="inv-item-name"
+                        type="text"
+                        autoFocus
+                        value={invForm.newBlueprintName}
+                        onChange={(e) => setInvForm((prev) => ({ ...prev, newBlueprintName: e.target.value }))}
+                        placeholder="e.g. Butt Hinge"
+                      />
+                    </Field>
+                    <Field label="Category" required>
+                      <SearchableSelect
+                        ariaLabel="Category"
+                        options={categories.map((cat) => ({ value: String(cat.id), label: cat.name }))}
+                        value={String(invForm.newBlueprintCategoryId || "")}
+                        onChange={(value) => setInvForm((prev) => ({ ...prev, newBlueprintCategoryId: value }))}
+                        placeholder="Select category…"
+                        searchPlaceholder="Search categories…"
+                        className="w-full"
+                      />
+                    </Field>
+                  </FieldGrid>
+                )}
+              </section>
+
+              {/* ── Section 2: Size ── */}
+              <section className="space-y-3 border-t border-line pt-5">
+                <h3 className="text-[11px] font-semibold tracking-[0.06em] text-ink-3 uppercase">2 · Size</h3>
+
+                {invBlueprintSizes.length > 0 && (
+                  <Field label="Quick-fill from existing sizes">
+                    <div className="flex flex-wrap gap-1.5">
+                      {invBlueprintSizes.map((s, i) => {
+                        const active = invForm.sizeInInch === s.sizeInInch && invForm.sizeInMm === s.sizeInMm;
+                        return (
+                          <button
+                            key={i}
+                            type="button"
+                            onClick={() => handleInvSizeSelect(s)}
+                            className={`rounded-full border px-2.5 py-1 font-mono text-[11.5px] transition-colors ${
+                              active
+                                ? "border-primary bg-primary text-primary-foreground"
+                                : "border-line text-ink-2 hover:border-ink-3 hover:bg-surface-2"
                             }`}
                           >
                             {s.sizeInInch} / {s.sizeInMm}
                           </button>
-                        ))}
-                      </div>
+                        );
+                      })}
                     </div>
-                  )}
-                  <div className="grid grid-cols-3 gap-3">
-                    <div>
-                      <label className="block text-xs font-medium text-gray-600 mb-1">Size In Inch <span className="text-red-500">*</span></label>
-                      <input type="text"
-                        value={invForm.sizeInInch}
-                        onChange={e => setInvForm(prev => ({ ...prev, sizeInInch: e.target.value }))}
-                        placeholder="e.g. 3x3/8"
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-400"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-medium text-gray-600 mb-1">Size In MM <span className="text-red-500">*</span></label>
-                      <input type="text"
-                        value={invForm.sizeInMm}
-                        onChange={e => setInvForm(prev => ({ ...prev, sizeInMm: e.target.value }))}
-                        placeholder="e.g. 75x9"
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-400"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-medium text-gray-600 mb-1">Dozen Weight</label>
-                      <input type="number" step="any"
-                        value={invForm.dozenWeight}
-                        onChange={e => setInvForm(prev => ({ ...prev, dozenWeight: e.target.value }))}
-                        placeholder="e.g. 1.2"
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-400"
-                      />
-                    </div>
-                  </div>
-                </div>
+                  </Field>
+                )}
 
-                {/* ── Section 3: Stock Details ── */}
-                <div>
-                  <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wide mb-3">3 · Stock Details</h3>
-                  <div className="grid grid-cols-4 gap-3">
-                    {stockCols.map(col => (
-                      <div key={col.key}>
-                        <label className="block text-xs font-medium text-gray-500 mb-1">{col.label}</label>
-                        <input type="number" step="any"
-                          value={invForm[col.key]}
-                          onChange={e => setInvForm(prev => ({ ...prev, [col.key]: e.target.value }))}
-                          placeholder="—"
-                          className="w-full px-2 py-1.5 border border-gray-200 rounded-md text-sm text-center focus:outline-none focus:ring-2 focus:ring-gray-400"
-                        />
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
+                <FieldGrid columns={3}>
+                  <Field label="Size in inch" htmlFor="inv-size-inch" required>
+                    <Input
+                      id="inv-size-inch"
+                      type="text"
+                      value={invForm.sizeInInch}
+                      onChange={(e) => setInvForm((prev) => ({ ...prev, sizeInInch: e.target.value }))}
+                      placeholder="e.g. 3x3/8"
+                      className="font-mono"
+                    />
+                  </Field>
+                  <Field label="Size in MM" htmlFor="inv-size-mm" required>
+                    <Input
+                      id="inv-size-mm"
+                      type="text"
+                      value={invForm.sizeInMm}
+                      onChange={(e) => setInvForm((prev) => ({ ...prev, sizeInMm: e.target.value }))}
+                      placeholder="e.g. 75x9"
+                      className="font-mono"
+                    />
+                  </Field>
+                  <Field label="Dozen weight" htmlFor="inv-dozen-weight">
+                    <Input
+                      id="inv-dozen-weight"
+                      type="number"
+                      step="any"
+                      value={invForm.dozenWeight}
+                      onChange={(e) => setInvForm((prev) => ({ ...prev, dozenWeight: e.target.value }))}
+                      placeholder="e.g. 1.2"
+                      className="font-mono"
+                    />
+                  </Field>
+                </FieldGrid>
+              </section>
 
-              {/* Footer */}
-              <div className="px-6 py-4 border-t border-gray-200 flex justify-end gap-3 shrink-0">
-                <button type="button"
-                  onClick={() => setAddInventoryDialog(false)}
-                  className="px-5 py-2 border border-gray-300 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50 transition"
-                >Cancel</button>
-                <button type="button"
-                  disabled={addingInventory}
-                  onClick={handleSaveInventory}
-                  className="px-6 py-2 bg-gray-900 text-white rounded-lg text-sm font-medium hover:bg-gray-800 transition disabled:opacity-50"
-                >{addingInventory ? "Saving…" : "Save Inventory"}</button>
-              </div>
+              {/* ── Section 3: Stock Details ── */}
+              <section className="space-y-3 border-t border-line pt-5">
+                <h3 className="text-[11px] font-semibold tracking-[0.06em] text-ink-3 uppercase">3 · Stock details</h3>
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+                  {stockCols.map((col) => (
+                    <Field key={col.key} label={col.label} htmlFor={`inv-${col.key}`}>
+                      <Input
+                        id={`inv-${col.key}`}
+                        type="number"
+                        step="any"
+                        value={invForm[col.key]}
+                        onChange={(e) => setInvForm((prev) => ({ ...prev, [col.key]: e.target.value }))}
+                        placeholder="—"
+                        className="text-center font-mono"
+                      />
+                    </Field>
+                  ))}
+                </div>
+              </section>
             </div>
-          </div>
+          </FormDialog>
         );
       })()}
 
       {/* Add Item dialog */}
-      {addItemDialog && (
-        <div className="fixed inset-0 bg-black/20 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4 overflow-hidden">
-            <div className="bg-gray-50 px-6 py-4 border-b border-gray-200">
-              <h2 className="text-lg font-semibold text-gray-900">Add New Item</h2>
-            </div>
-            <div className="px-6 py-4 space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Item Name <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  value={newItemName}
-                  onChange={(e) => setNewItemName(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && handleAddItem()}
-                  placeholder="e.g. Hex Bolt, CSK Screw"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-400"
-                  autoFocus
-                />
-              </div>
-              <div>
-                <BillDropdown
-                  label="Category"
-                  required
-                  value={newItemCategoryId}
-                  placeholder="Select category…"
-                  options={categories.map((cat) => ({
-                    value: String(cat.id),
-                    label: cat.name,
-                  }))}
-                  onSelect={(option) => setNewItemCategoryId(String(option.value))}
-                />
-              </div>
-            </div>
-            <div className="bg-gray-50 px-6 py-4 border-t border-gray-200 flex gap-4 justify-end">
-              <button
-                onClick={() => {
-                  setAddItemDialog(false);
-                  setNewItemName("");
-                  setNewItemCategoryId("");
-                }}
-                className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-100 transition font-medium text-sm"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleAddItem}
-                disabled={addingItem}
-                className="px-4 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition font-medium text-sm disabled:opacity-50"
-              >
-                {addingItem ? "Adding..." : "Add Item"}
-              </button>
-            </div>
-          </div>
+      <FormDialog
+        open={addItemDialog}
+        onOpenChange={(open) => {
+          if (!open) {
+            setAddItemDialog(false);
+            setNewItemName("");
+            setNewItemCategoryId("");
+          }
+        }}
+        title="Add new item"
+        description="An item blueprint is the name and category; sizes and stock hang off it."
+        size="sm"
+        submitLabel="Add item"
+        busyLabel="Adding…"
+        isPending={addingItem}
+        onSubmit={handleAddItem}
+      >
+        <div className="space-y-4">
+          <Field label="Item name" htmlFor="new-item-name" required>
+            <Input
+              id="new-item-name"
+              type="text"
+              value={newItemName}
+              onChange={(e) => setNewItemName(e.target.value)}
+              placeholder="e.g. Hex Bolt, CSK Screw"
+              autoFocus
+            />
+          </Field>
+          <Field label="Category" required>
+            <SearchableSelect
+              ariaLabel="Category"
+              options={categories.map((cat) => ({ value: String(cat.id), label: cat.name }))}
+              value={String(newItemCategoryId || "")}
+              onChange={(value) => setNewItemCategoryId(value)}
+              placeholder="Select category…"
+              searchPlaceholder="Search categories…"
+              className="w-full"
+            />
+          </Field>
         </div>
-      )}
+      </FormDialog>
 
       {/* View Items dialog — search + edit + delete */}
       {viewItemsDialog && (() => {
@@ -1837,211 +1862,223 @@ const Inventory = () => {
           (it.itemName || "").toLowerCase().includes(viewItemSearch.toLowerCase())
         );
         return (
-          <div className="fixed inset-0 bg-black/20 flex items-center justify-center z-50">
-            <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl mx-4 flex flex-col max-h-[80vh]">
-
-              {/* Header */}
-              <div className="px-5 py-4 border-b border-gray-200 flex items-center justify-between">
-                <h2 className="text-base font-semibold text-gray-900">
-                  All Items
-                  <span className="ml-2 text-sm font-normal text-gray-400">({filtered.length})</span>
-                </h2>
-                <button type="button" onClick={() => { setViewItemsDialog(false); setEditingItemId(null); setViewItemSearch(""); }} className="text-gray-400 hover:text-gray-600 transition">
-                  <X className="w-4 h-4" />
-                </button>
+          <ViewDialog
+            open={viewItemsDialog}
+            onOpenChange={(open) => {
+              if (!open) {
+                setViewItemsDialog(false);
+                setEditingItemId(null);
+                setViewItemSearch("");
+              }
+            }}
+            title={`All items (${filtered.length})`}
+            description="Rename an item or move it to a different category."
+            size="xl"
+            actions={
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setViewItemsDialog(false);
+                  setEditingItemId(null);
+                  setViewItemSearch("");
+                }}
+              >
+                Close
+              </Button>
+            }
+          >
+            <div className="space-y-4">
+              <div className="relative">
+                <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-ink-3" />
+                <Input
+                  autoFocus
+                  type="search"
+                  placeholder="Search items…"
+                  value={viewItemSearch}
+                  onChange={(e) => setViewItemSearch(e.target.value)}
+                  className="pl-9"
+                />
               </div>
 
-              {/* Search */}
-              <div className="px-4 py-3 border-b border-gray-100">
-                <div className="flex items-center gap-2 border border-gray-300 rounded-lg px-3 py-2">
-                  <Search className="w-4 h-4 text-gray-400 shrink-0" />
-                  <input
-                    autoFocus
-                    type="text"
-                    placeholder="Search items…"
-                    value={viewItemSearch}
-                    onChange={e => setViewItemSearch(e.target.value)}
-                    className="flex-1 text-sm bg-transparent focus:outline-none text-gray-700 placeholder-gray-400"
-                  />
-                  {viewItemSearch && (
-                    <button type="button" onClick={() => setViewItemSearch("")} className="text-gray-400 hover:text-gray-600">
-                      <X className="w-3.5 h-3.5" />
-                    </button>
-                  )}
+              {filtered.length === 0 ? (
+                <EmptyState icon={Boxes} title="No items found" description="Nothing here matches that search." />
+              ) : (
+                <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
+                  {filtered.map((item) => {
+                    const isEditing = editingItemId === item.id;
+                    return (
+                      <div key={item.id} className="group relative">
+                        {isEditing ? (
+                          /* Edit mode card */
+                          <div className="flex flex-col gap-2 rounded-lg border border-primary bg-primary-soft/40 p-2">
+                            <Input
+                              autoFocus
+                              type="text"
+                              value={editingItemName}
+                              onChange={(e) => setEditingItemName(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === "Escape") setEditingItemId(null);
+                              }}
+                              placeholder="Item name"
+                              className="h-8 bg-surface"
+                            />
+                            <SearchableSelect
+                              ariaLabel="Category"
+                              options={categories.map((cat) => ({ value: String(cat.id), label: cat.name }))}
+                              value={String(editingItemCategoryId || "")}
+                              onChange={(value) => setEditingItemCategoryId(value)}
+                              placeholder="Select category…"
+                              searchPlaceholder="Search categories…"
+                              className="h-8 w-full"
+                            />
+                            <div className="flex justify-end gap-1.5">
+                              <Button variant="outline" size="xs" onClick={() => setEditingItemId(null)}>
+                                Cancel
+                              </Button>
+                              <Button
+                                size="xs"
+                                disabled={itemActionLoading}
+                                onClick={async () => {
+                                  if (!editingItemName.trim()) {
+                                    toast.error("Item name is required");
+                                    return;
+                                  }
+                                  if (!editingItemCategoryId) {
+                                    toast.error("Please select a category");
+                                    return;
+                                  }
+                                  setItemActionLoading(true);
+                                  try {
+                                    await axiosInstance.put(`/api/v1/item-blueprints/${item.id}`, {
+                                      itemName: editingItemName.trim(),
+                                      categoryId: Number(editingItemCategoryId),
+                                    });
+                                    toast.success("Item updated");
+                                    setEditingItemId(null);
+                                    await loadAll();
+                                  } catch {
+                                    toast.error("Failed to update");
+                                  } finally {
+                                    setItemActionLoading(false);
+                                  }
+                                }}
+                              >
+                                Save
+                              </Button>
+                            </div>
+                          </div>
+                        ) : (
+                          /* Read-only card chip */
+                          <div className="flex min-h-[46px] cursor-default items-center justify-between gap-1 rounded-lg border border-line bg-surface px-3 py-2.5 transition-all hover:border-ink-3/40 hover:shadow-sm">
+                            <div className="flex min-w-0 flex-col">
+                              <span className="truncate text-[13px] font-medium text-ink">
+                                {item.itemName || `Item #${item.id}`}
+                              </span>
+                              {item.category?.name ? (
+                                <span className="truncate text-[11.5px] text-ink-3">{item.category.name}</span>
+                              ) : (
+                                <span className="truncate text-[11.5px] text-warning">No category</span>
+                              )}
+                            </div>
+                            <div className="flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100">
+                              <button
+                                type="button"
+                                title="Edit"
+                                onClick={() => {
+                                  setEditingItemId(item.id);
+                                  setEditingItemName(item.itemName || "");
+                                  setEditingItemCategoryId(item.category?.id ? String(item.category.id) : "");
+                                }}
+                                className="rounded-md p-1 text-ink-3 transition-colors hover:bg-primary-soft hover:text-primary"
+                              >
+                                <Pencil className="size-3.5" />
+                              </button>
+                              <button
+                                type="button"
+                                title="Delete"
+                                onClick={() => setDeleteItemTarget({ id: item.id, name: item.itemName })}
+                                className="rounded-md p-1 text-ink-3 transition-colors hover:bg-danger-soft hover:text-danger"
+                              >
+                                <Trash2 className="size-3.5" />
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
-              </div>
-
-              {/* Grid of item cards */}
-              <div className="overflow-y-auto flex-1 p-4">
-                {filtered.length === 0 ? (
-                  <p className="py-8 text-sm text-center text-gray-400">No items found.</p>
-                ) : (
-                  <div className="grid grid-cols-3 gap-3">
-                    {filtered.map((item) => {
-                      const isEditing = editingItemId === item.id;
-                      return (
-                        <div key={item.id} className="group relative">
-                          {isEditing ? (
-                            /* Edit mode card */
-                            <div className="border border-blue-400 rounded-lg p-2 bg-blue-50/30 flex flex-col gap-2">
-                              <input
-                                autoFocus
-                                type="text"
-                                value={editingItemName}
-                                onChange={e => setEditingItemName(e.target.value)}
-                                onKeyDown={e => { if (e.key === "Escape") setEditingItemId(null); }}
-                                placeholder="Item name"
-                                className="w-full text-sm px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-gray-400 bg-white"
-                              />
-                              <BillDropdown
-                                value={editingItemCategoryId}
-                                placeholder="Select category…"
-                                options={categories.map((cat) => ({ value: String(cat.id), label: cat.name }))}
-                                onSelect={(option) => setEditingItemCategoryId(String(option.value))}
-                                labelClassName="hidden"
-                                buttonClassName="w-full border border-gray-300 rounded px-2 py-1 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-gray-400 flex items-center justify-between"
-                                optionListClassName="absolute z-20 mt-1 w-full max-h-40 overflow-y-auto bg-white border border-gray-200 rounded-lg shadow-lg text-sm"
-                              />
-                              <div className="flex gap-1.5 justify-end">
-                                <button type="button"
-                                  onClick={async () => {
-                                    if (!editingItemName.trim()) { toast.error("Item name is required"); return; }
-                                    if (!editingItemCategoryId) { toast.error("Please select a category"); return; }
-                                    setItemActionLoading(true);
-                                    try {
-                                      await axiosInstance.put(`/api/v1/item-blueprints/${item.id}`, {
-                                        itemName: editingItemName.trim(),
-                                        categoryId: Number(editingItemCategoryId),
-                                      });
-                                      toast.success("Item updated");
-                                      setEditingItemId(null);
-                                      await loadAll();
-                                    } catch { toast.error("Failed to update"); }
-                                    finally { setItemActionLoading(false); }
-                                  }}
-                                  disabled={itemActionLoading}
-                                  className="px-2 py-0.5 text-xs bg-gray-800 text-white rounded hover:bg-gray-700 transition disabled:opacity-50"
-                                >Save</button>
-                                <button type="button" onClick={() => setEditingItemId(null)}
-                                  className="px-2 py-0.5 text-xs border border-gray-300 text-gray-600 rounded hover:bg-gray-100 transition"
-                                >Cancel</button>
-                              </div>
-                            </div>
-                          ) : (
-                            /* Read-only card chip */
-                            <div className="border border-gray-200 rounded-lg px-3 py-2.5 text-sm text-gray-700 bg-white hover:border-gray-300 hover:shadow-sm transition min-h-[44px] flex items-center justify-between gap-1 cursor-default">
-                              <div className="flex flex-col min-w-0">
-                                <span className="truncate font-medium">{item.itemName || `Item #${item.id}`}</span>
-                                {item.category?.name ? (
-                                  <span className="text-xs text-gray-400 truncate">{item.category.name}</span>
-                                ) : (
-                                  <span className="text-xs text-amber-600 truncate">No category</span>
-                                )}
-                              </div>
-                              <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
-                                <button type="button" title="Edit"
-                                  onClick={() => {
-                                    setEditingItemId(item.id);
-                                    setEditingItemName(item.itemName || "");
-                                    setEditingItemCategoryId(item.category?.id ? String(item.category.id) : "");
-                                  }}
-                                  className="p-1 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded transition"
-                                >
-                                  <Pencil className="w-3 h-3" />
-                                </button>
-                                <button type="button" title="Delete"
-                                  onClick={() => setDeleteItemTarget({ id: item.id, name: item.itemName })}
-                                  className="p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition"
-                                >
-                                  <Trash2 className="w-3 h-3" />
-                                </button>
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-
-              {/* Footer */}
-              <div className="px-5 py-3 border-t border-gray-200 flex justify-end">
-                <button type="button"
-                  onClick={() => { setViewItemsDialog(false); setEditingItemId(null); setViewItemSearch(""); }}
-                  className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-100 transition font-medium text-sm"
-                >
-                  Close
-                </button>
-              </div>
+              )}
             </div>
-          </div>
+          </ViewDialog>
         );
       })()}
 
       {/* Delete item confirmation */}
-      {deleteItemTarget && (
-        <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-[60]">
-          <div className="bg-white rounded-lg shadow-xl max-w-sm w-full mx-4 overflow-hidden">
-            <div className="px-6 py-5">
-              <h3 className="text-base font-semibold text-gray-900 mb-1">Delete Item</h3>
-              <p className="text-sm text-gray-500">
-                Are you sure you want to delete <strong>{deleteItemTarget.name}</strong>? This cannot be undone.
-              </p>
-            </div>
-            <div className="px-6 pb-5 flex justify-end gap-3">
-              <button type="button" onClick={() => setDeleteItemTarget(null)}
-                className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-100 transition text-sm font-medium"
-              >
-                Cancel
-              </button>
-              <button type="button" disabled={itemActionLoading}
-                onClick={async () => {
-                  setItemActionLoading(true);
-                  try {
-                    await axiosInstance.delete(`/api/v1/item-blueprints/${deleteItemTarget.id}`);
-                    toast.success("Item deleted");
-                    setDeleteItemTarget(null);
-                    await loadAll();
-                  } catch (err) {
-                    toast.error(err?.response?.data?.message || "Failed to delete item");
-                  } finally { setItemActionLoading(false); }
-                }}
-                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition text-sm font-medium disabled:opacity-50"
-              >
-                {itemActionLoading ? "Deleting…" : "Delete"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ConfirmDialog
+        open={deleteItemTarget !== null}
+        onOpenChange={(open) => {
+          if (!open) setDeleteItemTarget(null);
+        }}
+        title="Delete this item?"
+        description={
+          <>
+            <ConfirmName>{deleteItemTarget?.name}</ConfirmName> and its sizes and stock rows will be removed. This
+            cannot be undone.
+          </>
+        }
+        confirmLabel="Delete"
+        busyLabel="Deleting…"
+        isPending={itemActionLoading}
+        onConfirm={async () => {
+          setItemActionLoading(true);
+          try {
+            await axiosInstance.delete(`/api/v1/item-blueprints/${deleteItemTarget.id}`);
+            toast.success("Item deleted");
+            setDeleteItemTarget(null);
+            await loadAll();
+          } catch (err) {
+            toast.error(err?.response?.data?.message || "Failed to delete item");
+          } finally {
+            setItemActionLoading(false);
+          }
+        }}
+      />
 
       {/* Delete confirmation dialog */}
-      <ConfirmationDialog
-        isOpen={deleteDialog.open}
-        title="Delete Inventory Row"
-        message="Are you sure you want to delete this inventory row? This action cannot be undone."
-        confirmText={deleting ? "Deleting..." : "Delete"}
+      <ConfirmDialog
+        open={deleteDialog.open}
+        onOpenChange={(open) => {
+          if (!open) setDeleteDialog({ open: false, rowIndex: null });
+        }}
+        title="Delete this inventory row?"
+        description="The stock row will be removed. The item and its size stay in the master. This cannot be undone."
+        confirmLabel="Delete"
+        busyLabel="Deleting…"
+        isPending={deleting}
         onConfirm={handleDeleteRow}
-        onCancel={() => setDeleteDialog({ open: false, rowIndex: null })}
-        isDangerous
       />
 
       {/* Clear All items confirmation */}
-      <ConfirmationDialog
-        isOpen={clearAllOpen}
-        title="Clear All Items"
-        message={`Are you sure you want to delete all ${items.length} item(s) and their sizes/inventory? This action cannot be undone.`}
-        confirmText={clearingAll ? "Clearing…" : "Clear All"}
-        cancelText="Cancel"
-        isDangerous
-        onCancel={() => setClearAllOpen(false)}
+      <ConfirmDialog
+        open={clearAllOpen}
+        onOpenChange={(open) => {
+          if (!open) setClearAllOpen(false);
+        }}
+        title="Clear all items?"
+        description={
+          <>
+            All <ConfirmName>{items.length}</ConfirmName> items and every size and stock row beneath them will be
+            deleted. This cannot be undone.
+          </>
+        }
+        confirmLabel="Clear all"
+        busyLabel="Clearing…"
+        isPending={clearingAll}
         onConfirm={async () => {
           setClearingAll(true);
           try {
-            await Promise.all(
-              items.map((item) => axiosInstance.delete(`/api/v1/item-blueprints/${item.id}`))
-            );
+            await Promise.all(items.map((item) => axiosInstance.delete(`/api/v1/item-blueprints/${item.id}`)));
             toast.success("All items cleared!");
             await loadAll();
           } catch (err) {
@@ -2054,17 +2091,24 @@ const Inventory = () => {
       />
 
       {/* Import Stock Master Excel confirmation */}
-      <ConfirmationDialog
-        isOpen={importConfirmOpen}
-        title="Import Stock Master Excel"
-        message={
-          `Import "${importFile?.name || "the selected file"}" to add new items and sizes. ` +
-          `Existing items and sizes will not be modified or deleted. ` +
-          `Plating / finish price fields will be left empty for you to fill in afterwards.`
+      <ConfirmDialog
+        open={importConfirmOpen}
+        onOpenChange={(open) => {
+          if (!open) handleCancelImport();
+        }}
+        title="Import stock master Excel?"
+        destructive={false}
+        description={
+          <>
+            <ConfirmName>{importFile?.name || "The selected file"}</ConfirmName> will add new items and sizes.
+            Existing items and sizes are not modified or deleted, and plating / finish price fields are left empty
+            for you to fill in afterwards.
+          </>
         }
-        confirmText={importing ? "Importing..." : "Import"}
+        confirmLabel="Import"
+        busyLabel="Importing…"
+        isPending={importing}
         onConfirm={handleConfirmImport}
-        onCancel={handleCancelImport}
       />
 
       <AddStockDialog

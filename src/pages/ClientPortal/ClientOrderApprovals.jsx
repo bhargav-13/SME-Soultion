@@ -1,27 +1,42 @@
-import React, { useEffect, useMemo, useState } from "react";
-import { Link, useSearchParams } from "react-router-dom";
-import { Check, X as XIcon, Package, ArrowLeft, XCircle } from "lucide-react";
-import toast from "react-hot-toast";
-import SidebarLayout from "../../components/SidebarLayout";
-import PageHeader from "../../components/PageHeader";
-import StatsCard from "../../components/StatsCard";
-import ConfirmationDialog from "../../components/ConfirmationDialog";
-import OrderStatusBadge from "../../components/ClientPortal/OrderStatusBadge";
-import { clientPortalAdminApi } from "../../services/apiService";
-import { ITEM_STAGE, ORDER_STATUS, ORDER_STATUS_TABS, formatKg } from "../../utils/clientShop";
+import { useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
+import { Check, ClipboardList, Package, X as XIcon, XCircle } from 'lucide-react';
+import toast from 'react-hot-toast';
+import SidebarLayout from '@/components/SidebarLayout';
+import { PageBody, PageHeader } from '@/components/page-header';
+import { StatCard } from '@/components/stat-card';
+import { EmptyState, ListSkeleton } from '@/components/states';
+import { ConfirmDialog, ConfirmName } from '@/components/confirm-dialog';
+import OrderStatusBadge from '@/components/ClientPortal/OrderStatusBadge';
+import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import { clientPortalAdminApi } from '@/services/apiService';
+import { ITEM_STAGE, ORDER_STATUS, ORDER_STATUS_TABS, formatKg } from '@/utils/clientShop';
 
 const PAGE_SIZE = 20;
 
 // The server keeps every request in exactly one pipeline status, so these tabs partition the list.
 const TABS = [
-  { key: "ALL", label: "All" },
+  { key: 'ALL', label: 'All' },
   ...ORDER_STATUS_TABS.map((key) => ({ key, label: ORDER_STATUS[key].label })),
 ];
 
+const HEAD_CLASS = 'px-4 py-2.5 text-center text-[11.5px] font-semibold tracking-[0.03em] text-ink-3 uppercase whitespace-nowrap';
+const CELL_CLASS = 'px-4 py-2.5 text-center text-[13px] text-ink-2';
+
 const ClientOrderApprovals = () => {
   const [searchParams, setSearchParams] = useSearchParams();
-  const usernameFilter = searchParams.get("username") || "";
-  const partyNameFilter = searchParams.get("partyName") || "";
+  const usernameFilter = searchParams.get('username') || '';
+  const partyNameFilter = searchParams.get('partyName') || '';
 
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -29,13 +44,10 @@ const ClientOrderApprovals = () => {
   const [totalPages, setTotalPages] = useState(0);
   const [totalElements, setTotalElements] = useState(0);
   const [pendingCount, setPendingCount] = useState(0);
-  const [tab, setTab] = useState("ALL");
+  const [tab, setTab] = useState('ALL');
   const [expandedId, setExpandedId] = useState(null);
-  const [confirmDialog, setConfirmDialog] = useState({
-    isOpen: false,
-    id: null,
-    action: null,
-  });
+  const [confirmDialog, setConfirmDialog] = useState({ isOpen: false, id: null, action: null });
+  const [processing, setProcessing] = useState(false);
 
   const loadRequests = async (pageNum = 0) => {
     try {
@@ -46,8 +58,8 @@ const ClientOrderApprovals = () => {
         undefined,
         undefined,
         undefined,
-        tab === "ALL" ? undefined : tab,
-        partyNameFilter || undefined
+        tab === 'ALL' ? undefined : tab,
+        partyNameFilter || undefined,
       );
       const result = response.data;
       let data = result?.data || [];
@@ -58,8 +70,8 @@ const ClientOrderApprovals = () => {
       setTotalPages(result?.totalPages || 0);
       setTotalElements(result?.totalElements || 0);
     } catch (error) {
-      console.error("Error fetching order requests:", error);
-      toast.error(error.response?.data?.message || "Failed to fetch order requests");
+      console.error('Error fetching order requests:', error);
+      toast.error(error.response?.data?.message || 'Failed to fetch order requests');
       setRequests([]);
     } finally {
       setLoading(false);
@@ -74,12 +86,12 @@ const ClientOrderApprovals = () => {
         undefined,
         undefined,
         undefined,
-        "PENDING_APPROVAL",
-        partyNameFilter || undefined
+        'PENDING_APPROVAL',
+        partyNameFilter || undefined,
       );
       setPendingCount(response.data?.totalElements || 0);
     } catch (error) {
-      console.error("Error fetching pending order request count:", error);
+      console.error('Error fetching pending order request count:', error);
     }
   };
 
@@ -107,231 +119,225 @@ const ClientOrderApprovals = () => {
 
   const handleConfirm = async () => {
     const { id, action } = confirmDialog;
-    const newStatus = action === "approve" ? "APPROVED" : "REJECTED";
+    const newStatus = action === 'approve' ? 'APPROVED' : 'REJECTED';
     try {
+      setProcessing(true);
       await clientPortalAdminApi.updateOrderRequestStatus(id, { status: newStatus });
       await loadRequests(page);
       await loadPendingCount();
-      toast.success(action === "approve" ? "Order request approved" : "Order request rejected");
+      toast.success(action === 'approve' ? 'Order request approved' : 'Order request rejected');
     } catch (error) {
-      console.error("Error updating order request status:", error);
-      toast.error(error.response?.data?.message || "Failed to update order request");
+      console.error('Error updating order request status:', error);
+      toast.error(error.response?.data?.message || 'Failed to update order request');
     } finally {
+      setProcessing(false);
       setConfirmDialog({ isOpen: false, id: null, action: null });
     }
   };
 
   return (
     <SidebarLayout>
-      <div className="mx-auto">
-        <div className="mb-4">
-          <Link
-            to="/client-portal"
-            className="inline-flex items-center gap-1.5 text-sm font-medium text-gray-500 hover:text-gray-900 transition"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            Back to Client Portal
-          </Link>
-        </div>
-        <div className="mb-8">
-          <PageHeader
-            title="Order Approvals"
-            description="Review and approve order requests submitted by clients."
-          />
-        </div>
+      <PageHeader
+        title="Order approvals"
+        subtitle="Review and approve order requests submitted by clients."
+        backTo="/client-portal"
+        backLabel="Client Portal"
+      />
 
+      <PageBody className="space-y-6">
         {usernameFilter && (
-          <div className="mb-6 flex items-center justify-between bg-gray-100 border border-gray-200 rounded-lg px-4 py-2.5">
-            <p className="text-sm text-gray-700">
-              Showing requests for{" "}
-              <span className="font-semibold">{partyNameFilter || usernameFilter}</span>{" "}
-              <span className="text-gray-500">({usernameFilter})</span>
+          <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-line bg-surface-2 px-4 py-2.5">
+            <p className="text-[13px] text-ink-2">
+              Showing requests for{' '}
+              <span className="font-semibold text-ink">{partyNameFilter || usernameFilter}</span>{' '}
+              <span className="text-ink-3">({usernameFilter})</span>
             </p>
-            <button
-              onClick={clearClientFilter}
-              className="inline-flex items-center gap-1.5 text-sm font-medium text-gray-500 hover:text-gray-900 transition"
-            >
-              <XCircle className="w-4 h-4" />
+            <Button variant="ghost" size="sm" onClick={clearClientFilter} className="text-ink-2">
+              <XCircle className="size-4" />
               Clear filter
-            </button>
+            </Button>
           </div>
         )}
 
         {/* Stats */}
-        <div className="grid grid-cols-2 gap-6 mb-8">
-          <StatsCard label="Total Requests" value={totalElements} />
-          <StatsCard label="Pending Approval" value={pendingCount} />
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <StatCard label="Total requests" value={totalElements} icon={ClipboardList} tone="info" />
+          <StatCard label="Pending approval" value={pendingCount} icon={Package} tone="warning" />
         </div>
 
         {/* Tabs */}
-        <div className="flex gap-2 mb-6 border-b border-gray-200">
-          {TABS.map((t) => (
-            <button
-              key={t.key}
-              onClick={() => setTab(t.key)}
-              className={`px-4 py-2 text-sm font-medium border-b-2 transition ${
-                tab === t.key
-                  ? "border-gray-900 text-gray-900"
-                  : "border-transparent text-gray-500 hover:text-gray-700"
-              }`}
-            >
-              {t.label}
-            </button>
-          ))}
+        <div className="-mx-1 overflow-x-auto px-1">
+          <Tabs value={tab} onValueChange={setTab}>
+            <TabsList variant="line" className="w-max">
+              {TABS.map((t) => (
+                <TabsTrigger key={t.key} value={t.key}>
+                  {t.label}
+                </TabsTrigger>
+              ))}
+            </TabsList>
+          </Tabs>
         </div>
 
         {/* Requests list */}
         {loading ? (
-          <div className="text-center text-gray-500 py-10">Loading...</div>
+          <ListSkeleton rows={4} className="h-24" />
         ) : filteredRequests.length === 0 ? (
-          <div className="bg-white rounded-lg border border-gray-200 p-10 text-center text-gray-500">
-            <Package className="w-10 h-10 mx-auto mb-3 text-gray-300" />
-            No order requests found
-          </div>
+          <EmptyState icon={Package} title="No order requests found" />
         ) : (
           <div className="space-y-4">
             {filteredRequests.map((req) => (
-              <div key={req.id} className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-                <div className="px-6 py-4 flex flex-wrap items-center justify-between gap-3">
-                  <div>
-                    <p className="text-sm font-semibold text-gray-900">
-                      Request #{req.id} {req.partyName ? `· ${req.partyName}` : ""}
+              <Card key={req.id} className="gap-0 overflow-hidden py-0">
+                <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3.5 sm:px-5">
+                  <div className="min-w-0">
+                    <p className="text-[13.5px] font-semibold text-ink">
+                      Request #{req.id} {req.partyName ? `· ${req.partyName}` : ''}
                     </p>
-                    <p className="text-xs text-gray-500 mt-0.5">
-                      Client: <span className="font-medium text-gray-700">{req.username || "-"}</span>
-                      {" · "}
-                      {req.orderDate ? new Date(req.orderDate).toLocaleDateString() : "-"}
+                    <p className="mt-0.5 text-[12px] text-ink-3">
+                      Client: <span className="font-medium text-ink-2">{req.username || '-'}</span>
+                      {' · '}
+                      {req.orderDate ? new Date(req.orderDate).toLocaleDateString() : '-'}
                     </p>
                   </div>
-                  <div className="flex items-center gap-3">
+                  <div className="flex flex-wrap items-center gap-2">
                     <OrderStatusBadge status={req.status} />
-                    <button
+                    <Button
+                      variant="ghost"
+                      size="sm"
                       onClick={() => setExpandedId(expandedId === req.id ? null : req.id)}
-                      className="text-sm font-medium text-gray-600 hover:text-gray-900 transition"
                     >
-                      {expandedId === req.id ? "Hide Items" : "View Items"}
-                    </button>
-                    {req.status === "PENDING_APPROVAL" && (
+                      {expandedId === req.id ? 'Hide items' : 'View items'}
+                    </Button>
+                    {req.status === 'PENDING_APPROVAL' && (
                       <>
-                        <button
-                          onClick={() => handleAction(req.id, "approve")}
-                          className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700 transition"
+                        <Button
+                          size="sm"
+                          onClick={() => handleAction(req.id, 'approve')}
+                          className="bg-success text-white hover:bg-success/90"
                         >
-                          <Check className="w-4 h-4" />
+                          <Check className="size-4" />
                           Approve
-                        </button>
-                        <button
-                          onClick={() => handleAction(req.id, "reject")}
-                          className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-red-50 text-red-700 border border-red-200 text-sm font-medium rounded-lg hover:bg-red-100 transition"
-                        >
-                          <XIcon className="w-4 h-4" />
+                        </Button>
+                        <Button variant="outline" size="sm" onClick={() => handleAction(req.id, 'reject')}>
+                          <XIcon className="size-4" />
                           Reject
-                        </button>
+                        </Button>
                       </>
                     )}
                   </div>
                 </div>
 
                 {expandedId === req.id && (
-                  <table className="w-full border-t border-gray-100">
-                    <thead>
-                      <tr className="border-b border-gray-200 bg-gray-50">
-                        <th className="px-6 py-2.5 text-center text-xs font-[550] text-black">Item</th>
-                        <th className="px-6 py-2.5 text-center text-xs font-[550] text-black">Size (Inch)</th>
-                        <th className="px-6 py-2.5 text-center text-xs font-[550] text-black">Size (mm)</th>
-                        <th className="px-6 py-2.5 text-center text-xs font-[550] text-black">Plating</th>
-                        <th className="px-6 py-2.5 text-center text-xs font-[550] text-black">Qty (Pc)</th>
-                        <th className="px-6 py-2.5 text-center text-xs font-[550] text-black">Stage</th>
-                        <th className="px-6 py-2.5 text-center text-xs font-[550] text-black">Ready / At Plater (Kg)</th>
-                        <th className="px-6 py-2.5 text-center text-xs font-[550] text-black">Dispatched (Pc)</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {(req.items || []).map((item) => {
-                        const stage = ITEM_STAGE[item.stage];
-                        return (
-                          <tr key={item.id} className="border-b border-gray-100 last:border-0">
-                            <td className="px-6 py-2.5 text-sm text-gray-700 text-center">{item.itemName || "-"}</td>
-                            <td className="px-6 py-2.5 text-sm text-gray-700 text-center">{item.sizeInInch || "-"}</td>
-                            <td className="px-6 py-2.5 text-sm text-gray-700 text-center">{item.sizeInMm || "-"}</td>
-                            <td className="px-6 py-2.5 text-sm text-gray-700 text-center">{item.plating || "-"}</td>
-                            <td className="px-6 py-2.5 text-sm text-gray-700 text-center">{item.qtyPc ?? "-"}</td>
-                            <td className="px-6 py-2.5 text-sm text-center">
-                              {stage ? (
-                                <span className={`px-2.5 py-1 rounded-full text-xs font-medium whitespace-nowrap ${stage.className}`}>
-                                  {stage.label}
-                                </span>
-                              ) : (
-                                <span className="text-gray-400">-</span>
-                              )}
-                            </td>
-                            {/* On a partial return it is exactly the returned Kg that is ready to go
-                                out; the rest is still with the plater. */}
-                            <td className="px-6 py-2.5 text-sm text-gray-700 text-center">
-                              {item.sentKg == null ? (
-                                "-"
-                              ) : (
-                                <>
-                                  <span className="font-medium text-teal-700">{formatKg(item.returnedKg)}</span>
-                                  <span className="text-gray-400"> / </span>
-                                  <span className="text-gray-600">{formatKg(item.remainingKg)}</span>
-                                </>
-                              )}
-                            </td>
-                            <td className="px-6 py-2.5 text-sm text-gray-700 text-center">
-                              {item.dispatchedPc == null ? "-" : `${item.dispatchedPc} / ${item.qtyPc ?? "-"}`}
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
+                  <div className="w-full overflow-x-auto border-t border-line">
+                    <Table>
+                      <TableHeader>
+                        <TableRow className="hover:bg-transparent">
+                          <TableHead className={HEAD_CLASS}>Item</TableHead>
+                          <TableHead className={HEAD_CLASS}>Size (Inch)</TableHead>
+                          <TableHead className={HEAD_CLASS}>Size (mm)</TableHead>
+                          <TableHead className={HEAD_CLASS}>Plating</TableHead>
+                          <TableHead className={HEAD_CLASS}>Qty (Pc)</TableHead>
+                          <TableHead className={HEAD_CLASS}>Stage</TableHead>
+                          <TableHead className={HEAD_CLASS}>Ready / At Plater (Kg)</TableHead>
+                          <TableHead className={HEAD_CLASS}>Dispatched (Pc)</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {(req.items || []).map((item) => {
+                          const stage = ITEM_STAGE[item.stage];
+                          return (
+                            <TableRow key={item.id} className="border-line-2">
+                              <TableCell className={CELL_CLASS}>{item.itemName || '-'}</TableCell>
+                              <TableCell className={CELL_CLASS}>{item.sizeInInch || '-'}</TableCell>
+                              <TableCell className={CELL_CLASS}>{item.sizeInMm || '-'}</TableCell>
+                              <TableCell className={CELL_CLASS}>{item.plating || '-'}</TableCell>
+                              <TableCell className="px-4 py-2.5 text-center font-mono text-[13px] text-ink-2">
+                                {item.qtyPc ?? '-'}
+                              </TableCell>
+                              <TableCell className="px-4 py-2.5 text-center">
+                                {stage ? (
+                                  <span
+                                    className={`inline-flex w-fit items-center rounded-full px-2 py-0.5 text-[11.5px] font-medium whitespace-nowrap ${stage.className}`}
+                                  >
+                                    {stage.label}
+                                  </span>
+                                ) : (
+                                  <span className="text-ink-3">-</span>
+                                )}
+                              </TableCell>
+                              {/* On a partial return it is exactly the returned Kg that is ready to go
+                                  out; the rest is still with the plater. */}
+                              <TableCell className="px-4 py-2.5 text-center font-mono text-[13px] whitespace-nowrap">
+                                {item.sentKg == null ? (
+                                  '-'
+                                ) : (
+                                  <>
+                                    <span className="font-medium text-success">{formatKg(item.returnedKg)}</span>
+                                    <span className="text-ink-3"> / </span>
+                                    <span className="text-ink-2">{formatKg(item.remainingKg)}</span>
+                                  </>
+                                )}
+                              </TableCell>
+                              <TableCell className="px-4 py-2.5 text-center font-mono text-[13px] whitespace-nowrap text-ink-2">
+                                {item.dispatchedPc == null ? '-' : `${item.dispatchedPc} / ${item.qtyPc ?? '-'}`}
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
+                      </TableBody>
+                    </Table>
+                  </div>
                 )}
-              </div>
+              </Card>
             ))}
           </div>
         )}
 
         {/* Pagination */}
         {totalPages > 1 && (
-          <div className="flex items-center justify-between mt-6">
-            <p className="text-sm text-gray-500">
+          <div className="flex items-center justify-between">
+            <p className="text-[12.5px] text-ink-3">
               Page {page + 1} of {totalPages}
             </p>
             <div className="flex gap-2">
-              <button
-                onClick={() => setPage((p) => Math.max(0, p - 1))}
-                disabled={page === 0}
-                className="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
+              <Button variant="outline" size="sm" onClick={() => setPage((p) => Math.max(0, p - 1))} disabled={page === 0}>
                 Previous
-              </button>
-              <button
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
                 onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
                 disabled={page >= totalPages - 1}
-                className="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Next
-              </button>
+              </Button>
             </div>
           </div>
         )}
 
-        <ConfirmationDialog
-          isOpen={confirmDialog.isOpen}
-          title={confirmDialog.action === "approve" ? "Approve Order Request" : "Reject Order Request"}
-          message={
-            confirmDialog.action === "approve"
-              ? "This will mark the order request as approved and notify the client. Continue?"
-              : "This will reject the order request. The client will be notified. Continue?"
+        <ConfirmDialog
+          open={confirmDialog.isOpen}
+          onOpenChange={(open) => !open && setConfirmDialog({ isOpen: false, id: null, action: null })}
+          title={confirmDialog.action === 'approve' ? 'Approve order request' : 'Reject order request'}
+          description={
+            confirmDialog.action === 'approve' ? (
+              <>
+                This will mark the order request as <ConfirmName>approved</ConfirmName> and notify the client.
+                Continue?
+              </>
+            ) : (
+              <>
+                This will <ConfirmName>reject</ConfirmName> the order request. The client will be notified.
+                Continue?
+              </>
+            )
           }
-          confirmText={confirmDialog.action === "approve" ? "Approve" : "Reject"}
-          cancelText="Cancel"
+          confirmLabel={confirmDialog.action === 'approve' ? 'Approve' : 'Reject'}
+          busyLabel={confirmDialog.action === 'approve' ? 'Approving…' : 'Rejecting…'}
+          isPending={processing}
+          destructive={confirmDialog.action === 'reject'}
           onConfirm={handleConfirm}
-          onCancel={() => setConfirmDialog({ isOpen: false, id: null, action: null })}
-          isDangerous={confirmDialog.action === "reject"}
         />
-      </div>
+      </PageBody>
     </SidebarLayout>
   );
 };

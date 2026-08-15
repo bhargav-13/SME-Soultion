@@ -1,5 +1,12 @@
-import React from "react";
-import { X, Plus } from "lucide-react";
+import { Plus } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
 import FormSection from "../InvoiceForm/FormSection";
 import ExporterSection from "../InvoiceForm/sections/ExporterSection";
 import ImporterSection from "../InvoiceForm/sections/ImporterSection";
@@ -23,19 +30,14 @@ const InvoiceEditDialog = ({
   onPackingsChange,
   onAddPacking,
 }) => {
-  if (!isOpen) return null;
-
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg shadow-lg w-full max-w-5xl max-h-[90vh] flex flex-col">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 shrink-0">
-          <h2 className="text-3xl font-medium text-black">Edit Invoice</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-500">
-            <X className="w-6 h-6" />
-          </button>
-        </div>
+    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="max-h-[calc(100dvh-1.5rem)] gap-0 overflow-hidden p-0 sm:max-w-5xl">
+        <DialogHeader className="border-b border-line px-4 py-3.5 text-left sm:px-6">
+          <DialogTitle className="text-[15px] font-semibold text-ink sm:text-[18px]">Edit invoice</DialogTitle>
+        </DialogHeader>
 
-        <div className="p-6 overflow-y-auto">
+        <div className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-6">
           <div className="space-y-6">
             <FormSection title="Exporter">
               <ExporterSection formData={formData} onChange={onChange} />
@@ -66,14 +68,10 @@ const InvoiceEditDialog = ({
             <FormSection
               title="Items Details"
               action={
-                <button
-                  type="button"
-                  onClick={onAddItem}
-                  className="inline-flex items-center gap-2 bg-gray-900 text-white px-3 py-2 rounded-lg hover:bg-gray-800 transition"
-                >
-                  Add Item
-                  <Plus className="w-3 h-3" />
-                </button>
+                <Button size="sm" onClick={onAddItem}>
+                  <Plus className="size-4" />
+                  Add item
+                </Button>
               }
             >
               <ItemsDetailsSection items={items} onItemsChange={onItemsChange} />
@@ -82,14 +80,10 @@ const InvoiceEditDialog = ({
             <FormSection
               title="Packing Details"
               action={
-                <button
-                  type="button"
-                  onClick={onAddPacking}
-                  className="inline-flex items-center gap-2 bg-gray-900 text-white px-3 py-2 rounded-lg hover:bg-gray-800 transition"
-                >
-                  Add Item
-                  <Plus className="w-3 h-3" />
-                </button>
+                <Button size="sm" onClick={onAddPacking}>
+                  <Plus className="size-4" />
+                  Add item
+                </Button>
               }
             >
               <PackingDetailsSection
@@ -138,22 +132,16 @@ const InvoiceEditDialog = ({
           </div>
         </div>
 
-        <div className="flex justify-center gap-3 px-6 py-4 border-t border-gray-200 shrink-0">
-          <button
-            onClick={onSave}
-            className="bg-black text-white px-12 py-2 rounded-xl hover:bg-gray-900 transition font-medium text-sm"
-          >
-            Save
-          </button>
-          <button
-            onClick={onClose}
-            className="border border-gray-300 text-gray-700 px-12 py-2 rounded-xl hover:bg-gray-50 transition font-medium text-sm"
-          >
+        <DialogFooter className="border-t border-line bg-surface-2 px-4 py-3 sm:px-6">
+          <Button variant="outline" onClick={onClose} className="px-10">
             Cancel
-          </button>
-        </div>
-      </div>
-    </div>
+          </Button>
+          <Button onClick={onSave} className="px-10">
+            Save
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 };
 

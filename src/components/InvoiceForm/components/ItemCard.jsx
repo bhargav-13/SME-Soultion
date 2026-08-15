@@ -32,18 +32,16 @@ const ItemCard = ({
       : "";
 
   return (
-    <div className="bg-white border border-gray-200 rounded-xl p-5 relative">
-      <div className="flex items-center justify-between mb-4">
-        <span className="text-sm font-medium text-gray-500">
-          Item #{index + 1}
-        </span>
+    <div className="relative rounded-xl border border-line bg-surface p-5">
+      <div className="mb-4 flex items-center justify-between">
+        <span className="text-[13px] font-medium text-ink-3">Item #{index + 1}</span>
         {canRemove && (
           <button
             type="button"
             onClick={() => onRemove(index)}
-            className="text-gray-400 hover:text-red-500 transition"
+            className="text-ink-3 transition hover:text-danger"
           >
-            <X className="w-4 h-4" />
+            <X className="size-4" />
           </button>
         )}
       </div>

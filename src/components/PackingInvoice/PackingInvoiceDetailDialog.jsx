@@ -1,6 +1,20 @@
-﻿import React from "react";
-import { Download, X } from "lucide-react";
-import PrimaryActionButton from "../PrimaryActionButton";
+﻿import { Download } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { EmptyState } from "@/components/states";
 
 const detailColumns = [
   { key: "party", label: "Party" },
@@ -68,102 +82,69 @@ const PackingInvoiceDetailDialog = ({
   onDownload,
   downloading = false,
 }) => {
-  if (!isOpen || !invoice) return null;
-
-  const items = normalizeItems(invoice);
-  const invoiceId = String(invoice.invoiceId || invoice.id || "").replace(/^In-/i, "");
-  const invoiceDate = formatDate(invoice.date || invoice.invoiceDate);
-  const partyName = invoice.party || invoice.partyName || "-";
+  const items = normalizeItems(invoice || {});
+  const invoiceId = String(invoice?.invoiceId || invoice?.id || "").replace(/^In-/i, "");
+  const invoiceDate = formatDate(invoice?.date || invoice?.invoiceDate);
+  const partyName = invoice?.party || invoice?.partyName || "-";
 
   return (
-    <div
-      className="fixed inset-0 z-50 bg-black/50 px-4 py-6 flex items-center justify-center"
-      onClick={onClose}
-    >
-      <div
-        className="w-full max-w-6xl max-h-[92vh] overflow-hidden rounded-2xl bg-white shadow-2xl flex flex-col"
-        onClick={(event) => event.stopPropagation()}
-      >
-        <div className="border-b border-gray-200 px-6 py-5">
-          <div className="flex items-start justify-between gap-4">
-            <div className="space-y-2">
-              <p className=" font-medium text-black">
+    <Dialog open={isOpen && Boolean(invoice)} onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="max-h-[calc(100dvh-1.5rem)] gap-0 overflow-hidden p-0 sm:max-w-6xl">
+        <DialogHeader className="border-b border-line px-4 py-4 text-left sm:px-6">
+          <div className="flex flex-wrap items-start justify-between gap-3 pr-8">
+            <div className="space-y-1">
+              <DialogTitle className="text-[14px] font-medium text-ink">
                 Invoice ID - {invoiceId}
-                <span className="mx-3 text-gray-400">-</span>
+                <span className="mx-3 text-ink-3">-</span>
                 {invoiceDate}
-              </p>
-              <p className="text-base font-medium text-black">{partyName}</p>
+              </DialogTitle>
+              <p className="text-[15px] font-medium text-ink">{partyName}</p>
             </div>
-
-            <div className="flex items-center gap-3">
-              {/* <button
-                type="button"
-                onClick={() => onDownload?.(invoice)}
-                disabled={downloading}
-                className="inline-flex items-center gap-2 rounded-xl border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                <Download className="h-4 w-4" />
-                {downloading ? "Downloading..." : "Download Invoice"}
-              </button> */}
- <PrimaryActionButton
-                 onClick={() => onDownload?.(invoice)}
-                disabled={downloading}
-                icon={Download}
-              >
-                  {downloading ? "Downloading..." : "Download Invoice"}
-              </PrimaryActionButton>
-              <button
-                type="button"
-                onClick={onClose} border border-gray-300
-                className="inline-flex items-center justify-center border border-gray-300 rounded-full p-2 text-gray-500 cursor-pointer"
-                aria-label="Close dialog"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
+            <Button variant="outline" size="sm" onClick={() => onDownload?.(invoice)} disabled={downloading}>
+              <Download className="size-4" />
+              {downloading ? "Downloading…" : "Download invoice"}
+            </Button>
           </div>
-        </div>
+        </DialogHeader>
 
-        <div className="flex-1 overflow-auto px-6 py-5">
+        <div className="min-h-0 flex-1 overflow-auto p-4 sm:p-6">
           {items.length > 0 ? (
-            <div className="overflow-auto border border-gray-200">
-              <table className="min-w-full w-max table-auto">
-                <thead className="bg-gray-100">
-                  <tr>
+            <div className="w-full overflow-x-auto rounded-lg border border-line">
+              <Table>
+                <TableHeader>
+                  <TableRow className="hover:bg-transparent">
                     {detailColumns.map((column) => (
-                      <th
+                      <TableHead
                         key={column.key}
-                        className="px-6 py-4 text-center text-sm font-[550] border-b border-r border-gray-200 bg-gray-100 whitespace-nowrap"
+                        className="border-r border-line-2 px-4 py-3 text-center text-[11.5px] font-semibold tracking-[0.02em] whitespace-nowrap text-ink-3 uppercase"
                       >
                         {column.label}
-                      </th>
+                      </TableHead>
                     ))}
-                  </tr>
-                </thead>
-                <tbody>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
                   {items.map((item) => (
-                    <tr key={item.id} className="border-b border-gray-200 hover:bg-gray-50">
+                    <TableRow key={item.id} className="border-line-2">
                       {detailColumns.map((column) => (
-                        <td
+                        <TableCell
                           key={`${item.id}-${column.key}`}
-                          className="px-6 py-4 text-center text-sm text-gray-500 border-b border-r border-gray-200 whitespace-nowrap"
+                          className="border-r border-line-2 px-4 py-3 text-center text-[13px] whitespace-nowrap text-ink-2"
                         >
                           {item[column.key] ?? "-"}
-                        </td>
+                        </TableCell>
                       ))}
-                    </tr>
+                    </TableRow>
                   ))}
-                </tbody>
-              </table>
+                </TableBody>
+              </Table>
             </div>
           ) : (
-            <div className="rounded-2xl border border-dashed border-gray-300 bg-white px-6 py-12 text-center text-sm text-gray-500">
-              No item details available for this invoice.
-            </div>
+            <EmptyState title="No item details available for this invoice." />
           )}
         </div>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 };
 

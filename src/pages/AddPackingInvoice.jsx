@@ -1,7 +1,11 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
-import SidebarLayout from "../components/SidebarLayout";
-import PageHeader from "../components/PageHeader";
+import SidebarLayout from "@/components/SidebarLayout";
+import { PageBody, PageHeader } from "@/components/page-header";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { cn } from "@/lib/utils";
 import toast from "react-hot-toast";
 import {
   packingInvoiceApi,
@@ -9,9 +13,8 @@ import {
   itemBlueprintApi,
   sizeApi,
   clientInventoryApi,
-} from "../services/apiService";
-import { X } from "lucide-react";
-import BillDropdown from "../components/Bills/BillDropdown";
+} from "@/services/apiService";
+import BillDropdown from "@/components/Bills/BillDropdown";
 
 const columns = [
   { key: "date", label: "Date", type: "date" },
@@ -530,25 +533,16 @@ const AddPackingInvoice = () => {
 
   const renderField = (col) => {
     if (col.type === "date") {
-      return (
-        <input
-          type="date"
-          value={form.date}
-          onChange={(e) => handleDateChange(e.target.value)}
-          className="w-full border border-gray-300 rounded-md px-3 py-2.5 text-md focus:outline-none focus:ring-1 focus:ring-gray-400 bg-white disabled:bg-gray-50 disabled:text-gray-400 disabled:cursor-not-allowed"
-        />
-      );
+      return <Input type="date" value={form.date} onChange={(e) => handleDateChange(e.target.value)} />;
     }
 
     if (col.type === "party-select") {
       return (
         <BillDropdown
-          label=""
           value={form.party}
           options={partyDropdownOptions}
-          placeholder="Select Party"
+          placeholder="Select party"
           onSelect={(opt) => handlePartySelect(opt.value)}
-          buttonClassName="w-full border border-gray-300 rounded-md px-3 py-2.5 text-md bg-white focus:outline-none focus:ring-1 focus:ring-gray-400 flex items-center justify-between"
           labelClassName="sr-only"
         />
       );
@@ -557,12 +551,10 @@ const AddPackingInvoice = () => {
     if (col.type === "item-select") {
       return (
         <BillDropdown
-          label=""
           value={form.itemName}
           options={itemDropdownOptions}
-          placeholder="Select Item"
+          placeholder="Select item"
           onSelect={(opt) => handleItemSelect(opt.value)}
-          buttonClassName="w-full border border-gray-300 rounded-md px-3 py-2.5 text-md bg-white focus:outline-none focus:ring-1 focus:ring-gray-400 flex items-center justify-between"
           labelClassName="sr-only"
         />
       );
@@ -571,12 +563,10 @@ const AddPackingInvoice = () => {
     if (col.type === "size-select") {
       return (
         <BillDropdown
-          label=""
           value={form.size}
           options={sizeDropdownOptions}
-          placeholder={form._itemId ? "Select Size" : "Select Item first"}
+          placeholder={form._itemId ? "Select size" : "Select item first"}
           onSelect={(opt) => handleSizeSelect(opt.value)}
-          buttonClassName="w-full border border-gray-300 rounded-md px-3 py-2.5 text-md bg-white focus:outline-none focus:ring-1 focus:ring-gray-400 flex items-center justify-between"
           labelClassName="sr-only"
         />
       );
@@ -585,12 +575,10 @@ const AddPackingInvoice = () => {
     if (col.type === "finish-select") {
       return (
         <BillDropdown
-          label=""
           value={form.finish}
           options={finishDropdownOptions}
-          placeholder={form._clientInventory ? "Select Finish" : "Select Party & Size first"}
+          placeholder={form._clientInventory ? "Select finish" : "Select party & size first"}
           onSelect={(opt) => handleFinishSelect(opt.value)}
-          buttonClassName="w-full border border-gray-300 rounded-md px-3 py-2.5 text-md bg-white focus:outline-none focus:ring-1 focus:ring-gray-400 flex items-center justify-between"
           labelClassName="sr-only"
         />
       );
@@ -598,76 +586,48 @@ const AddPackingInvoice = () => {
 
     const isAuto = col.type === "auto";
     return (
-      <input
+      <Input
         type={col.type === "number" || col.type === "auto" ? "number" : "text"}
         step={col.type === "number" || col.type === "auto" ? "any" : undefined}
         value={form[col.key] ?? ""}
         onChange={(e) => handleChange(col.key, e.target.value)}
         readOnly={isAuto}
-        className={`w-full border rounded-md px-3 py-2.5 text-md focus:outline-none focus:ring-1 focus:ring-gray-400 ${
-          isAuto
-            ? "border-gray-200 bg-gray-50 text-gray-500 cursor-not-allowed"
-            : "border-gray-300 bg-white"
-        }`}
+        className={cn("font-mono", isAuto && "cursor-not-allowed bg-surface-2 text-ink-2")}
       />
     );
   };
 
   return (
     <SidebarLayout>
-      <div className="mx-auto">
-        <PageHeader
-          title={isEditMode ? "Edit Packing Invoice" : "Add Packing Invoice"}
-          description="Fill all fields and save"
-          action={
-            <button
-              type="button"
-              onClick={() => navigate("/packing-invoice")}
-              className="inline-flex items-center justify-center w-9 h-9 rounded-full border border-gray-300 text-gray-600 hover:text-gray-900 hover:border-gray-400 hover:bg-gray-50 transition cursor-pointer"
-              aria-label="Close and go back to invoices"
-            >
-              <X className="w-4 h-4" />
-            </button>
-          }
-        />
+      <PageHeader
+        title={isEditMode ? "Edit packing invoice" : "Add packing invoice"}
+        subtitle="Fill all fields and save"
+        backTo="/packing-invoice"
+        backLabel="Packing invoices"
+      />
 
-        <div className="mt-6 bg-white rounded-lg border border-gray-200 p-5">
-          {loadingForm && (
-            <p className="text-sm text-gray-500 mb-4">
-              Loading invoice data...
-            </p>
-          )}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      <PageBody>
+        <Card className="gap-0 p-4 sm:p-5">
+          {loadingForm && <p className="mb-4 text-[13px] text-ink-3">Loading invoice data…</p>}
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
             {columns.map((col) => (
               <div key={col.key}>
-                <label className="block text-md font-medium text-black mb-2">
-                  {col.label}
-                </label>
+                <label className="mb-2 block text-[12.5px] font-medium text-ink-2">{col.label}</label>
                 {renderField(col)}
               </div>
             ))}
           </div>
 
-          <div className="mt-6 flex items-center justify-center gap-4">
-            <button
-              type="button"
-              onClick={handleSave}
-              disabled={saving}
-              className="px-10 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition text-sm disabled:opacity-60"
-            >
-              {saving ? "Saving..." : "Save"}
-            </button>
-            <button
-              type="button"
-              onClick={() => navigate("/packing-invoice")}
-              disabled={saving}
-              className="px-10 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition text-sm"
-            >
+          <div className="mt-6 flex items-center justify-center gap-3">
+            <Button onClick={handleSave} disabled={saving} className="px-10">
+              {saving ? "Saving…" : "Save"}
+            </Button>
+            <Button variant="outline" onClick={() => navigate("/packing-invoice")} disabled={saving} className="px-10">
               Cancel
-            </button>
+            </Button>
           </div>
-        </div>
-      </div>
+        </Card>
+      </PageBody>
     </SidebarLayout>
   );
 };

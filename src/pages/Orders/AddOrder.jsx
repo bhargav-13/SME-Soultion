@@ -1,9 +1,22 @@
-import React, { useCallback, useEffect, useRef, useState } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
-import SidebarLayout from "../../components/SidebarLayout";
-import { ChevronDown, X } from "lucide-react";
-import PageHeader from "../../components/PageHeader";
-import toast from "react-hot-toast";
+import { useCallback, useEffect, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
+import { Plus, X } from 'lucide-react';
+import toast from 'react-hot-toast';
+import SidebarLayout from '@/components/SidebarLayout';
+import { PageBody, PageHeader, Section } from '@/components/page-header';
+import { Field, FieldGrid } from '@/components/form-field';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { SearchableSelect } from '@/components/ui/searchable-select';
 import {
   itemBlueprintApi,
   sizeApi,
@@ -11,8 +24,8 @@ import {
   inventoryApi,
   itemApi,
   axiosInstance,
-} from "../../services/apiService";
-import { FINISH_LABELS } from "../../constants/finishes";
+} from '@/services/apiService';
+import { FINISH_LABELS } from '@/constants/finishes';
 
 // ─── Finish / Plating options ─────────────────────────────────────────────
 // Canonical list shared with the Stock Master finish columns and Job Work.
@@ -24,30 +37,28 @@ const createEmptyItem = () => ({
   selectedSize: null,
   sizes: [],
   sizesLoading: false,
-  qtyPc: "",
-  stickerQty: "",
-  finish: "",
-  rawPcPerBox: "",
-  rawBoxPerCartoon: "",
-  pcPerBox: "",
-  boxPerCartoon: "",
-  pcPerCartoon: "",
-  qtyKg: "",
+  qtyPc: '',
+  stickerQty: '',
+  finish: '',
+  rawPcPerBox: '',
+  rawBoxPerCartoon: '',
+  pcPerBox: '',
+  boxPerCartoon: '',
+  pcPerCartoon: '',
+  qtyKg: '',
   clientInventoryLoading: false,
   stockStatus: null,
   stockTotalPc: null,
   stockLowWarn: 0,
-  itemSearch: "",
-  itemDropdownOpen: false,
 });
 
 const computeStockStatus = (totalPc, lowWarn, orderedQty) => {
   if (totalPc === null) return null;
   const ordered = parseFloat(orderedQty) || 0;
-  if (totalPc <= 0) return "OUT_OF_STOCK";
-  if (ordered > totalPc) return "EXCEEDS";
-  if (lowWarn > 0 && totalPc <= lowWarn) return "LOW";
-  return "IN_STOCK";
+  if (totalPc <= 0) return 'OUT_OF_STOCK';
+  if (ordered > totalPc) return 'EXCEEDS';
+  if (lowWarn > 0 && totalPc <= lowWarn) return 'LOW';
+  return 'IN_STOCK';
 };
 
 // ─── Derive box / carton / kg from user's qtyPc input ────────────────────────
@@ -57,173 +68,35 @@ const computeStockStatus = (totalPc, lowWarn, orderedQty) => {
 // Qty Kg only needs qty + dozenWeight — it must not be wiped out just because
 // the pieces-per-box rate happens to be missing (that used to zero out qtyKg too).
 const computeDerived = (qtyPc, rawPcPerBox, rawBoxPerCartoon, dozenWeight) => {
-  const qty     = parseFloat(qtyPc)            || 0;
-  const pcRate  = parseFloat(rawPcPerBox)       || 0;
-  const boxRate = parseFloat(rawBoxPerCartoon)  || 0;
-  const dozWt   = parseFloat(dozenWeight)       || 0;
+  const qty = parseFloat(qtyPc) || 0;
+  const pcRate = parseFloat(rawPcPerBox) || 0;
+  const boxRate = parseFloat(rawBoxPerCartoon) || 0;
+  const dozWt = parseFloat(dozenWeight) || 0;
 
-  const kg = qty && dozWt ? ((dozWt / 12) * qty).toFixed(3) : "";
+  const kg = qty && dozWt ? ((dozWt / 12) * qty).toFixed(3) : '';
 
-  if (!qty || !pcRate) return { pcPerBox: "", boxPerCartoon: "", qtyKg: kg };
+  if (!qty || !pcRate) return { pcPerBox: '', boxPerCartoon: '', qtyKg: kg };
 
-  const boxes   = Math.ceil(qty / pcRate);
-  const cartons = boxRate ? Math.ceil(boxes / boxRate) : "";
+  const boxes = Math.ceil(qty / pcRate);
+  const cartons = boxRate ? Math.ceil(boxes / boxRate) : '';
 
   return {
-    pcPerBox:      String(boxes),
-    boxPerCartoon: cartons !== "" ? String(cartons) : "",
-    qtyKg:         kg,
+    pcPerBox: String(boxes),
+    boxPerCartoon: cartons !== '' ? String(cartons) : '',
+    qtyKg: kg,
   };
 };
 
-// ─── Searchable dropdown ───────────────────────────────────────────────────
-const SearchableDropdown = ({
-  id, placeholder, value, options, onSelect,
-  searchValue, onSearchChange, isOpen, onOpen, onClose,
-  loading = false, disabled = false, getLabel,
-}) => {
-  const ref = useRef(null);
-  useEffect(() => {
-    if (!isOpen) return;
-    const handler = (e) => {
-      if (ref.current && !ref.current.contains(e.target)) onClose();
-    };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, [isOpen, onClose]);
-
-  return (
-    <div ref={ref} className="relative">
-      <div
-        className={`flex items-center border rounded-md overflow-hidden transition
-          ${disabled ? "border-gray-200 bg-gray-50 cursor-not-allowed" : "border-gray-300 bg-white hover:border-gray-400"}
-          ${isOpen ? "ring-1 ring-gray-400 border-gray-400" : ""}
-        `}
-      >
-        <input
-          id={id}
-          type="text"
-          value={isOpen ? searchValue : (value ? getLabel(value) : "")}
-          onChange={(e) => onSearchChange(e.target.value)}
-          onClick={() => !disabled && onOpen()}
-          placeholder={placeholder}
-          disabled={disabled}
-          readOnly={!isOpen}
-          className="flex-1 px-3 py-2.5 text-md focus:outline-none bg-transparent text-gray-800 placeholder-gray-400 disabled:cursor-not-allowed"
-        />
-        <ChevronDown
-          onClick={() => !disabled && (isOpen ? onClose() : onOpen())}
-          className={`w-4 h-4 text-gray-400 mr-2 shrink-0 transition-transform ${isOpen ? "rotate-180" : ""} ${disabled ? "opacity-40" : "cursor-pointer"}`}
-        />
-      </div>
-      {isOpen && (
-        <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-52 overflow-y-auto">
-          {loading ? (
-            <div className="px-3 py-3 text-sm text-gray-400">Loading…</div>
-          ) : options.length === 0 ? (
-            <div className="px-3 py-3 text-sm text-gray-400">No options found.</div>
-          ) : (
-            options.map((opt, i) => (
-              <button
-                key={i}
-                type="button"
-                onMouseDown={(e) => { e.preventDefault(); onSelect(opt); }}
-                className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 text-gray-700"
-              >
-                {getLabel(opt)}
-              </button>
-            ))
-          )}
-        </div>
-      )}
-    </div>
-  );
+const STOCK_BADGE = {
+  IN_STOCK: { variant: 'success', text: (pc) => `In stock (${pc} pc)` },
+  LOW: { variant: 'warning', text: (pc) => `Low stock (${pc} pc)` },
+  EXCEEDS: { variant: 'brass', text: (pc) => `Exceeds stock (only ${pc} pc available)` },
+  OUT_OF_STOCK: { variant: 'danger', text: () => 'Out of stock' },
 };
 
-const ButtonDropdown = ({
-  value,
-  placeholder,
-  options,
-  onSelect,
-  disabled = false,
-  loading = false,
-}) => {
-  const [open, setOpen] = useState(false);
-  const ref = useRef(null);
-  const selectedOption = options.find((opt) => String(opt.value) === String(value));
-
-  useEffect(() => {
-    if (disabled) setOpen(false);
-  }, [disabled]);
-
-  useEffect(() => {
-    if (!open) return;
-    const handler = (e) => {
-      if (ref.current && !ref.current.contains(e.target)) {
-        setOpen(false);
-      }
-    };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, [open]);
-
-  return (
-    <div ref={ref} className="relative">
-      <button
-        type="button"
-        disabled={disabled}
-        onClick={() => !disabled && setOpen((prev) => !prev)}
-        className={`w-full border border-gray-300 rounded-md px-3 py-2.5 text-md bg-white focus:outline-none focus:ring-1 focus:ring-gray-400 flex items-center justify-between ${
-          disabled ? "bg-gray-50 text-gray-500 cursor-not-allowed" : ""
-        }`}
-      >
-        <span className={selectedOption ? "text-black" : "text-gray-500"}>
-          {selectedOption?.label || placeholder}
-        </span>
-        <ChevronDown className={`w-4 h-4 text-gray-500 transition-transform ${open ? "rotate-180" : ""}`} />
-      </button>
-
-      {open && !disabled && (
-        <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-52 overflow-y-auto">
-          {loading ? (
-            <div className="px-3 py-3 text-sm text-gray-400">Loading…</div>
-          ) : options.length === 0 ? (
-            <div className="px-3 py-3 text-sm text-gray-400">No options found.</div>
-          ) : (
-            options.map((opt) => (
-              <button
-                key={opt.value}
-                type="button"
-                onMouseDown={(e) => {
-                  e.preventDefault();
-                  setOpen(false);
-                  onSelect(opt);
-                }}
-                className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-50 text-gray-700 ${
-                  String(opt.value) === String(value) ? "font-medium bg-gray-50" : ""
-                }`}
-              >
-                {opt.label}
-              </button>
-            ))
-          )}
-        </div>
-      )}
-    </div>
-  );
-};
-
-const Label = ({ children }) => (
-  <label className="block text-md font-medium text-black mb-2">{children}</label>
-);
-
+// A read-only, auto-computed field.
 const AutoInput = ({ value, loading }) => (
-  <input
-    readOnly
-    value={value ?? ""}
-    placeholder={loading ? "Loading…" : "Auto"}
-    className="w-full border border-gray-200 bg-gray-50 rounded-md px-3 py-2.5 text-md text-gray-600 cursor-default"
-  />
+  <Input readOnly value={value ?? ''} placeholder={loading ? 'Loading…' : 'Auto'} className="bg-surface-2 font-mono" />
 );
 
 // ─── Main Component ────────────────────────────────────────────────────────
@@ -232,7 +105,7 @@ const AddOrder = () => {
   const location = useLocation();
   const selectedParty = location.state?.selectedParty || null;
 
-  const [poDate, setPoDate] = useState("");
+  const [poDate, setPoDate] = useState('');
   const [items, setItems] = useState([createEmptyItem()]);
   const [saving, setSaving] = useState(false);
   const [allItems, setAllItems] = useState([]);
@@ -240,15 +113,17 @@ const AddOrder = () => {
   const [allStockEntries, setAllStockEntries] = useState([]);
 
   useEffect(() => {
-    itemBlueprintApi.getAllItems()
+    itemBlueprintApi
+      .getAllItems()
       .then((res) => setAllItems(Array.isArray(res.data) ? res.data : []))
-      .catch(() => toast.error("Failed to load items"))
+      .catch(() => toast.error('Failed to load items'))
       .finally(() => setItemsLoading(false));
     setItemsLoading(true);
   }, []);
 
   useEffect(() => {
-    itemApi.getAllItems(undefined, undefined, 0, 1000)
+    itemApi
+      .getAllItems(undefined, undefined, 0, 1000)
       .then((res) => {
         const data = res.data?.data || res.data || [];
         setAllStockEntries(Array.isArray(data) ? data : []);
@@ -261,128 +136,144 @@ const AddOrder = () => {
   }, []);
 
   // Step 1: item selected → load sizes
-  const handleSelectItem = useCallback(async (index, blueprint) => {
-    updateItem(index, {
-      selectedItem: blueprint,
-      selectedSize: null,
-      sizes: [], sizesLoading: true,
-      pcPerBox: "", boxPerCartoon: "", pcPerCartoon: "", qtyKg: "",
-      itemSearch: "", itemDropdownOpen: false,
-    });
-    try {
-      const res = await sizeApi.getSizesByItemId(blueprint.id);
-      updateItem(index, { sizes: Array.isArray(res.data) ? res.data : [], sizesLoading: false });
-    } catch {
-      toast.error("Failed to load sizes");
-      updateItem(index, { sizesLoading: false });
-    }
-  }, [updateItem]);
+  const handleSelectItem = useCallback(
+    async (index, blueprint) => {
+      updateItem(index, {
+        selectedItem: blueprint,
+        selectedSize: null,
+        sizes: [],
+        sizesLoading: true,
+        pcPerBox: '',
+        boxPerCartoon: '',
+        pcPerCartoon: '',
+        qtyKg: '',
+      });
+      try {
+        const res = await sizeApi.getSizesByItemId(blueprint.id);
+        updateItem(index, { sizes: Array.isArray(res.data) ? res.data : [], sizesLoading: false });
+      } catch {
+        toast.error('Failed to load sizes');
+        updateItem(index, { sizesLoading: false });
+      }
+    },
+    [updateItem],
+  );
 
   // Step 2: size selected → auto-fill from client inventory, falling back to the
   // main Item Master inventory (same data Masters > Item manages) when the
   // client has no size-specific override — otherwise most orders end up with
   // blank Qty Kg / Pc-Box / Box-Cartoon / Sticker Qty since client_inventory
   // overrides are rarely set up.
-  const handleSelectSize = useCallback(async (index, size, currentQtyPc = "", blueprintId) => {
-    updateItem(index, {
-      selectedSize: size,
-      clientInventoryLoading: true,
-      pcPerBox: "", boxPerCartoon: "", pcPerCartoon: "", qtyKg: "",
-    });
-
-    try {
-      const [clientRes, masterRes] = await Promise.allSettled([
-        selectedParty?.id
-          ? clientInventoryApi.getInventoryByClient(selectedParty.id, size.id)
-          : Promise.resolve(null),
-        blueprintId
-          ? inventoryApi.getAllInventory(blueprintId, undefined, size.sizeInInch, size.sizeInMm)
-          : Promise.resolve(null),
-      ]);
-
-      const extractList = (res) => {
-        if (res.status !== "fulfilled" || !res.value) return [];
-        const data = res.value.data;
-        return Array.isArray(data) ? data : (data?.data ?? []);
-      };
-      const clientEntry = extractList(clientRes)[0] ?? null;
-      const masterEntry = extractList(masterRes)[0] ?? null;
-
-      const pick = (field) =>
-        clientEntry?.[field] != null
-          ? String(clientEntry[field])
-          : masterEntry?.[field] != null
-            ? String(masterEntry[field])
-            : "";
-
-      const rawPcPerBox      = pick("pcsPerBox");
-      const rawBoxPerCartoon = pick("boxPerCarton");
-      const derived = computeDerived(
-        currentQtyPc,
-        rawPcPerBox,
-        rawBoxPerCartoon,
-        size.dozenWeight
-      );
-      const stockEntry = allStockEntries.find((st) => Number(st.sizeId) === Number(size.id));
-      let stockTotalPc = null;
-      let stockLowWarn = 0;
-      if (stockEntry) {
-        stockTotalPc = parseFloat(stockEntry.totalPc) || 0;
-        stockLowWarn = parseFloat(stockEntry.lowStockWarning) || 0;
-      }
-      const stockStatus = computeStockStatus(stockTotalPc, stockLowWarn, currentQtyPc);
-
+  const handleSelectSize = useCallback(
+    async (index, size, currentQtyPc = '', blueprintId) => {
       updateItem(index, {
-        clientInventoryLoading: false,
-        rawPcPerBox,
-        rawBoxPerCartoon,
-        pcPerCartoon: pick("pcsPerCarton"),
-        ...derived,
-        stickerQty: derived.pcPerBox,
-        stockStatus,
-        stockTotalPc,
-        stockLowWarn,
+        selectedSize: size,
+        clientInventoryLoading: true,
+        pcPerBox: '',
+        boxPerCartoon: '',
+        pcPerCartoon: '',
+        qtyKg: '',
       });
-    } catch {
-      updateItem(index, { clientInventoryLoading: false });
-    }
-  }, [selectedParty, updateItem, allStockEntries]);
+
+      try {
+        const [clientRes, masterRes] = await Promise.allSettled([
+          selectedParty?.id
+            ? clientInventoryApi.getInventoryByClient(selectedParty.id, size.id)
+            : Promise.resolve(null),
+          blueprintId
+            ? inventoryApi.getAllInventory(blueprintId, undefined, size.sizeInInch, size.sizeInMm)
+            : Promise.resolve(null),
+        ]);
+
+        const extractList = (res) => {
+          if (res.status !== 'fulfilled' || !res.value) return [];
+          const data = res.value.data;
+          return Array.isArray(data) ? data : (data?.data ?? []);
+        };
+        const clientEntry = extractList(clientRes)[0] ?? null;
+        const masterEntry = extractList(masterRes)[0] ?? null;
+
+        const pick = (field) =>
+          clientEntry?.[field] != null
+            ? String(clientEntry[field])
+            : masterEntry?.[field] != null
+              ? String(masterEntry[field])
+              : '';
+
+        const rawPcPerBox = pick('pcsPerBox');
+        const rawBoxPerCartoon = pick('boxPerCarton');
+        const derived = computeDerived(currentQtyPc, rawPcPerBox, rawBoxPerCartoon, size.dozenWeight);
+        const stockEntry = allStockEntries.find((st) => Number(st.sizeId) === Number(size.id));
+        let stockTotalPc = null;
+        let stockLowWarn = 0;
+        if (stockEntry) {
+          stockTotalPc = parseFloat(stockEntry.totalPc) || 0;
+          stockLowWarn = parseFloat(stockEntry.lowStockWarning) || 0;
+        }
+        const stockStatus = computeStockStatus(stockTotalPc, stockLowWarn, currentQtyPc);
+
+        updateItem(index, {
+          clientInventoryLoading: false,
+          rawPcPerBox,
+          rawBoxPerCartoon,
+          pcPerCartoon: pick('pcsPerCarton'),
+          ...derived,
+          stickerQty: derived.pcPerBox,
+          stockStatus,
+          stockTotalPc,
+          stockLowWarn,
+        });
+      } catch {
+        updateItem(index, { clientInventoryLoading: false });
+      }
+    },
+    [selectedParty, updateItem, allStockEntries],
+  );
 
   const addItem = () => setItems((prev) => [...prev, createEmptyItem()]);
   const removeItem = (idx) =>
-    setItems((prev) => prev.length === 1 ? prev : prev.filter((_, i) => i !== idx));
+    setItems((prev) => (prev.length === 1 ? prev : prev.filter((_, i) => i !== idx)));
 
   const handleSave = async () => {
-    if (!selectedParty?.id) { toast.error("No party selected"); return; }
-    if (!poDate) { toast.error("P/O Date is required"); return; }
+    if (!selectedParty?.id) {
+      toast.error('No party selected');
+      return;
+    }
+    if (!poDate) {
+      toast.error('P/O Date is required');
+      return;
+    }
     const validItems = items.filter((it) => it.selectedSize);
-    if (validItems.length === 0) { toast.error("Select at least one size"); return; }
+    if (validItems.length === 0) {
+      toast.error('Select at least one size');
+      return;
+    }
 
     setSaving(true);
     try {
       const payload = {
         orderDate: poDate,
         items: validItems.map((it) => ({
-          itemSizeId:    it.selectedSize.id,
-          plating:       it.finish || null,
-          qtyPc:         parseInt(it.qtyPc, 10) || 0,
-          qtyKg:         it.qtyKg         !== "" ? parseFloat(it.qtyKg)           : null,
-          pcPerBox:      it.pcPerBox       !== "" ? parseInt(it.pcPerBox, 10)      : null,
-          boxPerCartoon: it.boxPerCartoon  !== "" ? parseInt(it.boxPerCartoon, 10) : null,
-          pcPerCartoon:  it.pcPerCartoon   !== "" ? parseInt(it.pcPerCartoon, 10)  : null,
-          stickerQty:    it.stickerQty     !== "" ? parseInt(it.stickerQty, 10)    : null,
-          pendingPc:     null,
+          itemSizeId: it.selectedSize.id,
+          plating: it.finish || null,
+          qtyPc: parseInt(it.qtyPc, 10) || 0,
+          qtyKg: it.qtyKg !== '' ? parseFloat(it.qtyKg) : null,
+          pcPerBox: it.pcPerBox !== '' ? parseInt(it.pcPerBox, 10) : null,
+          boxPerCartoon: it.boxPerCartoon !== '' ? parseInt(it.boxPerCartoon, 10) : null,
+          pcPerCartoon: it.pcPerCartoon !== '' ? parseInt(it.pcPerCartoon, 10) : null,
+          stickerQty: it.stickerQty !== '' ? parseInt(it.stickerQty, 10) : null,
+          pendingPc: null,
           jobActionDone: null,
-          platingType:   null,
-          jobWorkNo:     null,
+          platingType: null,
+          jobWorkNo: null,
         })),
       };
 
       await axiosInstance.post(`/api/v1/parties/${selectedParty.id}/orders`, payload);
-      toast.success("Order placed successfully!");
-      navigate("/order");
+      toast.success('Order placed successfully!');
+      navigate('/order');
     } catch (err) {
-      toast.error(err?.response?.data?.message || "Failed to place order");
+      toast.error(err?.response?.data?.message || 'Failed to place order');
     } finally {
       setSaving(false);
     }
@@ -390,245 +281,184 @@ const AddOrder = () => {
 
   return (
     <SidebarLayout>
-      <div className="mx-auto space-y-6">
+      <PageHeader title="Add order" subtitle="Place a new order for the selected party" backTo="/order" backLabel="Orders" />
 
-        {/* Header */}
-        <div className="bg-white rounded-lg border border-gray-200 p-6">
-          <div className="mb-6">
-            <PageHeader
-              title="Add New Order"
-              action={
-                <button
-                  type="button"
-                  onClick={() => navigate("/order")}
-                  className="inline-flex items-center justify-center w-9 h-9 rounded-full border border-gray-300 text-gray-600 hover:text-gray-900 hover:border-gray-400 hover:bg-gray-50 transition"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              }
-            />
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-            <div>
-              <Label>Party Name</Label>
-              <input
-                readOnly
-                value={selectedParty?.name || ""}
-                className="w-full border border-gray-200 bg-gray-50 rounded-md px-3 py-2.5 text-md text-gray-700 cursor-default"
-              />
+      <PageBody className="space-y-6">
+        {/* Order header */}
+        <Card className="gap-0 p-4 sm:p-5">
+          <FieldGrid columns={2}>
+            <Field label="Party name">
+              <Input readOnly value={selectedParty?.name || ''} className="bg-surface-2" />
+            </Field>
+            <Field label="P/O date" htmlFor="po-date" required>
+              <Input id="po-date" type="date" value={poDate} onChange={(e) => setPoDate(e.target.value)} />
+            </Field>
+          </FieldGrid>
+        </Card>
+
+        <Section
+          title="Item details"
+          actions={
+            <Button size="sm" onClick={addItem}>
+              <Plus className="size-4" />
+              Add item
+            </Button>
+          }
+        >
+          <Card className="gap-0 p-4 sm:p-5">
+            <div className="space-y-6">
+              {items.map((item, index) => {
+                const itemOptions = allItems.map((bp) => ({ value: String(bp.id), label: bp.itemName }));
+                const sizeOptions = item.sizes.map((sz) => ({
+                  value: String(sz.id),
+                  label: `${sz.sizeInInch}${sz.sizeInMm ? ` (${sz.sizeInMm})` : ''}`,
+                }));
+                const badge = item.stockStatus ? STOCK_BADGE[item.stockStatus] : null;
+
+                return (
+                  <div key={index} className={index > 0 ? 'border-t border-line pt-6' : ''}>
+                    <div className="mb-4 flex items-center justify-between">
+                      <h3 className="text-[13.5px] font-semibold text-ink">Item {index + 1}</h3>
+                      <Button
+                        variant="ghost"
+                        size="icon-sm"
+                        onClick={() => removeItem(index)}
+                        disabled={items.length === 1}
+                        aria-label={`Remove item ${index + 1}`}
+                        className="text-danger hover:text-danger"
+                      >
+                        <X className="size-4" />
+                      </Button>
+                    </div>
+
+                    <FieldGrid columns={2}>
+                      <Field label="Item name">
+                        <SearchableSelect
+                          ariaLabel="Item name"
+                          placeholder={itemsLoading ? 'Loading…' : 'Search & select item…'}
+                          searchPlaceholder="Search item…"
+                          options={itemOptions}
+                          value={item.selectedItem ? String(item.selectedItem.id) : undefined}
+                          onChange={(v) => {
+                            const bp = allItems.find((b) => String(b.id) === v);
+                            if (bp) handleSelectItem(index, bp);
+                          }}
+                        />
+                      </Field>
+
+                      <Field
+                        label="Size"
+                        hint={item.sizesLoading ? 'Loading sizes…' : undefined}
+                      >
+                        <SearchableSelect
+                          ariaLabel="Size"
+                          placeholder={
+                            !item.selectedItem
+                              ? 'Select item first'
+                              : item.sizesLoading
+                                ? 'Loading…'
+                                : 'Select size…'
+                          }
+                          searchPlaceholder="Search size…"
+                          options={sizeOptions}
+                          value={item.selectedSize ? String(item.selectedSize.id) : undefined}
+                          disabled={!item.selectedItem || item.sizesLoading}
+                          onChange={(v) => {
+                            const sz = item.sizes.find((s) => String(s.id) === v);
+                            if (sz) handleSelectSize(index, sz, item.qtyPc, item.selectedItem?.id);
+                          }}
+                        />
+                        {item.selectedSize && (
+                          <div className="mt-1.5">
+                            {badge ? (
+                              <Badge variant={badge.variant}>{badge.text(item.stockTotalPc)}</Badge>
+                            ) : (
+                              <Badge variant="muted">Stock not added</Badge>
+                            )}
+                          </div>
+                        )}
+                      </Field>
+
+                      <Field label="Pcs.">
+                        <Input
+                          type="number"
+                          min="0"
+                          value={item.qtyPc}
+                          onChange={(e) => {
+                            const qtyPc = e.target.value;
+                            const derived = computeDerived(
+                              qtyPc,
+                              item.rawPcPerBox,
+                              item.rawBoxPerCartoon,
+                              item.selectedSize?.dozenWeight,
+                            );
+                            updateItem(index, {
+                              qtyPc,
+                              ...derived,
+                              stickerQty: derived.pcPerBox,
+                              stockStatus: computeStockStatus(item.stockTotalPc, item.stockLowWarn, qtyPc),
+                            });
+                          }}
+                          placeholder="Enter Pc."
+                        />
+                      </Field>
+
+                      <Field label="Sticker qty">
+                        <Input
+                          type="number"
+                          min="0"
+                          value={item.stickerQty}
+                          onChange={(e) => updateItem(index, { stickerQty: e.target.value })}
+                          placeholder="Enter sticker quantity"
+                        />
+                      </Field>
+
+                      <Field label="Finish">
+                        <Select
+                          value={item.finish || undefined}
+                          onValueChange={(v) => updateItem(index, { finish: v })}
+                        >
+                          <SelectTrigger className="w-full">
+                            <SelectValue placeholder="Select finish…" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {FINISH_OPTIONS.map((f) => (
+                              <SelectItem key={f} value={f}>
+                                {f}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </Field>
+
+                      <Field label="Box qty.">
+                        <AutoInput value={item.pcPerBox} loading={item.clientInventoryLoading} />
+                      </Field>
+
+                      <Field label="Cartoon">
+                        <AutoInput value={item.boxPerCartoon} loading={item.clientInventoryLoading} />
+                      </Field>
+
+                      <Field label="Qty Kg">
+                        <AutoInput value={item.qtyKg} loading={item.clientInventoryLoading} />
+                      </Field>
+                    </FieldGrid>
+                  </div>
+                );
+              })}
             </div>
-            <div>
-              <Label>P/O Date <span className="text-red-400 text-sm">*</span></Label>
-              <input
-                type="date"
-                value={poDate}
-                onChange={(e) => setPoDate(e.target.value)}
-                className="w-full border border-gray-300 rounded-md px-3 py-2.5 text-md focus:outline-none focus:ring-1 focus:ring-gray-400"
-              />
-            </div>
-          </div>
+          </Card>
+        </Section>
+
+        <div className="flex items-center justify-center gap-3">
+          <Button onClick={handleSave} disabled={saving} className="px-10">
+            {saving ? 'Saving…' : 'Save'}
+          </Button>
+          <Button variant="outline" onClick={() => navigate('/order/select')} disabled={saving} className="px-10">
+            Cancel
+          </Button>
         </div>
-
-        {/* Item details header */}
-        <div className="flex items-center justify-between">
-          <PageHeader title="Item Details" />
-          <button
-            type="button"
-            onClick={addItem}
-            className="inline-flex items-center gap-2 bg-gray-900 text-white px-3 py-2 rounded-lg hover:bg-gray-800 transition text-sm"
-          >
-            Add Item +
-          </button>
-        </div>
-
-        {/* Items */}
-        <div className="bg-white rounded-lg border border-gray-200 p-6 space-y-8">
-          {items.map((item, index) => {
-            const filtered = allItems.filter((bp) =>
-              (bp.itemName || "").toLowerCase().includes((item.itemSearch || "").toLowerCase())
-            );
-
-            return (
-              <div key={index}>
-                {/* Row header */}
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-md font-medium text-black">Item {index + 1}</h3>
-                  <button
-                    type="button"
-                    onClick={() => removeItem(index)}
-                    disabled={items.length === 1}
-                    className="text-red-500 hover:text-red-600 disabled:text-gray-300 disabled:cursor-not-allowed"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-
-                  {/* Item Name */}
-                  <div>
-                    <Label>Item Name</Label>
-                    <SearchableDropdown
-                      id={`item-${index}`}
-                      placeholder="Search & select item…"
-                      value={item.selectedItem}
-                      options={filtered}
-                      getLabel={(opt) => opt.itemName}
-                      searchValue={item.itemSearch}
-                      onSearchChange={(v) => updateItem(index, { itemSearch: v, itemDropdownOpen: true })}
-                      isOpen={item.itemDropdownOpen}
-                      onOpen={() => updateItem(index, { itemDropdownOpen: true, itemSearch: "" })}
-                      onClose={() => updateItem(index, { itemDropdownOpen: false, itemSearch: "" })}
-                      loading={itemsLoading}
-                      onSelect={(opt) => handleSelectItem(index, opt)}
-                    />
-                  </div>
-
-                  {/* Size */}
-                  <div>
-                    <Label>
-                      Size
-                      {item.sizesLoading && <span className="text-xs text-gray-400 ml-1 font-normal">Loading…</span>}
-                    </Label>
-                    <ButtonDropdown
-                      value={item.selectedSize?.id ?? ""}
-                      placeholder={
-                        !item.selectedItem ? "Select item first" : item.sizesLoading ? "Loading…" : "Select size…"
-                      }
-                      options={item.sizes.map((sz) => ({
-                        value: sz.id,
-                        label: `${sz.sizeInInch}${sz.sizeInMm ? ` (${sz.sizeInMm})` : ""}`,
-                        raw: sz,
-                      }))}
-                      disabled={!item.selectedItem || item.sizesLoading}
-                      loading={item.sizesLoading}
-                      onSelect={(opt) => handleSelectSize(index, opt.raw, item.qtyPc, item.selectedItem?.id)}
-                    />
-                    {item.selectedSize && (
-                      <span className={`mt-1.5 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${
-                        !item.stockStatus
-                          ? "bg-gray-50 text-gray-500 border-gray-200"
-                          : item.stockStatus === "IN_STOCK"
-                          ? "bg-emerald-50 text-emerald-700 border-emerald-200"
-                          : item.stockStatus === "LOW"
-                          ? "bg-yellow-50 text-yellow-700 border-yellow-200"
-                          : item.stockStatus === "EXCEEDS"
-                          ? "bg-orange-50 text-orange-700 border-orange-200"
-                          : "bg-red-50 text-red-700 border-red-200"
-                      }`}>
-                        {!item.stockStatus
-                          ? "Stock not added"
-                          : item.stockStatus === "IN_STOCK"
-                          ? `In Stock (${item.stockTotalPc} pc)`
-                          : item.stockStatus === "LOW"
-                          ? `Low Stock (${item.stockTotalPc} pc)`
-                          : item.stockStatus === "EXCEEDS"
-                          ? `Exceeds Stock (only ${item.stockTotalPc} pc available)`
-                          : "Out of Stock"}
-                      </span>
-                    )}
-                  </div>
-
-                  {/* Pcs */}
-                  <div>
-                    <Label>Pcs.</Label>
-                    <input
-                      type="number"
-                      min="0"
-                      value={item.qtyPc}
-                      onChange={(e) => {
-                        const qtyPc = e.target.value;
-                        const derived = computeDerived(
-                          qtyPc,
-                          item.rawPcPerBox,
-                          item.rawBoxPerCartoon,
-                          item.selectedSize?.dozenWeight
-                        );
-                        updateItem(index, {
-                          qtyPc,
-                          ...derived,
-                          stickerQty: derived.pcPerBox,
-                          stockStatus: computeStockStatus(item.stockTotalPc, item.stockLowWarn, qtyPc),
-                        });
-                      }}
-                      placeholder="Enter Pc."
-                      className="w-full border border-gray-300 rounded-md px-3 py-2.5 text-md focus:outline-none focus:ring-1 focus:ring-gray-400"
-                    />
-                  </div>
-
-                  {/* Sticker Qty */}
-                  <div>
-                    <Label>Sticker Qty</Label>
-                    <input
-                      type="number"
-                      min="0"
-                      value={item.stickerQty}
-                      onChange={(e) => updateItem(index, { stickerQty: e.target.value })}
-                      placeholder="Enter sticker quantity"
-                      className="w-full border border-gray-300 rounded-md px-3 py-2.5 text-md focus:outline-none focus:ring-1 focus:ring-gray-400"
-                    />
-                  </div>
-
-                  {/* Finish */}
-                  <div>
-                    <Label>Finish</Label>
-                    <ButtonDropdown
-                      value={item.finish}
-                      placeholder="Select finish…"
-                      options={FINISH_OPTIONS.map((f) => ({
-                        value: f,
-                        label: f,
-                      }))}
-                      onSelect={(opt) => updateItem(index, { finish: opt.value })}
-                    />
-                  </div>
-
-                  {/* Box Pc — auto */}
-                  <div>
-                    <Label>Box Qty.</Label>
-                    <AutoInput value={item.pcPerBox} loading={item.clientInventoryLoading} />
-                  </div>
-
-                  {/* Cartoon — auto */}
-                  <div>
-                    <Label>Cartoon</Label>
-                    <AutoInput value={item.boxPerCartoon} loading={item.clientInventoryLoading} />
-                  </div>
-
-                  {/* Qty Kg — auto */}
-                  <div>
-                    <Label>Qty Kg</Label>
-                    <AutoInput value={item.qtyKg} loading={item.clientInventoryLoading} />
-                  </div>
-
-                </div>
-
-                {index < items.length - 1 && <hr className="mt-6 border-gray-100" />}
-              </div>
-            );
-          })}
-
-          {/* Actions */}
-          <div className="flex items-center justify-center gap-4 pt-2">
-            <button
-              type="button"
-              onClick={handleSave}
-              disabled={saving}
-              className="px-10 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition text-sm disabled:opacity-60 disabled:cursor-not-allowed"
-            >
-              {saving ? "Saving…" : "Save"}
-            </button>
-            <button
-              type="button"
-              onClick={() => navigate("/order/select")}
-              disabled={saving}
-              className="px-10 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition text-sm"
-            >
-              Cancel
-            </button>
-          </div>
-        </div>
-      </div>
+      </PageBody>
     </SidebarLayout>
   );
 };

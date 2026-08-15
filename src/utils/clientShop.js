@@ -29,17 +29,19 @@ export const FINISH_OPTIONS = [
 // The statuses below name the actual stage an order sits at in the works, so
 // the client sees "In Plating" / "Ready to Dispatch" rather than a catch-all
 // "In Progress". See deriveErpOrderStatus for how a stage is worked out.
+// `className` is a pair of design-token utilities rather than raw palette classes, so a status
+// pill reads the same here as every other badge in the console.
 export const ORDER_STATUS = {
-  PENDING_APPROVAL: { label: "Pending Approval", className: "bg-yellow-100 text-yellow-800" },
-  APPROVED: { label: "Approved", className: "bg-blue-100 text-blue-800" },
-  IN_PLATING: { label: "In Plating", className: "bg-indigo-100 text-indigo-800" },
-  READY_TO_DISPATCH: { label: "Ready to Dispatch", className: "bg-teal-100 text-teal-800" },
-  DISPATCHED: { label: "Dispatched", className: "bg-purple-100 text-purple-800" },
-  COMPLETED: { label: "Completed", className: "bg-green-100 text-green-800" },
-  REJECTED: { label: "Rejected", className: "bg-red-100 text-red-800" },
+  PENDING_APPROVAL: { label: "Pending Approval", className: "bg-warning-soft text-warning" },
+  APPROVED: { label: "Approved", className: "bg-info-soft text-info" },
+  IN_PLATING: { label: "In Plating", className: "bg-primary-soft text-primary" },
+  READY_TO_DISPATCH: { label: "Ready to Dispatch", className: "bg-brass-soft text-brass" },
+  DISPATCHED: { label: "Dispatched", className: "bg-info-soft text-info" },
+  COMPLETED: { label: "Completed", className: "bg-success-soft text-success" },
+  REJECTED: { label: "Rejected", className: "bg-danger-soft text-danger" },
   // No order is *derived* as IN_PROGRESS any more, but an admin can still set a
   // request to it by hand, so it stays renderable (and off the filter tabs).
-  IN_PROGRESS: { label: "In Progress", className: "bg-indigo-100 text-indigo-800" },
+  IN_PROGRESS: { label: "In Progress", className: "bg-primary-soft text-primary" },
 };
 
 /**
@@ -125,10 +127,10 @@ export const formatStageQty = (qty) => {
 
 /** Per-line stage the server reports on an order request item. */
 export const ITEM_STAGE = {
-  APPROVED: { label: "Not started", className: "bg-gray-100 text-gray-700" },
-  IN_PLATING: { label: "In Plating", className: "bg-indigo-100 text-indigo-800" },
-  READY_TO_DISPATCH: { label: "Ready to Dispatch", className: "bg-teal-100 text-teal-800" },
-  DISPATCHED: { label: "Dispatched", className: "bg-purple-100 text-purple-800" },
+  APPROVED: { label: "Not started", className: "bg-surface-2 text-ink-3" },
+  IN_PLATING: { label: "In Plating", className: "bg-primary-soft text-primary" },
+  READY_TO_DISPATCH: { label: "Ready to Dispatch", className: "bg-brass-soft text-brass" },
+  DISPATCHED: { label: "Dispatched", className: "bg-info-soft text-info" },
 };
 
 /** Kg values come back as doubles; show at most 2 decimals and drop trailing zeros. */

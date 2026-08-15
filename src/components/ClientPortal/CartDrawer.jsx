@@ -1,89 +1,84 @@
-import React from "react";
-import { X, Trash2, ShoppingCart } from "lucide-react";
+import { ShoppingCart, Trash2 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 
+/**
+ * The order cart the client builds before submitting a request. A right-side sheet so the catalogue
+ * stays visible behind it on a desktop, and a near-full-width panel on a phone.
+ */
 const CartDrawer = ({ isOpen, onClose, cart, onRemove, onSubmit, submitting }) => {
-  if (!isOpen) return null;
-
   const totalPc = cart.reduce((sum, item) => sum + (Number(item.qtyPc) || 0), 0);
 
   return (
-    <>
-      {/* Overlay */}
-      <div className="fixed inset-0 bg-black/20 z-40" onClick={onClose} />
+    <Sheet open={isOpen} onOpenChange={(open) => !open && onClose()}>
+      <SheetContent className="w-full gap-0 p-0 sm:max-w-md">
+        <SheetHeader className="border-b border-line px-4 py-4 sm:px-6">
+          <SheetTitle className="flex items-center gap-2 font-heading text-[16px] text-ink">
+            <ShoppingCart className="size-5 text-ink-2" />
+            Order cart
+          </SheetTitle>
+        </SheetHeader>
 
-      {/* Drawer */}
-      <div className="fixed top-0 right-0 h-full w-full max-w-md bg-white shadow-xl z-50 flex flex-col">
-        <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-            <ShoppingCart className="w-5 h-5" />
-            Order Cart
-          </h2>
-          <button onClick={onClose} className="text-gray-500 hover:text-gray-700 transition">
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-
-        <div className="flex-1 overflow-y-auto px-6 py-4">
+        <div className="flex-1 overflow-y-auto px-4 py-4 sm:px-6">
           {cart.length === 0 ? (
-            <div className="text-center text-gray-500 py-12">
-              <ShoppingCart className="w-10 h-10 mx-auto mb-3 text-gray-300" />
-              Your cart is empty.
-              <p className="text-sm mt-1">Browse products and add items to request an order.</p>
+            <div className="flex flex-col items-center gap-2 py-12 text-center text-ink-3">
+              <ShoppingCart className="size-10 text-line" />
+              <p className="text-[13.5px] font-medium text-ink-2">Your cart is empty.</p>
+              <p className="text-[12.5px]">Browse products and add items to request an order.</p>
             </div>
           ) : (
             <div className="space-y-3">
               {cart.map((item) => (
                 <div
                   key={item.cartId}
-                  className="border border-gray-200 rounded-lg p-3 flex items-start justify-between gap-3"
+                  className="flex items-start justify-between gap-3 rounded-lg border border-line bg-surface p-3"
                 >
-                  <div>
-                    <p className="text-sm font-semibold text-gray-900">{item.itemName}</p>
-                    <p className="text-xs text-gray-500 mt-1">
+                  <div className="min-w-0">
+                    <p className="text-[13.5px] font-semibold text-ink">{item.itemName}</p>
+                    <p className="mt-1 text-[12px] text-ink-3">
                       Size: {item.sizeInInch}
-                      {item.sizeInMm && item.sizeInMm !== "—" ? ` (${item.sizeInMm})` : ""}
+                      {item.sizeInMm && item.sizeInMm !== '—' ? ` (${item.sizeInMm})` : ''}
                     </p>
-                    <p className="text-xs text-gray-500">Plating: {item.plating}</p>
-                    <p className="text-xs text-gray-700 mt-1 font-medium">
-                      Qty: {item.orderUnit && item.orderUnit !== "Pcs"
+                    <p className="text-[12px] text-ink-3">Plating: {item.plating}</p>
+                    <p className="mt-1 font-mono text-[12px] font-medium text-ink-2">
+                      Qty:{' '}
+                      {item.orderUnit && item.orderUnit !== 'Pcs'
                         ? `${item.orderQty} ${item.orderUnit} (${item.qtyPc} pc)`
                         : `${item.qtyPc} pc`}
-                      {item.qtyKg ? ` / ${item.qtyKg} kg` : ""}
+                      {item.qtyKg ? ` / ${item.qtyKg} kg` : ''}
                     </p>
                   </div>
-                  <button
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
                     onClick={() => onRemove(item.cartId)}
-                    className="text-gray-400 hover:text-red-600 transition"
-                    title="Remove"
+                    aria-label="Remove item"
+                    className="shrink-0 text-ink-3 hover:text-danger"
                   >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
+                    <Trash2 className="size-4" />
+                  </Button>
                 </div>
               ))}
             </div>
           )}
         </div>
 
-        <div className="px-6 py-4 border-t border-gray-200 space-y-3">
-          <div className="flex items-center justify-between text-sm">
-            <span className="text-gray-500">
-              {cart.length} item{cart.length === 1 ? "" : "s"}
+        <div className="space-y-3 border-t border-line px-4 py-4 sm:px-6">
+          <div className="flex items-center justify-between text-[13px]">
+            <span className="text-ink-3">
+              {cart.length} item{cart.length === 1 ? '' : 's'}
             </span>
-            <span className="font-medium text-gray-900">{totalPc} pc total</span>
+            <span className="font-mono font-medium text-ink">{totalPc} pc total</span>
           </div>
-          <button
-            onClick={onSubmit}
-            disabled={cart.length === 0 || submitting}
-            className="w-full bg-gray-900 text-white rounded-lg py-2.5 font-medium hover:bg-gray-800 transition disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {submitting ? "Submitting..." : "Place Order Request"}
-          </button>
-          <p className="text-xs text-gray-400 text-center">
+          <Button className="w-full" onClick={onSubmit} disabled={cart.length === 0 || submitting}>
+            {submitting ? 'Submitting…' : 'Place order request'}
+          </Button>
+          <p className="text-center text-[11.5px] text-ink-3">
             Your request will be sent to the admin for approval.
           </p>
         </div>
-      </div>
-    </>
+      </SheetContent>
+    </Sheet>
   );
 };
 

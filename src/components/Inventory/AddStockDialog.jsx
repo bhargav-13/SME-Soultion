@@ -1,43 +1,47 @@
-import React, { useState, useEffect } from "react";
-import { X } from "lucide-react";
-import { itemApi, sizeApi } from "../../services/apiService";
-import toast from "react-hot-toast";
+import { useEffect, useState } from 'react';
+import toast from 'react-hot-toast';
+import { FormDialog } from '@/components/form-dialog';
+import { Field } from '@/components/form-field';
+import { PageLoader } from '@/components/states';
+import { Input } from '@/components/ui/input';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { itemApi, sizeApi } from '@/services/apiService';
 
-const inputCls =
-  "w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-500 focus:border-transparent outline-none placeholder:text-sm placeholder:text-gray-500";
-const readonlyCls =
-  "w-full px-4 py-2 border border-gray-300 rounded-lg bg-gray-50 text-black cursor-not-allowed outline-none placeholder:text-sm placeholder:text-gray-500";
-const labelCls = "block font-medium text-black mb-2";
+const WEIGHT_UNITS = ['Kg', 'Gram'];
 
 // Round a numeric value to at most 3 decimals (e.g. 0.0791666… -> 0.079) for display.
 const round3 = (v) => {
   const n = parseFloat(v);
-  return isNaN(n) ? "" : String(Math.round(n * 1000) / 1000);
+  return isNaN(n) ? '' : String(Math.round(n * 1000) / 1000);
 };
 
 const AddStockDialog = ({ open, onClose, row, onSaved }) => {
-  const [itemKg, setItemKg] = useState("");
-  const [weightPerPc, setWeightPerPc] = useState("");
-  const [weightUnit, setWeightUnit] = useState("");
-  const [totalPc, setTotalPc] = useState("");
-  const [stockDozenWeight, setStockDozenWeight] = useState("");
-  const [lowStockWarning, setLowStockWarning] = useState("");
-  const [isWeightUnitOpen, setIsWeightUnitOpen] = useState(false);
+  const [itemKg, setItemKg] = useState('');
+  const [weightPerPc, setWeightPerPc] = useState('');
+  const [weightUnit, setWeightUnit] = useState('');
+  const [totalPc, setTotalPc] = useState('');
+  const [stockDozenWeight, setStockDozenWeight] = useState('');
+  const [lowStockWarning, setLowStockWarning] = useState('');
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(false);
 
   // Load existing stock data when dialog opens
   useEffect(() => {
     if (!open || !row) return;
-    setItemKg("");
+    setItemKg('');
     // Pre-fill Weight/Pc. from the size's PCS Weight (shown in the table), rounded to 3 decimals;
     // a saved stock entry's own weightPerPc, if any, overrides this once loaded below.
-    setWeightPerPc(row.pcsWeight != null && row.pcsWeight !== "" ? round3(row.pcsWeight) : "");
-    setWeightUnit(row.pcsWeight != null && row.pcsWeight !== "" ? "Kg" : "");
-    setTotalPc("");
-    setStockDozenWeight("");
-    setLowStockWarning("");
-    setIsWeightUnitOpen(false);
+    setWeightPerPc(row.pcsWeight != null && row.pcsWeight !== '' ? round3(row.pcsWeight) : '');
+    setWeightUnit(row.pcsWeight != null && row.pcsWeight !== '' ? 'Kg' : '');
+    setTotalPc('');
+    setStockDozenWeight('');
+    setLowStockWarning('');
 
     // Fetch existing stock entry for this row's size
     if (row.sizeInInch && row.sizeInMm && row._itemId) {
@@ -46,36 +50,27 @@ const AddStockDialog = ({ open, onClose, row, onSaved }) => {
         try {
           const sizesRes = await sizeApi.getSizesByItemId(Number(row._itemId));
           const sizes = Array.isArray(sizesRes.data) ? sizesRes.data : [];
-          const inch = (row.sizeInInch || "").trim();
-          const mm = (row.sizeInMm || "").trim();
+          const inch = (row.sizeInInch || '').trim();
+          const mm = (row.sizeInMm || '').trim();
           const matchedSize = sizes.find(
-            (s) =>
-              (s.sizeInInch || "").trim() === inch &&
-              (s.sizeInMm || "").trim() === mm
+            (s) => (s.sizeInInch || '').trim() === inch && (s.sizeInMm || '').trim() === mm,
           );
           if (!matchedSize?.id) return;
 
           const res = await itemApi.getAllItems(undefined, undefined, 0, 1000);
           const page = res.data;
-          const all = Array.isArray(page?.data)
-            ? page.data
-            : Array.isArray(page)
-            ? page
-            : [];
+          const all = Array.isArray(page?.data) ? page.data : Array.isArray(page) ? page : [];
           const matched = all.find((it) => it.sizeId === matchedSize.id);
           if (matched) {
             if (matched.itemKg != null) setItemKg(String(matched.itemKg));
-            if (matched.weightPerPc != null)
-              setWeightPerPc(round3(matched.weightPerPc));
+            if (matched.weightPerPc != null) setWeightPerPc(round3(matched.weightPerPc));
             if (matched.totalPc != null) setTotalPc(String(matched.totalPc));
-            if (matched.dozenWeight != null)
-              setStockDozenWeight(String(matched.dozenWeight));
-            if (matched.lowStockWarning != null)
-              setLowStockWarning(String(matched.lowStockWarning));
-            setWeightUnit("Kg");
+            if (matched.dozenWeight != null) setStockDozenWeight(String(matched.dozenWeight));
+            if (matched.lowStockWarning != null) setLowStockWarning(String(matched.lowStockWarning));
+            setWeightUnit('Kg');
           }
         } catch (err) {
-          console.error("Failed to load stock details:", err);
+          console.error('Failed to load stock details:', err);
         } finally {
           setLoading(false);
         }
@@ -87,9 +82,9 @@ const AddStockDialog = ({ open, onClose, row, onSaved }) => {
   const recalc = (kg, wpc, unit) => {
     const kgF = parseFloat(kg) || 0;
     const wpcF = parseFloat(wpc) || 0;
-    const wpcKg = unit === "Gram" ? wpcF / 1000 : wpcF;
-    setTotalPc(kgF > 0 && wpcKg > 0 ? Math.floor(kgF / wpcKg).toString() : "");
-    setStockDozenWeight(wpcKg > 0 ? (wpcKg * 12).toFixed(2) : "");
+    const wpcKg = unit === 'Gram' ? wpcF / 1000 : wpcF;
+    setTotalPc(kgF > 0 && wpcKg > 0 ? Math.floor(kgF / wpcKg).toString() : '');
+    setStockDozenWeight(wpcKg > 0 ? (wpcKg * 12).toFixed(2) : '');
   };
 
   const onItemKgChange = (v) => {
@@ -102,13 +97,12 @@ const AddStockDialog = ({ open, onClose, row, onSaved }) => {
   };
   const onWeightUnitChange = (v) => {
     setWeightUnit(v);
-    setIsWeightUnitOpen(false);
     recalc(itemKg, weightPerPc, v);
   };
 
   const handleSave = async () => {
     if (!itemKg && !weightPerPc && !lowStockWarning) {
-      toast.error("Please fill at least one stock field");
+      toast.error('Please fill at least one stock field');
       return;
     }
 
@@ -117,16 +111,14 @@ const AddStockDialog = ({ open, onClose, row, onSaved }) => {
       // Resolve sizeId
       const sizesRes = await sizeApi.getSizesByItemId(Number(row._itemId));
       const sizes = Array.isArray(sizesRes.data) ? sizesRes.data : [];
-      const inch = (row.sizeInInch || "").trim();
-      const mm = (row.sizeInMm || "").trim();
+      const inch = (row.sizeInInch || '').trim();
+      const mm = (row.sizeInMm || '').trim();
       const matchedSize = sizes.find(
-        (s) =>
-          (s.sizeInInch || "").trim() === inch &&
-          (s.sizeInMm || "").trim() === mm
+        (s) => (s.sizeInInch || '').trim() === inch && (s.sizeInMm || '').trim() === mm,
       );
 
       if (!matchedSize?.id) {
-        toast.error("Could not resolve size. Please try again.");
+        toast.error('Could not resolve size. Please try again.');
         return;
       }
 
@@ -137,7 +129,7 @@ const AddStockDialog = ({ open, onClose, row, onSaved }) => {
         weightPerPc: parseFloat(weightPerPc) || 0,
         totalPc: parseInt(totalPc, 10) || 0,
         lowStockWarning: parseFloat(lowStockWarning) || 0,
-        stockStatus: "IN_STOCK",
+        stockStatus: 'IN_STOCK',
       };
 
       // Check if stock entry already exists → update, otherwise create
@@ -145,14 +137,8 @@ const AddStockDialog = ({ open, onClose, row, onSaved }) => {
       try {
         const stockRes = await itemApi.getAllItems(undefined, undefined, 0, 1000);
         const stockPage = stockRes.data;
-        const allStock = Array.isArray(stockPage?.data)
-          ? stockPage.data
-          : Array.isArray(stockPage)
-          ? stockPage
-          : [];
-        const existing = allStock.find(
-          (it) => Number(it.sizeId) === numericSizeId
-        );
+        const allStock = Array.isArray(stockPage?.data) ? stockPage.data : Array.isArray(stockPage) ? stockPage : [];
+        const existing = allStock.find((it) => Number(it.sizeId) === numericSizeId);
         if (existing?.id) existingStockId = Number(existing.id);
       } catch {
         /* ignore — will create new */
@@ -164,183 +150,82 @@ const AddStockDialog = ({ open, onClose, row, onSaved }) => {
         await itemApi.createItem(stockPayload);
       }
 
-      toast.success("Stock updated successfully!");
+      toast.success('Stock updated successfully!');
       onSaved?.();
       onClose();
     } catch (error) {
       console.error(error);
-      toast.error(
-        error.response?.data?.message ||
-          error.message ||
-          "Failed to save stock"
-      );
+      toast.error(error.response?.data?.message || error.message || 'Failed to save stock');
     } finally {
       setSaving(false);
     }
   };
 
-  if (!open) return null;
+  const subtitle = `${row?.itemName || ''}${row?.sizeInInch ? ` — ${row.sizeInInch}` : ''}${
+    row?.sizeInMm ? ` / ${row.sizeInMm}` : ''
+  }`;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
-      {/* Backdrop */}
-      <div
-        className="absolute inset-0 bg-black/40"
-        onClick={onClose}
-      />
-
-      {/* Dialog */}
-      <div className="relative bg-white rounded-xl shadow-xl w-full max-w-2xl mx-4">
-        {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
-          <div>
-            <h2 className="text-lg font-semibold text-gray-900">
-              Update Stock
-            </h2>
-            <p className="text-sm text-gray-500 mt-0.5">
-              {row?.itemName}
-              {row?.sizeInInch ? ` — ${row.sizeInInch}` : ""}
-              {row?.sizeInMm ? ` / ${row.sizeInMm}` : ""}
-            </p>
+    <FormDialog
+      open={open}
+      onOpenChange={(next) => !next && onClose()}
+      title="Update stock"
+      description={subtitle}
+      onSubmit={handleSave}
+      submitLabel="Update stock"
+      busyLabel="Saving…"
+      isPending={saving}
+      submitDisabled={loading}
+      size="lg"
+    >
+      {loading ? (
+        <PageLoader text="Loading stock details…" />
+      ) : (
+        <div className="space-y-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+            <Field label="Item in Kg">
+              <Input value={itemKg} onChange={(e) => onItemKgChange(e.target.value)} placeholder="Enter Kg" className="font-mono" />
+            </Field>
+            <Field label="Weight/Pc.">
+              <Input
+                value={weightPerPc}
+                onChange={(e) => onWeightPerPcChange(e.target.value)}
+                placeholder="Weight/Pc."
+                className="font-mono"
+              />
+            </Field>
+            <Field label="Unit">
+              <Select value={weightUnit || undefined} onValueChange={onWeightUnitChange}>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Select unit" />
+                </SelectTrigger>
+                <SelectContent>
+                  {WEIGHT_UNITS.map((unit) => (
+                    <SelectItem key={unit} value={unit}>
+                      {unit}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </Field>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="inline-flex items-center justify-center w-8 h-8 rounded-full text-gray-500 hover:text-gray-900 hover:bg-gray-100 transition"
-          >
-            <X className="w-4 h-4" />
-          </button>
-        </div>
 
-        {/* Body */}
-        <div className="px-6 py-6 space-y-6">
-          {loading ? (
-            <div className="flex items-center justify-center h-32 text-gray-400 text-sm">
-              Loading stock details...
-            </div>
-          ) : (
-            <>
-              <div className="grid grid-cols-3 gap-5">
-                <div>
-                  <label className={labelCls}>Item in Kg</label>
-                  <input
-                    type="text"
-                    value={itemKg}
-                    onChange={(e) => onItemKgChange(e.target.value)}
-                    placeholder="Enter Kg"
-                    className={inputCls}
-                  />
-                </div>
-                <div>
-                  <label className={labelCls}>Weight/Pc.</label>
-                  <input
-                    type="text"
-                    value={weightPerPc}
-                    onChange={(e) => onWeightPerPcChange(e.target.value)}
-                    placeholder="Weight/Pc."
-                    className={inputCls}
-                  />
-                </div>
-                <div>
-                  <label className={labelCls}>Unit</label>
-                  <div className="relative">
-                    <button
-                      type="button"
-                      onClick={() => setIsWeightUnitOpen(!isWeightUnitOpen)}
-                      className="w-full flex items-center justify-between px-4 py-2 border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-gray-500 transition"
-                    >
-                      <span
-                        className={`font-medium text-sm ${
-                          weightUnit === ""
-                            ? "text-gray-500"
-                            : "text-gray-900"
-                        }`}
-                      >
-                        {weightUnit === "" ? "Select Unit" : weightUnit}
-                      </span>
-                      <svg
-                        className={`w-3 h-3 text-gray-500 transition-transform ${
-                          isWeightUnitOpen ? "rotate-180" : ""
-                        }`}
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          d="M19 9l-7 7-7-7"
-                        />
-                      </svg>
-                    </button>
-                    {isWeightUnitOpen && (
-                      <div className="absolute z-20 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden">
-                        {["Kg", "Gram"].map((unit) => (
-                          <button
-                            key={unit}
-                            type="button"
-                            onClick={() => onWeightUnitChange(unit)}
-                            className="w-full text-left px-4 py-2 text-sm hover:bg-gray-100 transition"
-                          >
-                            {unit}
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-5">
-                <div>
-                  <label className={labelCls}>
-                    Total Pc.{" "}
-                    <span className="text-gray-400 text-xs">(Auto)</span>
-                  </label>
-                  <input
-                    type="text"
-                    value={totalPc}
-                    readOnly
-                    placeholder="Auto"
-                    className={readonlyCls}
-                  />
-                </div>
-                <div>
-                  <label className={labelCls}>Low Stock Warning</label>
-                  <input
-                    type="text"
-                    value={lowStockWarning}
-                    onChange={(e) => setLowStockWarning(e.target.value)}
-                    placeholder="Pcs"
-                    className={inputCls}
-                  />
-                </div>
-              </div>
-            </>
-          )}
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <Field label="Total Pc." hint="Auto">
+              <Input value={totalPc} readOnly placeholder="Auto" className="bg-surface-2 font-mono" />
+            </Field>
+            <Field label="Low stock warning">
+              <Input
+                value={lowStockWarning}
+                onChange={(e) => setLowStockWarning(e.target.value)}
+                placeholder="Pcs"
+                className="font-mono"
+              />
+            </Field>
+          </div>
         </div>
-
-        {/* Footer */}
-        <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-gray-100 bg-gray-50 rounded-b-xl">
-          <button
-            type="button"
-            onClick={onClose}
-            className="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-100 transition font-medium"
-          >
-            Cancel
-          </button>
-          <button
-            type="button"
-            onClick={handleSave}
-            disabled={saving || loading}
-            className="px-6 py-2 bg-black text-white rounded-lg hover:bg-gray-800 transition font-medium disabled:opacity-50"
-          >
-            {saving ? "Saving..." : "Update Stock"}
-          </button>
-        </div>
-      </div>
-    </div>
+      )}
+    </FormDialog>
   );
 };
 

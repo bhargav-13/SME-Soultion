@@ -1,63 +1,31 @@
-import React, { useMemo, useState } from "react";
-import { CircleCheck, ChevronDown, Printer, SquarePen, Trash2 } from "lucide-react";
-import GresStatusDropdown from "./GresStatusDropdown";
+import { useMemo, useState } from 'react';
+import { ChevronDown, CircleCheck, SquarePen, Trash2 } from 'lucide-react';
+import GresStatusDropdown from './GresStatusDropdown';
+import { PrintSizeButton } from '@/components/PrintSizeButton';
+import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
+import { cn } from '@/lib/utils';
 
 const round3 = (n) => Math.round(n * 1000) / 1000;
-const fmt = (v) => (v == null || v === "" ? "—" : v);
+const fmt = (v) => (v == null || v === '' ? '—' : v);
 const fmtDate = (s) => {
-  if (!s) return "—";
+  if (!s) return '—';
   try {
-    return new Date(s).toLocaleDateString("en-IN");
+    return new Date(s).toLocaleDateString('en-IN');
   } catch {
     return s;
   }
 };
 
-// Print button with an A6/A8 size chooser — matches the Job Work card's print control.
-const PrintSizeButton = ({ printing, onPrint }) => {
-  const [open, setOpen] = useState(false);
-  return (
-    <div className="relative">
-      <button
-        type="button"
-        disabled={!!printing}
-        onClick={() => setOpen((p) => !p)}
-        className="inline-flex items-center gap-1.5 px-3 py-1 text-sm border border-gray-300 rounded-md text-black hover:bg-gray-100 transition disabled:opacity-60 disabled:cursor-not-allowed"
-      >
-        {printing ? (
-          <><span className="animate-spin inline-block w-3 h-3 border-2 border-gray-400 border-t-transparent rounded-full" /> Printing…</>
-        ) : (
-          <>Print <Printer className="w-4 h-4" /> <ChevronDown className={`w-3 h-3 transition-transform ${open ? "rotate-180" : ""}`} /></>
-        )}
-      </button>
-      {open && !printing && (
-        <div className="absolute z-20 right-0 mt-1 w-28 bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden">
-          {["A6", "A8"].map((size) => (
-            <button
-              key={size}
-              type="button"
-              onClick={() => { setOpen(false); onPrint(size); }}
-              className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50"
-            >
-              Print {size}
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-};
+/** A column inside one of the card's data grids: a quiet caption over a bold figure. */
+const Cell = ({ label, children, align = 'left' }) => (
+  <div className={cn('min-w-0', align === 'center' && 'text-center', align === 'right' && 'text-right')}>
+    <p className="text-[10.5px] font-medium tracking-[0.04em] text-ink-3 uppercase">{label}</p>
+    <p className="mt-0.5 truncate font-mono text-[13px] font-semibold text-ink">{children}</p>
+  </div>
+);
 
-const GresCard = ({
-  gres,
-  onEdit,
-  onDelete,
-  onStatusChange,
-  onReturnRecord,
-  onEditReturn,
-  onDeleteReturn,
-  onPrint,
-}) => {
+const GresCard = ({ gres, onEdit, onDelete, onStatusChange, onReturnRecord, onEditReturn, onDeleteReturn, onPrint }) => {
   const [expanded, setExpanded] = useState(false);
   const [printLoading, setPrintLoading] = useState(null);
   const primaryItem = gres.items?.[0] || {};
@@ -73,161 +41,173 @@ const GresCard = ({
     return { totalReturn, totalNet, totalGhati };
   }, [returns, primaryItem.qtyKg]);
 
-  const productName = primaryItem.itemName || primaryItem.size || "—";
-  const sizeLabel = primaryItem.size || "—";
-  const elementLabel = primaryItem.element != null
-    ? `${primaryItem.element} ${primaryItem.elementType === "DRUM" ? "Drum" : "Peti"}`
-    : "—";
+  const productName = primaryItem.itemName || primaryItem.size || '—';
+  const sizeLabel = primaryItem.size || '—';
+  const elementLabel =
+    primaryItem.element != null
+      ? `${primaryItem.element} ${primaryItem.elementType === 'DRUM' ? 'Drum' : 'Peti'}`
+      : '—';
 
   const handlePrint = (formType, size) => onPrint?.(gres, formType, size, setPrintLoading);
 
   return (
-    <div className="border border-gray-200 rounded-xl bg-white p-4 shadow-sm">
-      {/* Product name - prominent above */}
-      <div className="mb-2">
-        <span className="text-base font-semibold text-black">{productName}</span>
-        {primaryItem.size && primaryItem.size !== productName && (
-          <span className="ml-2 text-sm text-gray-500">({primaryItem.size})</span>
-        )}
+    <Card className="gap-0 rounded-xl p-4">
+      {/* Identity: what it is, which chitthi, for whom, when. */}
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-[15px] font-semibold text-ink">
+            {productName}
+            {primaryItem.size && primaryItem.size !== productName && (
+              <span className="ml-2 text-[12.5px] font-normal text-ink-3">({primaryItem.size})</span>
+            )}
+          </p>
+          <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[12.5px] text-ink-3">
+            <span className="font-mono font-semibold text-ink-2">{gres.chithiNo || `GRES-${gres.id}`}</span>
+            <span className="inline-block size-1 rounded-full bg-ink-3/50" />
+            <span>{gres.vendorName || '—'}</span>
+            <span className="inline-block size-1 rounded-full bg-ink-3/50" />
+            <span>
+              Rate <span className="font-mono font-semibold text-ink">{fmt(primaryItem.ratePerKg)}</span>
+            </span>
+          </div>
+        </div>
+
+        <div className="flex items-start gap-3">
+          <div className="text-right text-[11.5px] text-ink-3">
+            <p>
+              Date <span className="font-mono font-semibold text-ink-2">{fmtDate(gres.date)}</span>
+            </p>
+            <p>
+              Time <span className="font-mono font-semibold text-ink-2">{fmt(gres.time)}</span>
+            </p>
+          </div>
+          <div className="flex shrink-0 items-center gap-0.5">
+            <Button variant="ghost" size="icon-sm" onClick={onEdit} aria-label="Edit gres">
+              <SquarePen className="size-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              onClick={onDelete}
+              aria-label="Delete gres"
+              className="text-danger hover:bg-danger-soft hover:text-danger"
+            >
+              <Trash2 className="size-4" />
+            </Button>
+          </div>
+        </div>
       </div>
 
-      <div className="flex items-start justify-between gap-3 mb-3">
-        <div>
-          <div className="flex items-center gap-3 text-black">
-            <span className="font-semibold text-sm">{gres.chithiNo || `GRES-${gres.id}`}</span>
-            <button type="button" onClick={onEdit} aria-label="Edit gres" className="text-gray-500 hover:text-gray-800 transition">
-              <SquarePen className="w-4 h-4" />
-            </button>
-            <button type="button" onClick={onDelete} aria-label="Delete gres" className="text-red-400 hover:text-red-600 transition">
-              <Trash2 className="w-4 h-4" />
-            </button>
+      <div className="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-2">
+        {/* Items — what went out. */}
+        <div className="rounded-lg border border-line bg-surface-2 p-3.5">
+          <div className="mb-3 flex items-center justify-between gap-2">
+            <p className="text-[13px] font-semibold text-ink">Items</p>
+            <PrintSizeButton printing={printLoading === 'javak'} onPrint={(size) => handlePrint('JAVAK', size)} />
           </div>
-          <div className="flex flex-wrap items-center gap-2 mt-1 text-sm text-gray-500">
-            <span>{gres.vendorName || "—"}</span>
-            <span className="w-1 h-1 rounded-full bg-gray-400 inline-block" />
-            <span>Rate: <span className="font-bold text-black">{fmt(primaryItem.ratePerKg)}</span></span>
+          <div className="grid grid-cols-4 gap-2">
+            <Cell label="Size">{sizeLabel}</Cell>
+            <Cell label="Element" align="center">
+              {elementLabel}
+            </Cell>
+            <Cell label="Kg." align="center">
+              {fmt(primaryItem.qtyKg)} Kg
+            </Cell>
+            <Cell label="Rate/Kg" align="right">
+              {fmt(primaryItem.ratePerKg)}
+            </Cell>
           </div>
-        </div>
-        <div className="text-right text-sm text-gray-500 flex-shrink-0">
-          <p>Date: <span className="font-bold">{fmtDate(gres.date)}</span></p>
-          <p>Time: <span className="font-bold">{fmt(gres.time)}</span></p>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
-        <div className="border border-gray-200 rounded-xl bg-gray-50 p-4">
-          <div className="flex items-center justify-between mb-3">
-            <p className="text-black font-semibold">Items</p>
-            <PrintSizeButton
-              printing={printLoading === "javak"}
-              onPrint={(size) => handlePrint("JAVAK", size)}
-            />
-          </div>
-          <div className="grid grid-cols-4 text-xs text-gray-400 mb-1">
-            <span>Size</span>
-            <span className="text-center">Element</span>
-            <span className="text-center">Kg.</span>
-            <span className="text-right">Rate/Kg</span>
-          </div>
-          <div className="grid grid-cols-4 text-sm text-gray-700">
-            <span className="font-bold">{sizeLabel}</span>
-            <span className="text-center font-bold">{elementLabel}</span>
-            <span className="text-center font-bold">{fmt(primaryItem.qtyKg)} Kg</span>
-            <span className="text-right font-bold">{fmt(primaryItem.ratePerKg)}</span>
-          </div>
-          <div className="mt-2 text-xs text-gray-500">Qty Pc: <span className="font-bold text-black">{fmt(primaryItem.qtyPc)}</span></div>
+          <p className="mt-2.5 text-[11.5px] text-ink-3">
+            Qty Pc <span className="font-mono font-semibold text-ink">{fmt(primaryItem.qtyPc)}</span>
+          </p>
         </div>
 
-        <div className="border border-gray-200 rounded-xl bg-gray-50 p-4">
-          <div className="flex items-center justify-between mb-3">
+        {/* Return — what came back. */}
+        <div className="rounded-lg border border-line bg-surface-2 p-3.5">
+          <div className="mb-3 flex items-center justify-between gap-2">
             <div className="flex items-center gap-2">
-              <p className="text-black font-semibold">Return</p>
-              {returns.length > 0 && <span className="text-xs font-medium text-gray-500">({returns.length})</span>}
+              <p className="text-[13px] font-semibold text-ink">Return</p>
+              {returns.length > 0 && <span className="text-[11.5px] text-ink-3">({returns.length})</span>}
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5">
               {returns.length > 0 && (
-                <button
-                  type="button"
-                  onClick={() => setExpanded((prev) => !prev)}
-                  className="text-xs font-medium text-gray-500 hover:text-black transition flex items-center gap-1"
-                >
-                  {expanded ? "Collapse" : "Expand"}
-                  <ChevronDown className={`w-3.5 h-3.5 transition-transform ${expanded ? "rotate-180" : ""}`} />
-                </button>
+                <Button variant="ghost" size="sm" onClick={() => setExpanded((prev) => !prev)}>
+                  {expanded ? 'Collapse' : 'Expand'}
+                  <ChevronDown className={cn('size-3.5 transition-transform', expanded && 'rotate-180')} />
+                </Button>
               )}
-              <PrintSizeButton
-                printing={printLoading === "aavak"}
-                onPrint={(size) => handlePrint("AAVAK", size)}
-              />
+              <PrintSizeButton printing={printLoading === 'aavak'} onPrint={(size) => handlePrint('AAVAK', size)} />
             </div>
           </div>
 
           {returns.length === 0 ? (
-            <p className="text-sm text-gray-400 italic">No return recorded yet</p>
+            <p className="text-[12.5px] text-ink-3 italic">No return recorded yet</p>
           ) : (
             <>
               {expanded && (
-                <div className="space-y-3 mb-3">
+                <div className="mb-3 space-y-2.5">
                   {returns.map((ret) => (
-                    <div key={ret.id} className="border border-gray-200 rounded-lg bg-white p-3">
-                      <div className="flex items-center justify-between mb-1.5">
-                        <span className="text-xs text-gray-400">Return: <span className="font-medium text-gray-600">{fmtDate(ret.returnDate)}</span></span>
-                        <div className="flex items-center gap-2">
-                          <button type="button" onClick={() => onEditReturn(ret)} className="text-gray-400 hover:text-gray-700 transition">
-                            <SquarePen className="w-3.5 h-3.5" />
-                          </button>
-                          <button type="button" onClick={() => onDeleteReturn(ret)} className="text-red-300 hover:text-red-500 transition">
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
+                    <div key={ret.id} className="rounded-lg border border-line bg-surface p-3">
+                      <div className="mb-1.5 flex items-center justify-between gap-2">
+                        <span className="text-[11px] text-ink-3">
+                          Return <span className="font-mono font-medium text-ink-2">{fmtDate(ret.returnDate)}</span>
+                        </span>
+                        <div className="flex items-center gap-0.5">
+                          <Button variant="ghost" size="icon-xs" onClick={() => onEditReturn(ret)} aria-label="Edit return">
+                            <SquarePen className="size-3.5" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon-xs"
+                            onClick={() => onDeleteReturn(ret)}
+                            aria-label="Delete return"
+                            className="text-danger hover:bg-danger-soft hover:text-danger"
+                          >
+                            <Trash2 className="size-3.5" />
+                          </Button>
                         </div>
                       </div>
-                      <div className="grid grid-cols-4 text-xs text-gray-400 mb-0.5">
-                        <span>Element</span>
-                        <span className="text-center">Return Kg.</span>
-                        <span className="text-center">Net Kg</span>
-                        <span className="text-right">Rate/Kg</span>
-                      </div>
-                      <div className="grid grid-cols-4 text-sm text-gray-700">
-                        <span className="font-bold">{ret.returnElement || "—"}</span>
-                        <span className="text-center font-bold">{fmt(ret.grossKg)} Kg</span>
-                        <span className="text-center font-bold">{fmt(ret.netKg)} Kg</span>
-                        <span className="text-right font-bold">{fmt(ret.rsKg)}</span>
+                      <div className="grid grid-cols-4 gap-2">
+                        <Cell label="Element">{ret.returnElement || '—'}</Cell>
+                        <Cell label="Return Kg." align="center">
+                          {fmt(ret.grossKg)} Kg
+                        </Cell>
+                        <Cell label="Net Kg" align="center">
+                          {fmt(ret.netKg)} Kg
+                        </Cell>
+                        <Cell label="Rate/Kg" align="right">
+                          {fmt(ret.rsKg)}
+                        </Cell>
                       </div>
                     </div>
                   ))}
                 </div>
               )}
 
-              <div className="border-t border-dashed border-gray-300 pt-2">
-                <div className="grid grid-cols-3 text-xs text-gray-400 mb-0.5">
-                  <span>Total Return</span>
-                  <span className="text-center">Total Net</span>
-                  <span className="text-right">Total Ghati</span>
-                </div>
-                <div className="grid grid-cols-3 text-sm text-gray-700">
-                  <span className="font-bold">{totals.totalReturn ? `${totals.totalReturn} Kg` : "—"}</span>
-                  <span className="text-center font-bold">{totals.totalNet ? `${totals.totalNet} Kg` : "—"}</span>
-                  <span className="text-right font-bold">{totals.totalGhati || "—"}</span>
-                </div>
+              <div className="grid grid-cols-3 gap-2 border-t border-dashed border-line pt-2.5">
+                <Cell label="Total return">{totals.totalReturn ? `${totals.totalReturn} Kg` : '—'}</Cell>
+                <Cell label="Total net" align="center">
+                  {totals.totalNet ? `${totals.totalNet} Kg` : '—'}
+                </Cell>
+                <Cell label="Total ghati" align="right">
+                  {totals.totalGhati || '—'}
+                </Cell>
               </div>
             </>
           )}
         </div>
       </div>
 
-      <div className="flex flex-wrap items-center gap-3">
+      <div className="mt-3 flex flex-wrap items-center gap-2">
         {/* Not locked once Complete: the server auto-completes on the first return and reverts to
             Pending when the last one is deleted, so the dropdown stays available for corrections. */}
         <GresStatusDropdown value={gres.status} onChange={(value) => onStatusChange(gres, value)} />
-        <button
-          type="button"
-          onClick={onReturnRecord}
-          className="inline-flex items-center gap-2 px-5 py-1.5 rounded-md bg-[#b9d8e9] text-black text-sm font-medium hover:bg-[#a6cde3] transition"
-        >
-          Return Record <CircleCheck className="w-4 h-4" />
-        </button>
+        <Button size="sm" variant="secondary" onClick={onReturnRecord} className="gap-1.5">
+          Return record
+          <CircleCheck className="size-4" />
+        </Button>
       </div>
-    </div>
+    </Card>
   );
 };
 

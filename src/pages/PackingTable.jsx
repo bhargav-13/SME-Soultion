@@ -1,10 +1,14 @@
 
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Calendar, Download, Plus } from "lucide-react";
-import SidebarLayout from "../components/SidebarLayout";
-import PageHeader from "../components/PageHeader";
-import StatsCard from "../components/StatsCard";
-import SearchFilter from "../components/SearchFilter";
+import SidebarLayout from "@/components/SidebarLayout";
+import { PageBody, PageHeader } from "@/components/page-header";
+import { StatCard } from "@/components/stat-card";
+import { PageLoader } from "@/components/states";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Search } from "lucide-react";
 import {
   packingInvoiceApi,
   partyApi,
@@ -14,8 +18,6 @@ import {
   axiosInstance,
 } from "../services/apiService";
 import toast from "react-hot-toast";
-import Loader from "../components/Loader";
-import PrimaryActionButton from "../components/PrimaryActionButton";
 
 const columns = [
   { key: "date", label: "Date", type: "date" },
@@ -810,43 +812,43 @@ const PackingInvoice = () => {
 
   return (
     <SidebarLayout>
-      <div className="mx-auto">
-        <PageHeader
-          title="Packing Invoice"
-          description="Add packing Invoice and other details"
-           action={
-                        <PrimaryActionButton
-                          onClick={() => navigate("/")}
-                          icon={Plus}
-                        >
-                          Add Packing
-                        </PrimaryActionButton>
-                      }
-        />
+      <PageHeader
+        title="Packing table"
+        subtitle="Add packing invoice and other details"
+        actions={
+          <Button size="sm" onClick={() => navigate("/")}>
+            <Plus className="size-4" />
+            <span className="hidden sm:inline">Add packing</span>
+          </Button>
+        }
+      />
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6 mb-4">
-          <StatsCard label="Today's Invoices" value={stats.todaysInvoices} />
-          <StatsCard label="Total Invoice" value={stats.totalInvoices} />
+      <PageBody className="space-y-5">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <StatCard label="Today's invoices" value={stats.todaysInvoices} tone="info" />
+          <StatCard label="Total invoices" value={stats.totalInvoices} tone="primary" />
         </div>
 
-        <SearchFilter
-          searchQuery={searchQuery}
-          setSearchQuery={setSearchQuery}
-          typeFilter={typeFilter}
-          setTypeFilter={setTypeFilter}
-          filterOptions={["Type"]}
-          filterPlaceholder="Type"
-        />
+        <div className="relative w-full sm:max-w-sm">
+          <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-ink-3" />
+          <Input
+            type="search"
+            placeholder="Search invoices…"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="bg-surface pl-9"
+          />
+        </div>
 
-        <div className="bg-white rounded-lg overflow-hidden border border-gray-200">
+        <Card className="gap-0 overflow-hidden py-0">
           <div className="max-h-[460px] overflow-auto scrollbar-thin">
             <table className="w-max min-w-full table-auto">
               <thead>
-                <tr className="bg-gray-100 border-b border-gray-200">
+                <tr className="border-b border-line bg-surface-2">
                   {columns.map((col) => (
                     <th
                       key={col.key}
-                      className={`sticky top-0 z-10 whitespace-normal px-3 py-3 text-center text-sm font-[550] text-gray-900 border-r border-gray-200 bg-gray-100 ${getColumnWidthClass(
+                      className={`sticky top-0 z-10 whitespace-normal border-r border-line-2 bg-surface-2 px-3 py-3 text-center text-[11.5px] font-semibold tracking-[0.02em] text-ink-3 uppercase ${getColumnWidthClass(
                         col.key
                       )}`}
                     >
@@ -857,7 +859,7 @@ const PackingInvoice = () => {
                       </span>
                     </th>
                   ))}
-                  <th className="sticky top-0 z-10 whitespace-nowrap px-3 py-3 text-center text-sm font-[550] text-gray-900 bg-gray-100 min-w-[92px] border-r border-gray-200">
+                  <th className="sticky top-0 z-10 min-w-[92px] border-r border-line-2 bg-surface-2 px-3 py-3 text-center text-[11.5px] font-semibold tracking-[0.02em] whitespace-nowrap text-ink-3 uppercase">
                     Action
                   </th>
                 </tr>
@@ -866,12 +868,12 @@ const PackingInvoice = () => {
                 {loading ? (
                   <tr>
                     <td colSpan={columns.length + 1}>
-                      <Loader text="Loading invoices..." />
+                      <PageLoader text="Loading invoices…" />
                     </td>
                   </tr>
                 ) : (
                   filteredRows.map((row, rowIndex) => (
-                    <tr key={row.id} className={`border-b border-gray-200 ${row._updatedAt && row._createdAt && row._updatedAt !== row._createdAt ? "bg-yellow-50" : "hover:bg-gray-50"}`}>
+                    <tr key={row.id} className={`border-b border-line-2 ${row._updatedAt && row._createdAt && row._updatedAt !== row._createdAt ? "bg-warning-soft" : "hover:bg-surface-2"}`}>
                       {columns.map((col, colIndex) => {
                         const cellId = `${row.id}-${col.key}`;
                         const isSelected = selectedCell === cellId;
@@ -885,9 +887,9 @@ const PackingInvoice = () => {
                           <td
                             key={cellId}
                             onClick={() => handleCellClick(cellId)}
-                            className={`h-10 px-2 py-1 text-center border-r text-sm text-bllack border-gray-200 cursor-pointer ${
+                            className={`h-10 cursor-pointer border-r border-line-2 px-2 py-1 text-center text-[13px] text-ink-2 ${
                               getColumnWidthClass(col.key)
-                            } ${isSelected ? "ring-2 ring-gray-400 ring-inset" : ""}`}
+                            } ${isSelected ? "ring-2 ring-primary-ring ring-inset" : ""}`}
                           >
                             {isEditing || isAlwaysDropdown
                               ? renderEditableCell(
@@ -904,15 +906,16 @@ const PackingInvoice = () => {
                         );
                       })}
                       <td className="h-12 px-3 py-1 text-center">
-                        <button
+                        <Button
                           type="button"
+                          variant="outline"
+                          size="sm"
                           disabled={downloadingId === row.id || row._isNew}
                           onClick={() => handleDownload(row)}
-                          className="inline-flex items-center gap-2 px-3 py-1 text-sm border border-gray-300 rounded bg-gray-100 hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
                         >
-                          {downloadingId === row.id ? "Downloading..." : "Download"}
-                          <Download className="w-4 h-4" />
-                        </button>
+                          {downloadingId === row.id ? "Downloading…" : "Download"}
+                          <Download className="size-4" />
+                        </Button>
                       </td>
                     </tr>
                   ))
@@ -920,43 +923,24 @@ const PackingInvoice = () => {
               </tbody>
             </table>
           </div>
-        </div>
+        </Card>
 
-        <div className="mt-4">
-          <p className="text-xs text-gray-500 text-right mb-2">
-            Press Tab on last cell to add a new row.
-          </p>
-          <div className="flex items-center justify-center gap-4">
-            <button
-              type="button"
-              onClick={handleSaveAll}
-              disabled={!hasChanges || saving}
-              className={`px-10 py-2 rounded-lg transition text-sm font-medium ${
-                hasChanges && !saving
-                  ? "bg-gray-900 text-white hover:bg-gray-800"
-                  : "bg-gray-300 text-gray-500 cursor-not-allowed"
-              }`}
-            >
-              {saving ? "Saving..." : "Save"}
-            </button>
-            <button
-              type="button"
-              onClick={handleAddRow}
-              className="flex items-center gap-2 px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition text-sm"
-            >
-              <Plus className="w-4 h-4" />
-              Add Row
-            </button>
-            <button
-              type="button"
-              onClick={handleRefresh}
-              className="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition text-sm"
-            >
+        <div>
+          <p className="mb-2 text-right text-[11.5px] text-ink-3">Press Tab on last cell to add a new row.</p>
+          <div className="flex flex-wrap items-center justify-center gap-3">
+            <Button onClick={handleSaveAll} disabled={!hasChanges || saving} className="px-10">
+              {saving ? "Saving…" : "Save"}
+            </Button>
+            <Button variant="outline" onClick={handleAddRow}>
+              <Plus className="size-4" />
+              Add row
+            </Button>
+            <Button variant="outline" onClick={handleRefresh}>
               Refresh
-            </button>
+            </Button>
           </div>
         </div>
-      </div>
+      </PageBody>
     </SidebarLayout>
   );
 };

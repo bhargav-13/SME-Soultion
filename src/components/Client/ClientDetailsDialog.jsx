@@ -1,7 +1,8 @@
-import React, { useEffect, useState } from "react";
-import EditableClientTable from "./EditableClientTable";
-import ConfirmationDialog from "../ConfirmationDialog";
-import { Edit2, X } from "lucide-react";
+import { useEffect, useState } from 'react';
+import { ViewDialog } from '@/components/form-dialog';
+import { ConfirmDialog, ConfirmName } from '@/components/confirm-dialog';
+import { Button } from '@/components/ui/button';
+import EditableClientTable from './EditableClientTable';
 
 const ClientDetailsDialog = ({
   isOpen,
@@ -30,87 +31,76 @@ const ClientDetailsDialog = ({
     }
   }, [isOpen]);
 
-  if (!isOpen || !clientName) return null;
+  if (!clientName) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
-      <div className="w-full max-w-[1400px] max-h-[90vh] bg-white rounded-xl border border-gray-200 flex flex-col overflow-hidden">
-        <div className="sticky top-0 z-20 bg-white border-b border-gray-200 px-4 md:px-6 py-4">
-          <h2 className="text-2xl font-medium text-gray-800">{clientName}</h2>
-        </div>
-
-        <div className="flex-1 overflow-y-auto px-4 md:px-6 py-4">
-          <EditableClientTable
-            columns={columns}
-            rows={rows}
-            readOnlyCols={readOnlyCols}
-            selectedCell={isEditMode ? selectedCell : null}
-            editingCell={isEditMode ? editingCell : null}
-            onCellClick={isEditMode ? onCellClick : () => {}}
-            onCellChange={isEditMode ? onCellChange : () => {}}
-            onCellBlur={isEditMode ? onCellBlur : () => {}}
-            onLastCellTab={isEditMode ? onLastCellTab : () => {}}
-            modifiedRowIndices={modifiedRowIndices}
-          />
-
-          {rows.length === 0 && <p className="mt-2 text-xs text-gray-500">No matching rows.</p>}
-        </div>
-
-        <div className="sticky bottom-0 z-20 bg-white border-t border-gray-200 px-4 md:px-6 py-4">
-          <div className="flex items-center justify-start gap-4">
+    <>
+      <ViewDialog
+        open={isOpen}
+        onOpenChange={(open) => !open && onClose()}
+        title={clientName}
+        size="full"
+        actions={
+          <div className="flex w-full flex-wrap items-center justify-start gap-3">
             {isEditMode ? (
-              <button
-                type="button"
+              <Button
                 onClick={() => {
                   onSave();
                   setIsEditMode(false);
                 }}
-                className="px-12 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition text-sm cursor-pointer"
+                className="px-10"
               >
                 Save
-              </button>
+              </Button>
             ) : (
-              <button
-                type="button"
-                onClick={() => setIsEditMode(true)}
-                className="px-12 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition text-sm cursor-pointer"
-             >
+              <Button onClick={() => setIsEditMode(true)} className="px-10">
                 Edit
-              </button>
+              </Button>
             )}
-           
-            <button
-              type="button"
+            <Button
+              variant="outline"
               onClick={() => setIsDeleteConfirmOpen(true)}
-              className="px-12 py-2 border border-red-400 text-red-500 rounded-lg hover:bg-red-50 transition text-sm"
+              className="px-10 text-danger hover:text-danger"
             >
-              Delete All
-            </button>
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-12 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition text-sm"
-            >
+              Delete all
+            </Button>
+            <Button variant="outline" onClick={onClose} className="px-10">
               Cancel
-            </button>
+            </Button>
           </div>
-        </div>
-      </div>
+        }
+      >
+        <EditableClientTable
+          columns={columns}
+          rows={rows}
+          readOnlyCols={readOnlyCols}
+          selectedCell={isEditMode ? selectedCell : null}
+          editingCell={isEditMode ? editingCell : null}
+          onCellClick={isEditMode ? onCellClick : () => {}}
+          onCellChange={isEditMode ? onCellChange : () => {}}
+          onCellBlur={isEditMode ? onCellBlur : () => {}}
+          onLastCellTab={isEditMode ? onLastCellTab : () => {}}
+          modifiedRowIndices={modifiedRowIndices}
+        />
+        {rows.length === 0 && <p className="mt-2 text-[12px] text-ink-3">No matching rows.</p>}
+      </ViewDialog>
 
-      <ConfirmationDialog
-        isOpen={isDeleteConfirmOpen}
-        title="Delete All Items?"
-        message={`This will remove all rows for ${clientName}. This action cannot be undone.`}
-        confirmText="Delete"
-        cancelText="Cancel"
-        isDangerous
-        onCancel={() => setIsDeleteConfirmOpen(false)}
+      <ConfirmDialog
+        open={isDeleteConfirmOpen}
+        onOpenChange={(open) => !open && setIsDeleteConfirmOpen(false)}
+        title="Delete all items?"
+        description={
+          <>
+            This will remove all rows for <ConfirmName>{clientName}</ConfirmName>. This action cannot be undone.
+          </>
+        }
+        confirmLabel="Delete"
         onConfirm={() => {
           onDeleteAll();
           setIsDeleteConfirmOpen(false);
         }}
       />
-    </div>
+    </>
   );
 };
 

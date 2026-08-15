@@ -1,20 +1,29 @@
 import React, { useCallback, useDeferredValue, useEffect, useMemo, useState } from "react";
 import { useLocation } from "react-router-dom";
-import { Trash2 } from "lucide-react";
+import { Boxes, Calculator, Eye, MoreHorizontal, Plus, Trash2, Upload, User, Users } from "lucide-react";
 import { normalizeSearch } from "../../utils/search";
 import SidebarLayout from "../../components/SidebarLayout";
-import PageHeader from "../../components/PageHeader";
-import StatsCard from "../../components/StatsCard";
+import { PageBody, PageHeader } from "../../components/page-header";
+import { StatCard } from "../../components/stat-card";
+import { EmptyState, ListSkeleton } from "../../components/states";
+import { Button } from "../../components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "../../components/ui/dropdown-menu";
+import { fmtNumber } from "../../lib/format";
 import ClientFilterBar from "../../components/Client/ClientFilterBar";
 import ClientListDialog from "../../components/Client/ClientListDialog";
 import ClientDetailsDialog from "../../components/Client/ClientDetailsDialog";
 import ClientImportDialog from "../../components/Client/ClientImportDialog";
 import ClientAddItemDialog from "../../components/Client/ClientAddItemDialog";
-import ConfirmationDialog from "../../components/ConfirmationDialog";
+import { ConfirmDialog, ConfirmName } from "../../components/confirm-dialog";
 import PricingFormulaDialog from "../../components/Client/PricingFormulaDialog";
 import EditableClientTable from "../../components/Client/EditableClientTable";
 import { CLIENT_TABLE_COLUMNS } from "../../Data/clientmanagementdata";
-import PrimaryActionButton from "../../components/PrimaryActionButton";
 import { clientInventoryApi, partyApi } from "../../services/apiService";
 import { resolvePricingRules, applyFinish, fallbackRules } from "../../services/pricingRulesApi";
 import toast from "react-hot-toast";
@@ -482,72 +491,82 @@ const ClientSelect = () => {
 
   return (
     <SidebarLayout>
-      <div className="mx-auto">
-        <div className="mb-6">
-          <PageHeader
-            title="Client Management"
-            description="Customize the price & Packing List"
-            action={
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => setIsImportOpen(true)}
-                  className="flex items-center gap-1.5 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg text-sm hover:bg-gray-50 transition"
-                >
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
-                      d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5m0 0l5-5m-5 5V4" />
-                  </svg>
+      <PageHeader
+        title="Client management"
+        subtitle="Per-client prices and packing list"
+        actions={
+          <>
+            <Button
+              size="sm"
+              onClick={() => {
+                if (!selectedClient?.id) {
+                  toast.error("Select a client first");
+                  return;
+                }
+                setIsAddOpen(true);
+              }}
+            >
+              <Plus className="size-4" />
+              <span className="hidden sm:inline">Add item</span>
+            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="icon-sm" aria-label="Client management actions">
+                  <MoreHorizontal className="size-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="min-w-[13rem]">
+                <DropdownMenuItem onSelect={openClientDialogForDetails}>
+                  <Eye className="size-4" />
+                  View client-wise items
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => setIsImportOpen(true)}>
+                  <Upload className="size-4" />
                   Import
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (!selectedClient?.id) {
-                      toast.error("Select a client first");
-                      return;
-                    }
-                    setIsAddOpen(true);
-                  }}
-                  className="flex items-center gap-1.5 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg text-sm hover:bg-gray-50 transition"
-                >
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                  </svg>
-                  Add Item
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onSelect={() => {
                     if (!selectedClient?.id) {
                       toast.error("Select a client first");
                       return;
                     }
                     setIsFormulaOpen(true);
                   }}
-                  className="flex items-center gap-1.5 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg text-sm hover:bg-gray-50 transition"
                 >
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
-                      d="M9 7h6m-6 4h6m-3 4h3M5 3h14a2 2 0 012 2v14a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2z" />
-                  </svg>
-                  Formula
-                </button>
-                <PrimaryActionButton onClick={openClientDialogForDetails}>
-                  View Client wise Item
-                </PrimaryActionButton>
-              </div>
-            }
+                  <Calculator className="size-4" />
+                  Pricing formula
+                </DropdownMenuItem>
+                {apiItems.length > 0 && (
+                  <>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem variant="destructive" onSelect={() => setIsClearAllOpen(true)}>
+                      <Trash2 className="size-4" />
+                      Clear all items
+                    </DropdownMenuItem>
+                  </>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </>
+        }
+      />
+
+      {/* `min-w-0` all the way down keeps the wide price sheet scrolling inside the page rather
+          than pushing it out from under the navigation rail. */}
+      <PageBody className="flex min-w-0 flex-col">
+        <div className="mb-5 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:max-w-2xl">
+          <StatCard label="Total clients" value={fmtNumber(parties.length || 0)} icon={Users} tone="primary" />
+          <StatCard
+            label="Items for this client"
+            value={fmtNumber(totalItems)}
+            hint={selectedClientName || undefined}
+            icon={Boxes}
+            tone="brass"
           />
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-          <StatsCard label="Total Clients" value={parties.length || 0} className="h-[90px] rounded-md" />
-          <StatsCard label="Total Items" value={totalItems} className="h-[90px] rounded-md" />
-        </div>
-
         <ClientFilterBar
-          leftLabel={selectedClientName || "Select Client"}
+          leftLabel={selectedClientName || "Select client"}
           onLeftClick={openClientDialogForTable}
           searchQuery={tableSearchQuery}
           setSearchQuery={setTableSearchQuery}
@@ -558,11 +577,9 @@ const ClientSelect = () => {
         />
 
         {showInlineTable && selectedClientName ? (
-          <div>
+          <div className="flex min-w-0 flex-col">
             {inventoryLoading ? (
-              <div className="flex items-center justify-center py-16 text-sm text-gray-400">
-                Loading inventory…
-              </div>
+              <ListSkeleton rows={8} className="h-10" />
             ) : (
               <>
                 <EditableClientTable
@@ -574,9 +591,9 @@ const ClientSelect = () => {
                   columnFilters={columnFilters}
                   onColumnFilterChange={handleColumnFilterChange}
                   colWidths={{
-                    0: 'min-w-[160px]',  // Item Name
-                    1: 'min-w-[180px]',  // Size (Inch)
-                    2: 'min-w-[140px]',  // In MM
+                    0: 'min-w-[160px]',
+                    1: 'min-w-[180px]',
+                    2: 'min-w-[140px]',
                   }}
                   selectedCell={inlineSelectedCell}
                   editingCell={inlineEditingCell}
@@ -587,46 +604,44 @@ const ClientSelect = () => {
                   modifiedRowIndices={modifiedRowIndices}
                   collapsibleFrom={COL.SSSATINLACQ}
                 />
-                <div className="mt-4">
-                  <div className="flex items-center justify-center gap-3">
-                    <button
-                      type="button"
-                      onClick={handleInlineSave}
-                      disabled={saving}
-                      className="px-6 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition text-sm cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
-                    >
-                      {saving ? "Saving…" : "Save"}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleInlineCancel}
-                      disabled={saving}
-                      className="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition text-sm cursor-pointer disabled:opacity-60"
-                    >
+
+                {filteredRows.length === 0 && (
+                  <p className="mt-3 text-center text-[12.5px] text-ink-3">No matching rows.</p>
+                )}
+
+                {/* Sticky so Save stays reachable however far down the sheet you have scrolled. */}
+                <div className="sticky bottom-0 z-10 mt-4 flex flex-col gap-2 border-t border-line bg-[color-mix(in_oklab,var(--paper)_88%,transparent)] py-3 backdrop-blur-md sm:flex-row sm:items-center sm:justify-between">
+                  <p className="text-[11.5px] text-ink-3">
+                    {modifiedRowIndices?.size > 0
+                      ? `${modifiedRowIndices.size} row${modifiedRowIndices.size === 1 ? "" : "s"} edited`
+                      : "Double-click a cell to edit."}
+                  </p>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Button variant="outline" onClick={handleInlineCancel} disabled={saving}>
                       Cancel
-                    </button>
-                    {apiItems.length > 0 && (
-                      <button
-                        type="button"
-                        onClick={() => setIsClearAllOpen(true)}
-                        disabled={saving || clearingAll}
-                        title="Delete all items for this client"
-                        className="flex items-center gap-1.5 shrink-0 whitespace-nowrap px-3 py-2 border border-red-200 text-red-600 rounded-lg hover:bg-red-50 transition text-sm font-medium cursor-pointer disabled:opacity-60"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                        Clear All
-                      </button>
-                    )}
+                    </Button>
+                    <Button onClick={handleInlineSave} disabled={saving}>
+                      {saving ? "Saving\u2026" : "Save"}
+                    </Button>
                   </div>
                 </div>
-                {filteredRows.length === 0 && (
-                  <p className="mt-2 text-xs text-gray-500">No matching rows.</p>
-                )}
               </>
             )}
           </div>
-        ) : null}
-      </div>
+        ) : (
+          <EmptyState
+            icon={Users}
+            title="Pick a client to start"
+            description="Prices and packing details are held per client \u2014 choose one above to load its sheet."
+            action={
+              <Button size="sm" onClick={openClientDialogForTable}>
+                <User className="size-4" />
+                Select client
+              </Button>
+            }
+          />
+        )}
+      </PageBody>
 
       <ClientListDialog
         isOpen={isClientListOpen}
@@ -681,14 +696,21 @@ const ClientSelect = () => {
         modifiedRowIndices={modifiedRowIndices}
       />
 
-      <ConfirmationDialog
-        isOpen={isClearAllOpen}
-        title="Clear All Items"
-        message={`Are you sure you want to delete all ${apiItems.length} item(s) for ${selectedClientName}? This action cannot be undone.`}
-        confirmText={clearingAll ? "Clearing…" : "Clear All"}
-        cancelText="Cancel"
-        isDangerous
-        onCancel={() => setIsClearAllOpen(false)}
+      <ConfirmDialog
+        open={isClearAllOpen}
+        onOpenChange={(open) => {
+          if (!open) setIsClearAllOpen(false);
+        }}
+        title="Clear all items for this client?"
+        description={
+          <>
+            All <ConfirmName>{apiItems.length}</ConfirmName> items priced for{" "}
+            <ConfirmName>{selectedClientName}</ConfirmName> will be removed. This cannot be undone.
+          </>
+        }
+        confirmLabel="Clear all"
+        busyLabel="Clearing\u2026"
+        isPending={clearingAll}
         onConfirm={handleDeleteAll}
       />
     </SidebarLayout>

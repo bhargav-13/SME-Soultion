@@ -1,40 +1,42 @@
-import React, { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
-import { Plus, ChevronRight, X, Users } from "lucide-react";
-import SidebarLayout from "../../../components/SidebarLayout";
-import ConfirmationDialog from "../../../components/ConfirmationDialog";
-import StatsCard from "../../../components/StatsCard";
-import PageHeader from "../../../components/PageHeader";
-import PrimaryActionButton from "../../../components/PrimaryActionButton";
-import PartiesTable from "../../../components/Party/PartiesTable";
-import EditPartyDialog from "../../../components/Party/EditPartyDialog";
-import GroupLoginsModal from "../../../components/Party/GroupLoginsModal";
-import { NEW_GROUP } from "../../../components/Party/GroupPicker";
-import { partyApi, partyGroupApi } from "../../../services/apiService";
+import { useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Building2, Plus, UserCheck, Users } from 'lucide-react';
 import toast from 'react-hot-toast';
+import SidebarLayout from '@/components/SidebarLayout';
+import PartiesTable from '@/components/Party/PartiesTable';
+import EditPartyDialog from '@/components/Party/EditPartyDialog';
+import GroupLoginsModal from '@/components/Party/GroupLoginsModal';
+import { NEW_GROUP } from '@/components/Party/GroupPicker';
+import { ConfirmDialog, ConfirmName } from '@/components/confirm-dialog';
+import { PageBody, PageHeader } from '@/components/page-header';
+import { StatCard } from '@/components/stat-card';
+import { Button } from '@/components/ui/button';
+import { matchesSearch, useListFilters } from '@/hooks/use-list-filters';
+import { fmtNumber } from '@/lib/format';
+import { partyApi, partyGroupApi } from '@/services/apiService';
 
 const mapPartyTypeToLabel = (partyType) => {
   switch (partyType) {
-    case "CUSTOMER":
-      return "Customer";
-    case "VENDOR":
-      return "Vendor";
-    case "BOTH":
-      return "Both";
+    case 'CUSTOMER':
+      return 'Customer';
+    case 'VENDOR':
+      return 'Vendor';
+    case 'BOTH':
+      return 'Both';
     default:
-      return partyType || "";
+      return partyType || '';
   }
 };
 
 const mapPartyTypeToApi = (value) => {
-  if (!value) return "";
-  if (["CUSTOMER", "VENDOR", "BOTH"].includes(value)) return value;
+  if (!value) return '';
+  if (['CUSTOMER', 'VENDOR', 'BOTH'].includes(value)) return value;
 
   const normalized = value.toLowerCase();
-  if (normalized === "customer") return "CUSTOMER";
-  if (normalized === "vendor") return "VENDOR";
-  if (normalized === "both") return "BOTH";
-  return "";
+  if (normalized === 'customer') return 'CUSTOMER';
+  if (normalized === 'vendor') return 'VENDOR';
+  if (normalized === 'both') return 'BOTH';
+  return '';
 };
 
 const PartyMaster = () => {
@@ -43,8 +45,7 @@ const PartyMaster = () => {
   const [groups, setGroups] = useState([]);
   const [groupModalOpen, setGroupModalOpen] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [typeFilter, setTypeFilter] = useState("");
+  const [deleting, setDeleting] = useState(false);
   const [stats, setStats] = useState({
     customers: 0,
     vendors: 0,
@@ -53,13 +54,15 @@ const PartyMaster = () => {
   const [deleteDialog, setDeleteDialog] = useState({
     isOpen: false,
     partyId: null,
-    partyName: "",
+    partyName: '',
   });
   const [editDialog, setEditDialog] = useState({
     isOpen: false,
     data: null,
   });
-  const [message, setMessage] = useState("");
+
+  const { filters, setFilter, search, onSearchChange, debouncedSearch, clearFilters, hasActiveFilters } =
+    useListFilters({ defaults: { type: '', group: '' } });
 
   // Fetch parties data on component mount
   useEffect(() => {
@@ -83,7 +86,7 @@ const PartyMaster = () => {
       const partiesData = response.data;
 
       // Transform API data to match component expectations
-      const transformedParties = partiesData.map(party => ({
+      const transformedParties = partiesData.map((party) => ({
         id: party.id,
         name: party.name,
         email: party.email,
@@ -92,18 +95,18 @@ const PartyMaster = () => {
         gstin: party.gst,
         type: mapPartyTypeToLabel(party.partyType),
         partyType: party.partyType,
-        groupId: party.groupId ?? "",
-        groupName: party.groupName || "",
+        groupId: party.groupId ?? '',
+        groupName: party.groupName || '',
       }));
-      
+
       setParties(transformedParties);
-      
+
       // Calculate stats
       const customers = transformedParties.filter(
-        (p) => p.partyType === "CUSTOMER" || p.partyType === "BOTH"
+        (p) => p.partyType === 'CUSTOMER' || p.partyType === 'BOTH',
       ).length;
       const vendors = transformedParties.filter(
-        (p) => p.partyType === "VENDOR" || p.partyType === "BOTH"
+        (p) => p.partyType === 'VENDOR' || p.partyType === 'BOTH',
       ).length;
       setStats({
         customers,
@@ -111,7 +114,7 @@ const PartyMaster = () => {
         total: transformedParties.length,
       });
     } catch (error) {
-      console.error("Error fetching parties:", error);
+      console.error('Error fetching parties:', error);
       toast.error(error.response?.data?.message || 'Failed to fetch parties');
       setStats({
         customers: 0,
@@ -123,25 +126,25 @@ const PartyMaster = () => {
     }
   };
 
-  // Filter parties based on search and type
-  const filteredParties = parties.filter((party) => {
-    const matchesSearch =
-      party.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      party.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      party.gstin.toLowerCase().includes(searchQuery.toLowerCase());
+  // Filter parties based on search, type and group
+  const filteredParties = useMemo(
+    () =>
+      parties.filter((party) => {
+        const bySearch = matchesSearch(party, debouncedSearch, ['name', 'email', 'gstin']);
+        const byType = !filters.type || party.type.toLowerCase() === filters.type.toLowerCase();
+        const byGroup = !filters.group || String(party.groupId) === String(filters.group);
+        return bySearch && byType && byGroup;
+      }),
+    [parties, debouncedSearch, filters.type, filters.group],
+  );
 
-    const matchesType =
-      !typeFilter ||
-      party.type.toLowerCase().includes(typeFilter.toLowerCase());
-
-    return matchesSearch && matchesType;
-  });
+  const groupOptions = useMemo(
+    () => groups.map((g) => ({ value: String(g.id), label: g.name })),
+    [groups],
+  );
 
   const handleEdit = (party) => {
-    setEditDialog({
-      isOpen: true,
-      data: party,
-    });
+    setEditDialog({ isOpen: true, data: party });
   };
 
   /**
@@ -149,19 +152,18 @@ const PartyMaster = () => {
    * creating the group first when needed. Returns null for "no group".
    */
   const resolveGroupId = async (choice, name) => {
-    if (choice === "" || choice == null) return null;
+    if (choice === '' || choice == null) return null;
     if (choice === NEW_GROUP) {
       if (!name.trim()) {
-        toast.error("Enter a name for the new group");
-        throw new Error("missing group name");
+        toast.error('Enter a name for the new group');
+        throw new Error('missing group name');
       }
       const res = await partyGroupApi.create({ name: name.trim() });
       await fetchGroups();
       if (res.data?.username && res.data?.initialPassword) {
-        toast.success(
-          `Group login created — ${res.data.username} / ${res.data.initialPassword}`,
-          { duration: 8000 }
-        );
+        toast.success(`Group login created — ${res.data.username} / ${res.data.initialPassword}`, {
+          duration: 8000,
+        });
       }
       return res.data.id;
     }
@@ -181,17 +183,17 @@ const PartyMaster = () => {
       await partyApi.updateParty(editDialog.data.id, updateData);
 
       // Apply group membership change (create new group if requested; null removes from group).
-      const groupId = await resolveGroupId(formData.groupChoice, formData.newGroupName || "");
+      const groupId = await resolveGroupId(formData.groupChoice, formData.newGroupName || '');
       await partyGroupApi.assignParty(editDialog.data.id, groupId);
 
       // Refresh the list
       await fetchParties();
 
       setEditDialog({ isOpen: false, data: null });
-      toast.success("Party updated successfully!");
+      toast.success('Party updated successfully!');
     } catch (error) {
-      console.error("Error updating party:", error);
-      if (error?.message !== "missing group name") {
+      console.error('Error updating party:', error);
+      if (error?.message !== 'missing group name') {
         toast.error(error.response?.data?.message || 'Failed to update party');
       }
     }
@@ -207,113 +209,121 @@ const PartyMaster = () => {
 
   const handleConfirmDelete = async () => {
     try {
+      setDeleting(true);
       await partyApi.deleteParty(deleteDialog.partyId);
-      
+
       // Refresh the list
       await fetchParties();
-      
-      setDeleteDialog({ isOpen: false, partyId: null, partyName: "" });
-      toast.success("Party deleted successfully!");
-    } catch (error) {
-      console.error("Error deleting party:", error);
-      toast.error(error.response?.data?.message || 'Failed to delete party');
-    }
-  };
 
-  const handleCancelDelete = () => {
-    setDeleteDialog({ isOpen: false, partyId: null, partyName: "" });
+      setDeleteDialog({ isOpen: false, partyId: null, partyName: '' });
+      toast.success('Party deleted successfully!');
+    } catch (error) {
+      console.error('Error deleting party:', error);
+      toast.error(error.response?.data?.message || 'Failed to delete party');
+    } finally {
+      setDeleting(false);
+    }
   };
 
   return (
     <SidebarLayout>
-      <div className="mx-auto">
-        <div className="mb-8">
-          <PageHeader
-            title="Party Master"
-            description="Centralised management of customers and vendors with GST, contact, and role details."
-            action={
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => setGroupModalOpen(true)}
-                  className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-gray-300 text-sm font-medium text-gray-700 hover:bg-gray-50 transition"
-                >
-                  <Users className="w-4 h-4" /> Group Logins
-                </button>
-                <PrimaryActionButton
-                  onClick={() => navigate("/masters/party/add")}
-                  icon={Plus}
-                >
-                  Add Party
-                </PrimaryActionButton>
-              </div>
-            }
+      <PageHeader
+        title="Party master"
+        subtitle="Customers and vendors, with GST, contact and group details"
+        actions={
+          <>
+            <Button variant="outline" size="sm" onClick={() => setGroupModalOpen(true)}>
+              <Users className="size-4" />
+              <span className="hidden sm:inline">Group logins</span>
+            </Button>
+            <Button size="sm" onClick={() => navigate('/masters/party/add')}>
+              <Plus className="size-4" />
+              <span className="hidden sm:inline">Add party</span>
+            </Button>
+          </>
+        }
+      />
+
+      <PageBody>
+        <div className="mb-5 grid grid-cols-1 gap-3 sm:grid-cols-3">
+          <StatCard
+            label="Customers"
+            value={fmtNumber(stats.customers)}
+            hint="Including parties marked Both"
+            icon={UserCheck}
+            tone="info"
+            isPending={loading}
+          />
+          <StatCard
+            label="Vendors"
+            value={fmtNumber(stats.vendors)}
+            hint="Including parties marked Both"
+            icon={Building2}
+            tone="brass"
+            isPending={loading}
+          />
+          <StatCard
+            label="Total parties"
+            value={fmtNumber(stats.total)}
+            icon={Users}
+            tone="primary"
+            isPending={loading}
           />
         </div>
 
-        {/* Stats Cards */}
-        <div className="grid grid-cols-3 gap-6 mb-8">
-          <StatsCard label="Total Customers" value={stats.customers} />
-          <StatsCard label="Total Vendors" value={stats.vendors} />
-          <StatsCard label="Total Parties" value={stats.total} />
-        </div>
-
-        {/* Search and Filter */}
         <PartiesTable
           filteredParties={filteredParties}
-          searchQuery={searchQuery}
-          setSearchQuery={setSearchQuery}
-          typeFilter={typeFilter}
-          setTypeFilter={setTypeFilter}
+          searchQuery={search}
+          setSearchQuery={onSearchChange}
+          typeFilter={filters.type}
+          setTypeFilter={(v) => setFilter('type', v)}
+          groupFilter={filters.group}
+          setGroupFilter={(v) => setFilter('group', v)}
+          groupOptions={groupOptions}
+          onClearFilters={clearFilters}
+          hasActiveFilters={hasActiveFilters}
           handleEdit={handleEdit}
           handleDeleteClick={handleDeleteClick}
           loading={loading}
         />
+      </PageBody>
 
-        {/* Edit Party Dialog */}
-        <EditPartyDialog
-          isOpen={editDialog.isOpen}
-          onClose={() => setEditDialog({ isOpen: false, data: null })}
-          onSave={handleSaveEdit}
-          initialData={editDialog.data}
-          groups={groups}
-        />
+      {/* Edit Party Dialog */}
+      <EditPartyDialog
+        isOpen={editDialog.isOpen}
+        onClose={() => setEditDialog({ isOpen: false, data: null })}
+        onSave={handleSaveEdit}
+        initialData={editDialog.data}
+        groups={groups}
+      />
 
-        {/* Group Logins management */}
-        <GroupLoginsModal
-          isOpen={groupModalOpen}
-          onClose={() => setGroupModalOpen(false)}
-          onChanged={() => {
-            fetchGroups();
-            fetchParties();
-          }}
-        />
+      {/* Group Logins management */}
+      <GroupLoginsModal
+        isOpen={groupModalOpen}
+        onClose={() => setGroupModalOpen(false)}
+        onChanged={() => {
+          fetchGroups();
+          fetchParties();
+        }}
+      />
 
-        {/* Message Alert */}
-        {message && (
-          <div className="mt-6 p-4 rounded-lg bg-green-50 text-green-800 border border-green-200 flex items-center justify-between">
-            <span>{message}</span>
-            <button
-              onClick={() => setMessage("")}
-              className="text-gray-500 hover:text-gray-700"
-            >
-              <X className="w-4 h-4" />
-            </button>
-          </div>
-        )}
-
-        {/* Confirmation Dialog */}
-        <ConfirmationDialog
-          isOpen={deleteDialog.isOpen}
-          title="Delete Party"
-          message={`Are you sure you want to delete "${deleteDialog.partyName}"? This action cannot be undone.`}
-          confirmText="Delete"
-          cancelText="Cancel"
-          onConfirm={handleConfirmDelete}
-          onCancel={handleCancelDelete}
-          isDangerous={true}
-        />
-      </div>
+      <ConfirmDialog
+        open={deleteDialog.isOpen}
+        onOpenChange={(open) => {
+          if (!open) setDeleteDialog({ isOpen: false, partyId: null, partyName: '' });
+        }}
+        title="Delete this party?"
+        description={
+          <>
+            <ConfirmName>{deleteDialog.partyName}</ConfirmName> will be removed from the master. Orders, bills and
+            job work already pointing at it are not deleted. This cannot be undone.
+          </>
+        }
+        confirmLabel="Delete"
+        busyLabel="Deleting…"
+        isPending={deleting}
+        onConfirm={handleConfirmDelete}
+      />
     </SidebarLayout>
   );
 };

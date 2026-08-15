@@ -1,10 +1,11 @@
-import React, { useEffect, useState } from "react";
-import { Building2, ChevronDown } from "lucide-react";
+import { useEffect, useMemo, useState } from 'react';
+import { Building2 } from 'lucide-react';
+import { SearchableSelect } from '@/components/ui/searchable-select';
 import {
   clientPortalCompaniesApi,
   getSelectedPartyId,
   setSelectedPartyId,
-} from "../../services/apiService";
+} from '@/services/apiService';
 
 /**
  * Lets a client who belongs to a group choose which company/party they are shopping as. The choice
@@ -13,7 +14,7 @@ import {
  */
 const CompanySwitcher = () => {
   const [companies, setCompanies] = useState([]);
-  const [selected, setSelected] = useState(getSelectedPartyId() || "");
+  const [selected, setSelected] = useState(getSelectedPartyId() || '');
 
   useEffect(() => {
     let cancelled = false;
@@ -32,7 +33,7 @@ const CompanySwitcher = () => {
         if (chosen != null && String(chosen) !== String(stored)) {
           setSelectedPartyId(chosen);
         }
-        setSelected(chosen != null ? String(chosen) : "");
+        setSelected(chosen != null ? String(chosen) : '');
       } catch {
         // Ignore — switcher just won't render.
       }
@@ -42,11 +43,15 @@ const CompanySwitcher = () => {
     };
   }, []);
 
+  const options = useMemo(
+    () => companies.map((c) => ({ value: String(c.partyId), label: c.partyName })),
+    [companies],
+  );
+
   // Nothing to switch between for a standalone client.
   if (companies.length <= 1) return null;
 
-  const handleChange = (e) => {
-    const value = e.target.value;
+  const handleChange = (value) => {
     setSelectedPartyId(value);
     setSelected(value);
     // Reload so every screen refetches scoped to the newly selected company.
@@ -54,25 +59,20 @@ const CompanySwitcher = () => {
   };
 
   return (
-    <div className="mb-4 px-1">
-      <label className="block text-[11px] font-medium uppercase tracking-wide text-gray-400 mb-1">
+    <div className="space-y-1.5">
+      <p className="flex items-center gap-1.5 text-[10px] font-semibold tracking-[0.13em] text-ink-3 uppercase">
+        <Building2 className="size-3" aria-hidden="true" />
         Company
-      </label>
-      <div className="relative">
-        <Building2 className="w-4 h-4 text-gray-400 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-        <select
-          value={selected}
-          onChange={handleChange}
-          className="w-full appearance-none text-sm border border-gray-300 rounded-lg pl-8 pr-8 py-2 bg-white focus:ring-2 focus:ring-gray-900 focus:border-transparent outline-none truncate"
-        >
-          {companies.map((c) => (
-            <option key={c.partyId} value={c.partyId}>
-              {c.partyName}
-            </option>
-          ))}
-        </select>
-        <ChevronDown className="w-4 h-4 text-gray-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-      </div>
+      </p>
+      <SearchableSelect
+        ariaLabel="Shopping as company"
+        options={options}
+        value={selected}
+        onChange={handleChange}
+        placeholder="Select company"
+        searchPlaceholder="Search companies…"
+        className="w-full"
+      />
     </div>
   );
 };

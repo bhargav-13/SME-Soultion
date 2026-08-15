@@ -1,193 +1,46 @@
-import React, { useState, useEffect } from "react";
-import { X } from "lucide-react";
+import { ViewDialog } from '@/components/form-dialog';
+import { ReadOnlyField } from '@/components/form-field';
+import { Button } from '@/components/ui/button';
 
-const ViewItemDialog = ({
-  isOpen,
-  onClose,
-  onEdit,
-  onDelete,
-  itemData = null,
-}) => {
-  const [formData, setFormData] = useState({
-    sizeInch: "",
-    sizeMM: "",
-    category: "",
-    itemKg: "",
-    weightPerPL: "",
-    totalPL: "",
-    dozenWeight: "",
-    lowStockWarning: "",
-  });
-
-  useEffect(() => {
-    if (itemData) {
-      setFormData({
-        sizeInch: itemData.sizeInch || "",
-        sizeMM: itemData.sizeMM || "",
-        category: itemData.category || "",
-        itemKg: itemData.itemKg || "",
-        weightPerPL: itemData.weightPerPL || "",
-        totalPL: itemData.totalPL || "",
-        dozenWeight: itemData.dozenWeight || "",
-        lowStockWarning: itemData.lowStockWarning || "",
-      });
-    }
-  }, [itemData, isOpen]);
-
+const ViewItemDialog = ({ isOpen, onClose, onEdit, onDelete, itemData = null }) => {
   const handleEdit = () => {
-    if (onEdit) {
-      onEdit(itemData);
-    }
+    if (onEdit) onEdit(itemData);
     onClose();
   };
 
   const handleDelete = () => {
-    if (onDelete) {
-      onDelete(itemData);
-    }
+    if (onDelete) onDelete(itemData);
     onClose();
   };
 
-  if (!isOpen) return null;
-
   return (
-    <div className="fixed inset-0 bg-black/50  flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg shadow-lg p-8 w-full max-w-xl max-h-[90vh] overflow-y-auto">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-6">
-          <h2 className="text-xl font-medium text-black">Item Details</h2>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-gray-500"
-          >
-            <X className="w-6 h-6" />
-          </button>
-        </div>
-
-        {/* Form - Read Only */}
-        <div className="space-y-4 mb-6">
-          {/* Row 1 */}
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-black mb-1">
-                Size in Inch
-              </label>
-              <input
-                type="text"
-                value={formData.sizeInch}
-                readOnly
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-sm text-gray-500"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-black mb-1">
-                Size in MM
-              </label>
-              <input
-                type="text"
-                value={formData.sizeMM}
-                readOnly
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-sm text-gray-500"
-              />
-            </div>
-          </div>
-
-          {/* Row 2 - Category */}
-          <div>
-            <label className="block text-sm font-medium text-black mb-1">
-              Category
-            </label>
-            <input
-              type="text"
-              value={formData.category}
-              readOnly
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-sm text-gray-500"
-            />
-          </div>
-
-          {/* Row 3 */}
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-black mb-1">
-                Item in Kg
-              </label>
-              <input
-                type="text"
-                value={formData.itemKg}
-                readOnly
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-sm text-gray-500"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-black mb-1">
-                Weight/PL
-              </label>
-              <input
-                type="text"
-                value={formData.weightPerPL}
-                readOnly
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-sm text-gray-500"
-              />
-            </div>
-          </div>
-
-          {/* Row 4 */}
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-black mb-1">
-                Total PL
-              </label>
-              <input
-                type="text"
-                value={formData.totalPL}
-                readOnly
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-sm text-gray-500"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-black mb-1">
-                Dozen Weight
-              </label>
-              <input
-                type="text"
-                value={formData.dozenWeight}
-                readOnly
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-sm text-gray-500"
-              />
-            </div>
-          </div>
-
-          {/* Row 5 */}
-          <div>
-            <label className="block text-sm font-medium text-black mb-1">
-              Low stock Warning [Pcs]
-            </label>
-            <input
-              type="text"
-              value={formData.lowStockWarning}
-              readOnly
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-sm text-gray-500"
-            />
-          </div>
-        </div>
-
-        {/* Action Buttons */}
-        <div className="flex gap-3 justify-center">
-          <button
-            onClick={handleEdit}
-            className="bg-black text-white px-6 py-2 rounded-xl hover:bg-gray-900 transition font-medium text-sm"
-          >
-            Edit
-          </button>
-          <button
-            onClick={handleDelete}
-            className="border border-gray-800 text-gray-800 px-4 py-2 rounded-xl hover:bg-gray-50 transition font-medium text-sm"
-          >
+    <ViewDialog
+      open={isOpen}
+      onOpenChange={(open) => !open && onClose()}
+      title="Item details"
+      size="md"
+      actions={
+        <>
+          <Button variant="outline" onClick={handleDelete}>
             Delete
-          </button>
+          </Button>
+          <Button onClick={handleEdit}>Edit</Button>
+        </>
+      }
+    >
+      {itemData && (
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <ReadOnlyField label="Size in inch" value={itemData.sizeInch} />
+          <ReadOnlyField label="Size in mm" value={itemData.sizeMM} />
+          <ReadOnlyField label="Category" value={itemData.category} className="sm:col-span-2" />
+          <ReadOnlyField label="Item in Kg" value={itemData.itemKg} mono />
+          <ReadOnlyField label="Weight/Pc." value={itemData.weightPerPL} mono />
+          <ReadOnlyField label="Total Pc." value={itemData.totalPL} mono />
+          <ReadOnlyField label="Dozen weight" value={itemData.dozenWeight} mono />
+          <ReadOnlyField label="Low stock warning [Pcs]" value={itemData.lowStockWarning} mono className="sm:col-span-2" />
         </div>
-      </div>
-    </div>
+      )}
+    </ViewDialog>
   );
 };
 

@@ -1,41 +1,35 @@
-import React, { useState } from "react";
-import { ChevronDown } from "lucide-react";
+import { ChevronDown } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 
-const TYPE_OPTIONS = ["JOB_WORK", "INHOUSE", "OUTSIDE"];
-const TYPE_LABEL = { JOB_WORK: "Job Work", INHOUSE: "In-Side", OUTSIDE: "Out-Side" };
+const TYPE_OPTIONS = ['JOB_WORK', 'INHOUSE', 'OUTSIDE'];
+const TYPE_LABEL = { JOB_WORK: 'Job Work', INHOUSE: 'In-Side', OUTSIDE: 'Out-Side' };
 
-const JobWorkTypeDropdown = ({ value, onChange }) => {
-  const [open, setOpen] = useState(false);
-
-  return (
-    <div className="relative">
-      <button
-        type="button"
-        onClick={() => setOpen((prev) => !prev)}
-        className="flex items-center gap-2 px-4 py-1.5 border border-gray-300 rounded-md bg-white text-sm font-medium text-black transition hover:border-gray-400"
-      >
+const JobWorkTypeDropdown = ({ value, onChange }) => (
+  <DropdownMenu>
+    <DropdownMenuTrigger asChild>
+      <Button variant="outline" size="sm" className="h-7 gap-1.5 rounded-full px-3 text-[12px] font-medium">
         {TYPE_LABEL[value] || value}
-        <ChevronDown className={`w-3.5 h-3.5 text-gray-500 transition-transform ${open ? "rotate-180" : ""}`} />
-      </button>
-      {open && (
-        <div className="absolute z-20 mt-1 w-36 bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden">
-          {TYPE_OPTIONS.map((opt) => (
-            <button
-              key={opt}
-              type="button"
-              onClick={() => {
-                onChange(opt);
-                setOpen(false);
-              }}
-              className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-50 ${value === opt ? "font-semibold" : ""}`}
-            >
-              {TYPE_LABEL[opt]}
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-};
+        <ChevronDown className="size-3.5 text-ink-3" />
+      </Button>
+    </DropdownMenuTrigger>
+    <DropdownMenuContent align="start" className="min-w-[9rem]">
+      <DropdownMenuRadioGroup value={value} onValueChange={onChange}>
+        {TYPE_OPTIONS.map((opt) => (
+          <DropdownMenuRadioItem key={opt} value={opt}>
+            {TYPE_LABEL[opt]}
+          </DropdownMenuRadioItem>
+        ))}
+      </DropdownMenuRadioGroup>
+    </DropdownMenuContent>
+  </DropdownMenu>
+);
 
+export { TYPE_LABEL };
 export default JobWorkTypeDropdown;

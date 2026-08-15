@@ -1,19 +1,33 @@
-import React, { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useEffect, useMemo, useState } from 'react';
 import {
-  Users,
-  ArrowLeft,
-  Package,
-  Scale,
-  RotateCcw,
-  Clock,
-  Search,
-  CheckCircle2,
   AlertTriangle,
-} from "lucide-react";
-import SidebarLayout from "../components/SidebarLayout";
-import { axiosInstance, partyApi } from "../services/apiService";
-import { KpiCard, BarChart, LineChart, DonutChart, StatBar, PALETTE, numFmt } from "../components/charts";
+  CheckCircle2,
+  Clock,
+  Package,
+  RotateCcw,
+  Scale,
+  Users,
+} from 'lucide-react';
+import SidebarLayout from '@/components/SidebarLayout';
+import { ListToolbar } from '@/components/list-toolbar';
+import { PageBody, PageHeader } from '@/components/page-header';
+import { EmptyState, ListSkeleton } from '@/components/states';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { matchesSearch, useListFilters } from '@/hooks/use-list-filters';
+import { axiosInstance, partyApi } from '@/services/apiService';
+import {
+  BarChart,
+  ChartPanel,
+  DonutChart,
+  KpiCard,
+  LineChart,
+  PALETTE,
+  StatBar,
+  numFmt,
+} from '@/components/charts';
 
 const listOf = (res) => {
   const d = res?.data;
@@ -27,7 +41,7 @@ const monthKey = (dateStr) => {
   if (!dateStr) return null;
   const d = new Date(dateStr);
   if (Number.isNaN(d.getTime())) return null;
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
 };
 
 const lastNMonths = (n) => {
@@ -36,8 +50,8 @@ const lastNMonths = (n) => {
   for (let i = n - 1; i >= 0; i--) {
     const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
     out.push({
-      key: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`,
-      label: d.toLocaleString("en-IN", { month: "short" }),
+      key: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`,
+      label: d.toLocaleString('en-IN', { month: 'short' }),
     });
   }
   return out;
@@ -54,8 +68,8 @@ const lastNMonths = (n) => {
 const groupByParty = (jobWorks) => {
   const map = new Map();
   for (const j of jobWorks) {
-    const id = j.party?.id ?? "unknown";
-    const name = j.party?.name || "—";
+    const id = j.party?.id ?? 'unknown';
+    const name = j.party?.name || '—';
     if (!map.has(id)) {
       map.set(id, {
         partyId: id,
@@ -73,7 +87,7 @@ const groupByParty = (jobWorks) => {
     }
     const p = map.get(id);
     p.count += 1;
-    if ((j.status || "PENDING") === "COMPLETE") p.doneCount += 1;
+    if ((j.status || 'PENDING') === 'COMPLETE') p.doneCount += 1;
     else p.pendingCount += 1;
     p.given += Number(j.qtyKg) || 0;
     p.totalRate += Number(j.totalRate) || 0;
@@ -92,29 +106,36 @@ const groupByParty = (jobWorks) => {
   return Array.from(map.values()).sort((a, b) => b.given - a.given);
 };
 
-/** ⬇ MAIN PAGE ⬇ */
-const PlatingAnalytics = ({ jobWorkType, title, subtitle, accent = "blue" }) => {
-  const navigate = useNavigate();
+const SORT_OPTIONS = [
+  { value: 'given', label: 'Most Kg given' },
+  { value: 'pending', label: 'Most Kg pending' },
+  { value: 'value', label: 'Highest value' },
+  { value: 'recent', label: 'Most recent' },
+  { value: 'name', label: 'Party name' },
+];
+
+/** The party-wise plating analytics screen, shared by the in-house and outside job-work routes. */
+const PlatingAnalytics = ({ jobWorkType, title, subtitle, accent = 'primary' }) => {
   const [loading, setLoading] = useState(true);
   const [jobWorks, setJobWorks] = useState([]);
-  const [parties, setParties] = useState([]);
-  const [search, setSearch] = useState("");
   const [selectedId, setSelectedId] = useState(null);
+
+  const { filters, setFilter, search, onSearchChange, debouncedSearch, clearFilters, hasActiveFilters } =
+    useListFilters({ defaults: { sort: 'given' } });
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
       setLoading(true);
       try {
-        const [jRes, pRes] = await Promise.allSettled([
-          axiosInstance.get("/api/v1/job-works", {
+        const [jRes] = await Promise.allSettled([
+          axiosInstance.get('/api/v1/job-works', {
             params: { jobWorkType, page: 0, size: 1000 },
           }),
           partyApi.getAllParties(),
         ]);
         if (cancelled) return;
-        setJobWorks(jRes.status === "fulfilled" ? listOf(jRes.value) : []);
-        setParties(pRes.status === "fulfilled" ? listOf(pRes.value) : []);
+        setJobWorks(jRes.status === 'fulfilled' ? listOf(jRes.value) : []);
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -127,14 +148,30 @@ const PlatingAnalytics = ({ jobWorkType, title, subtitle, accent = "blue" }) => 
   const partyAggregates = useMemo(() => groupByParty(jobWorks), [jobWorks]);
 
   const filteredParties = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    if (!q) return partyAggregates;
-    return partyAggregates.filter((p) => (p.partyName || "").toLowerCase().includes(q));
-  }, [partyAggregates, search]);
+    const list = partyAggregates.filter((p) => matchesSearch(p, debouncedSearch, ['partyName']));
+    const sorted = [...list];
+    switch (filters.sort) {
+      case 'pending':
+        sorted.sort((a, b) => b.pending - a.pending);
+        break;
+      case 'value':
+        sorted.sort((a, b) => b.totalRate - a.totalRate);
+        break;
+      case 'recent':
+        sorted.sort((a, b) => new Date(b.lastDate || 0) - new Date(a.lastDate || 0));
+        break;
+      case 'name':
+        sorted.sort((a, b) => a.partyName.localeCompare(b.partyName));
+        break;
+      default:
+        sorted.sort((a, b) => b.given - a.given);
+    }
+    return sorted;
+  }, [partyAggregates, debouncedSearch, filters.sort]);
 
   const selected = useMemo(
     () => partyAggregates.find((p) => String(p.partyId) === String(selectedId)) || null,
-    [partyAggregates, selectedId]
+    [partyAggregates, selectedId],
   );
 
   const summary = useMemo(() => {
@@ -153,36 +190,44 @@ const PlatingAnalytics = ({ jobWorkType, title, subtitle, accent = "blue" }) => 
 
   return (
     <SidebarLayout>
-      <div className="mx-auto max-w-7xl px-5 py-6 space-y-6">
+      <PageHeader
+        title={selected ? selected.partyName : title}
+        subtitle={selected ? `${selected.count} job work${selected.count === 1 ? '' : 's'}` : subtitle}
+        {...(selected
+          ? {
+              actions: (
+                <Button variant="outline" size="sm" onClick={() => setSelectedId(null)}>
+                  All parties
+                </Button>
+              ),
+            }
+          : {})}
+      />
+
+      <PageBody className="space-y-5">
         {selected ? (
-          <PartyDetail party={selected} accent={accent} onBack={() => setSelectedId(null)} />
+          <PartyDetail party={selected} accent={accent} />
         ) : (
           <>
-            {/* Header */}
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900">{title}</h1>
-              <p className="text-sm text-gray-500 mt-1">{subtitle}</p>
-            </div>
-
             {/* Summary KPI */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
               <KpiCard label="Parties" value={numFmt.int(summary.partyCount)} icon={Users} accent={accent} />
               <KpiCard
-                label="Total Kg Given"
+                label="Total Kg given"
                 value={numFmt.num(summary.given, 1)}
                 sublabel="Across all job works"
                 icon={Scale}
                 accent="slate"
               />
               <KpiCard
-                label="Total Kg Returned"
+                label="Total Kg returned"
                 value={numFmt.num(summary.returned, 1)}
                 sublabel={`${((summary.returned / (summary.given || 1)) * 100).toFixed(0)}% of given`}
                 icon={RotateCcw}
                 accent="green"
               />
               <KpiCard
-                label="Kg Pending"
+                label="Kg pending"
                 value={numFmt.num(summary.pending, 1)}
                 sublabel={`₹ ${numFmt.int(summary.totalRate)} total value`}
                 icon={Clock}
@@ -191,42 +236,51 @@ const PlatingAnalytics = ({ jobWorkType, title, subtitle, accent = "blue" }) => 
             </div>
 
             {loading ? (
-              <div className="text-sm text-gray-400 py-16 text-center">Loading party analytics…</div>
+              <ListSkeleton rows={3} className="h-44" />
             ) : partyAggregates.length === 0 ? (
-              <div className="text-sm text-gray-400 py-16 text-center rounded-xl border border-dashed border-gray-300 bg-gray-50">
-                No {title.toLowerCase()} records yet.
-              </div>
+              <EmptyState
+                icon={Users}
+                title={`No ${title.toLowerCase()} records yet`}
+                description="Job works of this type will roll up here, party by party."
+              />
             ) : (
               <>
-                {/* Search */}
-                <div className="relative max-w-md">
-                  <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                  <input
-                    type="text"
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                    placeholder="Search party…"
-                    className="w-full pl-9 pr-3 py-2.5 border border-gray-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-gray-900/10 outline-none"
-                  />
-                </div>
+                <ListToolbar
+                  search={{ value: search, onChange: onSearchChange, placeholder: 'Search party…' }}
+                  onClear={clearFilters}
+                  hasActiveFilters={hasActiveFilters}
+                  sort={{ value: filters.sort, onChange: (v) => setFilter('sort', v), options: SORT_OPTIONS }}
+                  className="mb-0"
+                />
 
-                {/* Party cards grid */}
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {filteredParties.map((p, idx) => (
-                    <PartyCard
-                      key={p.partyId}
-                      party={p}
-                      accent={accent}
-                      color={PALETTE[idx % PALETTE.length]}
-                      onClick={() => setSelectedId(p.partyId)}
-                    />
-                  ))}
-                </div>
+                {filteredParties.length === 0 ? (
+                  <EmptyState
+                    icon={Users}
+                    title="No parties match"
+                    description="Nothing here matches that search."
+                    action={
+                      <Button variant="outline" size="sm" onClick={clearFilters}>
+                        Clear search
+                      </Button>
+                    }
+                  />
+                ) : (
+                  <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
+                    {filteredParties.map((p, idx) => (
+                      <PartyCard
+                        key={p.partyId}
+                        party={p}
+                        color={PALETTE[idx % PALETTE.length]}
+                        onClick={() => setSelectedId(p.partyId)}
+                      />
+                    ))}
+                  </div>
+                )}
               </>
             )}
           </>
         )}
-      </div>
+      </PageBody>
     </SidebarLayout>
   );
 };
@@ -241,58 +295,56 @@ const PartyCard = ({ party, onClick, color }) => {
     <button
       type="button"
       onClick={onClick}
-      className="group relative text-left rounded-2xl border border-gray-200 bg-white p-5 shadow-sm hover:shadow-md hover:border-gray-300 transition"
+      className="group rounded-xl border border-line bg-surface p-4 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md"
     >
       <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <div className="flex items-center gap-2 flex-wrap">
-            <span
-              className="inline-flex items-center justify-center w-9 h-9 rounded-full text-white text-sm font-bold shrink-0"
-              style={{ background: color }}
-            >
-              {(party.partyName || "?").charAt(0).toUpperCase()}
-            </span>
-            <div className="min-w-0">
-              <p className="font-semibold text-gray-900 truncate">{party.partyName}</p>
-              <p className="text-xs text-gray-500">
-                {party.count} job work{party.count === 1 ? "" : "s"} · last{" "}
-                {party.lastDate ? new Date(party.lastDate).toLocaleDateString("en-IN") : "—"}
-              </p>
-            </div>
+        <div className="flex min-w-0 items-center gap-2.5">
+          <span
+            className="grid size-9 shrink-0 place-items-center rounded-full text-[13px] font-bold text-white"
+            style={{ background: color }}
+          >
+            {(party.partyName || '?').charAt(0).toUpperCase()}
+          </span>
+          <div className="min-w-0">
+            <p className="truncate text-[13.5px] font-semibold text-ink">{party.partyName}</p>
+            <p className="text-[11.5px] text-ink-3">
+              {party.count} job work{party.count === 1 ? '' : 's'} · last{' '}
+              {party.lastDate ? new Date(party.lastDate).toLocaleDateString('en-IN') : '—'}
+            </p>
           </div>
         </div>
         {isComplete ? (
-          <span className="inline-flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-full bg-emerald-50 text-emerald-700 shrink-0">
-            <CheckCircle2 className="w-3 h-3" /> Cleared
-          </span>
+          <Badge variant="success" className="shrink-0 gap-1">
+            <CheckCircle2 className="size-3" /> Cleared
+          </Badge>
         ) : party.pending > 0 ? (
-          <span className="inline-flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-full bg-amber-50 text-amber-700 shrink-0">
-            <AlertTriangle className="w-3 h-3" /> {numFmt.num(party.pending, 1)} kg
-          </span>
+          <Badge variant="warning" className="shrink-0 gap-1">
+            <AlertTriangle className="size-3" /> {numFmt.num(party.pending, 1)} kg
+          </Badge>
         ) : null}
       </div>
 
-      <div className="mt-4 grid grid-cols-3 gap-2 text-center">
-        <div className="rounded-lg bg-slate-50 p-2">
-          <p className="text-[10px] uppercase tracking-wide text-slate-500">Given</p>
-          <p className="text-sm font-bold text-slate-900">{numFmt.num(party.given, 1)}</p>
+      <div className="mt-3.5 grid grid-cols-3 gap-2 text-center">
+        <div className="rounded-lg bg-surface-2 p-2">
+          <p className="text-[10px] tracking-[0.04em] text-ink-3 uppercase">Given</p>
+          <p className="font-mono text-[13px] font-semibold text-ink">{numFmt.num(party.given, 1)}</p>
         </div>
-        <div className="rounded-lg bg-emerald-50 p-2">
-          <p className="text-[10px] uppercase tracking-wide text-emerald-600">Returned</p>
-          <p className="text-sm font-bold text-emerald-800">{numFmt.num(party.returned, 1)}</p>
+        <div className="rounded-lg bg-success-soft p-2">
+          <p className="text-[10px] tracking-[0.04em] text-success uppercase">Returned</p>
+          <p className="font-mono text-[13px] font-semibold text-success">{numFmt.num(party.returned, 1)}</p>
         </div>
-        <div className="rounded-lg bg-amber-50 p-2">
-          <p className="text-[10px] uppercase tracking-wide text-amber-600">Pending</p>
-          <p className="text-sm font-bold text-amber-800">{numFmt.num(party.pending, 1)}</p>
+        <div className="rounded-lg bg-warning-soft p-2">
+          <p className="text-[10px] tracking-[0.04em] text-warning uppercase">Pending</p>
+          <p className="font-mono text-[13px] font-semibold text-warning">{numFmt.num(party.pending, 1)}</p>
         </div>
       </div>
 
       <div className="mt-3">
-        <div className="flex items-center justify-between text-[11px] text-gray-500 mb-1">
+        <div className="mb-1 flex items-center justify-between text-[11px] text-ink-3">
           <span>Return progress</span>
-          <span className="font-medium text-gray-700">{returnedPct.toFixed(0)}%</span>
+          <span className="font-mono font-medium text-ink-2">{returnedPct.toFixed(0)}%</span>
         </div>
-        <div className="h-2 rounded-full bg-gray-100 overflow-hidden">
+        <div className="h-2 overflow-hidden rounded-full bg-line-2">
           <div
             className="h-full rounded-full transition-all"
             style={{ width: `${Math.min(100, returnedPct)}%`, background: color }}
@@ -300,9 +352,9 @@ const PartyCard = ({ party, onClick, color }) => {
         </div>
       </div>
 
-      <div className="mt-3 flex items-center justify-between text-xs text-gray-500">
+      <div className="mt-3 flex items-center justify-between border-t border-line-2 pt-2.5 text-[11.5px] text-ink-3">
         <span>Total value</span>
-        <span className="font-semibold text-gray-900">₹ {numFmt.int(party.totalRate)}</span>
+        <span className="font-mono font-semibold text-ink">₹ {numFmt.int(party.totalRate)}</span>
       </div>
     </button>
   );
@@ -311,7 +363,7 @@ const PartyCard = ({ party, onClick, color }) => {
 // ────────────────────────────────────────────────────────────────
 // Drill-down for one party
 // ────────────────────────────────────────────────────────────────
-const PartyDetail = ({ party, onBack, accent }) => {
+const PartyDetail = ({ party, accent }) => {
   const months = lastNMonths(6);
   const byMonth = new Map(months.map((m) => [m.key, { given: 0, returned: 0 }]));
   for (const j of party.rows) {
@@ -326,7 +378,7 @@ const PartyDetail = ({ party, onBack, accent }) => {
   // Item-wise sent
   const itemMap = new Map();
   for (const j of party.rows) {
-    const name = j.size?.itemName || j.size?.item?.itemName || j.size?.sizeInInch || "—";
+    const name = j.size?.itemName || j.size?.item?.itemName || j.size?.sizeInInch || '—';
     itemMap.set(name, (itemMap.get(name) || 0) + (Number(j.qtyKg) || 0));
   }
   const topItems = Array.from(itemMap.entries())
@@ -334,142 +386,111 @@ const PartyDetail = ({ party, onBack, accent }) => {
     .sort((a, b) => b.value - a.value);
 
   const statusDonut = [
-    { label: "Completed", value: party.doneCount, color: PALETTE[1] },
-    { label: "Pending", value: party.pendingCount, color: PALETTE[2] },
+    { label: 'Completed', value: party.doneCount, color: PALETTE[3] },
+    { label: 'Pending', value: party.pendingCount, color: PALETTE[7] },
   ];
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between gap-3">
-        <button
-          type="button"
-          onClick={onBack}
-          className="inline-flex items-center gap-1.5 text-sm text-gray-600 hover:text-black transition"
-        >
-          <ArrowLeft className="w-4 h-4" /> Back to all parties
-        </button>
-      </div>
-
-      <div className="flex items-center gap-3">
-        <span
-          className="inline-flex items-center justify-center w-12 h-12 rounded-full text-white text-lg font-bold"
-          style={{ background: PALETTE[0] }}
-        >
-          {(party.partyName || "?").charAt(0).toUpperCase()}
+    <div className="space-y-5">
+      <p className="text-[12.5px] text-ink-3">
+        Last activity{' '}
+        <span className="font-mono font-medium text-ink-2">
+          {party.lastDate ? new Date(party.lastDate).toLocaleDateString('en-IN') : '—'}
         </span>
-        <div>
-          <h2 className="text-2xl font-bold text-gray-900">{party.partyName}</h2>
-          <p className="text-sm text-gray-500">
-            {party.count} job work{party.count === 1 ? "" : "s"} · Last activity{" "}
-            {party.lastDate ? new Date(party.lastDate).toLocaleDateString("en-IN") : "—"}
-          </p>
-        </div>
-      </div>
+      </p>
 
       {/* KPI */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <KpiCard label="Given" value={`${numFmt.num(party.given, 2)} kg`} icon={Scale} accent="slate" />
         <KpiCard label="Returned" value={`${numFmt.num(party.returned, 2)} kg`} icon={RotateCcw} accent="green" />
         <KpiCard label="Pending" value={`${numFmt.num(party.pending, 2)} kg`} icon={Clock} accent="amber" />
-        <KpiCard label="Total Value" value={`₹ ${numFmt.int(party.totalRate)}`} icon={Package} accent={accent} />
+        <KpiCard label="Total value" value={`₹ ${numFmt.int(party.totalRate)}`} icon={Package} accent={accent} />
       </div>
 
       {/* Progress bar */}
-      <div className="bg-white rounded-2xl border border-gray-200 p-5 shadow-sm">
-        <StatBar
-          label="Return progress"
-          value={party.returned}
-          total={party.given}
-          suffix=" kg"
-          color={PALETTE[1]}
-        />
-      </div>
+      <Card className="gap-0 rounded-xl p-4 sm:p-5">
+        <StatBar label="Return progress" value={party.returned} total={party.given} suffix=" kg" color={PALETTE[3]} />
+      </Card>
 
       {/* Charts */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <div className="bg-white rounded-2xl border border-gray-200 p-5 shadow-sm lg:col-span-2">
-          <div className="mb-3">
-            <h3 className="text-base font-semibold text-gray-900">Monthly Kg given</h3>
-            <p className="text-xs text-gray-500">Last 6 months</p>
-          </div>
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
+        <ChartPanel className="xl:col-span-2" title="Monthly Kg given" subtitle="Last 6 months">
           <LineChart data={trend} color={PALETTE[0]} />
-        </div>
-        <div className="bg-white rounded-2xl border border-gray-200 p-5 shadow-sm">
-          <div className="mb-3">
-            <h3 className="text-base font-semibold text-gray-900">Status</h3>
-            <p className="text-xs text-gray-500">Completed vs pending</p>
-          </div>
+        </ChartPanel>
+        <ChartPanel title="Status" subtitle="Completed vs pending">
           <DonutChart data={statusDonut} centerLabel="Total JW" />
-        </div>
+        </ChartPanel>
       </div>
 
-      {/* Top items */}
-      <div className="bg-white rounded-2xl border border-gray-200 p-5 shadow-sm">
-        <div className="mb-4">
-          <h3 className="text-base font-semibold text-gray-900">Top items sent</h3>
-          <p className="text-xs text-gray-500">Total Kg by item</p>
-        </div>
+      <ChartPanel title="Top items sent" subtitle="Total Kg by item">
         <BarChart data={topItems} valueLabel="Kg" maxRows={8} />
-      </div>
+      </ChartPanel>
 
       {/* Job work rows table */}
-      <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-        <div className="p-5 border-b border-gray-200">
-          <h3 className="text-base font-semibold text-gray-900">Job work history</h3>
+      <Card className="gap-0 overflow-hidden py-0">
+        <div className="border-b border-line px-4 py-3.5 sm:px-5">
+          <h3 className="font-heading text-[14px] font-semibold text-ink">Job work history</h3>
         </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="bg-gray-50 text-gray-600 text-xs uppercase tracking-wide">
-              <tr>
-                <th className="text-left px-4 py-2.5">Chithi No.</th>
-                <th className="text-left px-4 py-2.5">Date</th>
-                <th className="text-left px-4 py-2.5">Item</th>
-                <th className="text-right px-4 py-2.5">Kg given</th>
-                <th className="text-right px-4 py-2.5">Kg returned</th>
-                <th className="text-right px-4 py-2.5">Rate / Kg</th>
-                <th className="text-right px-4 py-2.5">Total</th>
-                <th className="text-left px-4 py-2.5">Status</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
+        <div className="w-full overflow-x-auto">
+          <Table>
+            <TableHeader>
+              <TableRow className="hover:bg-transparent">
+                {['Chithi no.', 'Date', 'Item'].map((h) => (
+                  <TableHead
+                    key={h}
+                    className="px-3 text-[11.5px] font-semibold tracking-[0.03em] text-ink-3 uppercase"
+                  >
+                    {h}
+                  </TableHead>
+                ))}
+                {['Kg given', 'Kg returned', 'Rate / Kg', 'Total'].map((h) => (
+                  <TableHead
+                    key={h}
+                    className="px-3 text-right text-[11.5px] font-semibold tracking-[0.03em] text-ink-3 uppercase"
+                  >
+                    {h}
+                  </TableHead>
+                ))}
+                <TableHead className="px-3 text-[11.5px] font-semibold tracking-[0.03em] text-ink-3 uppercase">
+                  Status
+                </TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
               {party.rows.map((j) => {
                 const ret = (j.jobWorkReturns || []).reduce((s, r) => s + (Number(r.returnKg) || 0), 0);
-                const itemName = j.size?.itemName || j.size?.item?.itemName || j.size?.sizeInInch || "—";
+                const itemName = j.size?.itemName || j.size?.item?.itemName || j.size?.sizeInInch || '—';
                 return (
-                  <tr key={j.id} className="hover:bg-gray-50">
-                    <td className="px-4 py-2.5 font-medium text-gray-900">{j.chitthiNo || `#${j.id}`}</td>
-                    <td className="px-4 py-2.5 text-gray-700">
-                      {j.jobDate ? new Date(j.jobDate).toLocaleDateString("en-IN") : "—"}
-                    </td>
-                    <td className="px-4 py-2.5 text-gray-700">{itemName}</td>
-                    <td className="px-4 py-2.5 text-right tabular-nums">{numFmt.num(j.qtyKg, 3)}</td>
-                    <td className="px-4 py-2.5 text-right tabular-nums text-emerald-700">
+                  <TableRow key={j.id} className="border-line-2">
+                    <TableCell className="px-3 py-2.5 font-mono text-[12.5px] font-medium text-ink">
+                      {j.chitthiNo || `#${j.id}`}
+                    </TableCell>
+                    <TableCell className="px-3 py-2.5 font-mono text-[12.5px] text-ink-2">
+                      {j.jobDate ? new Date(j.jobDate).toLocaleDateString('en-IN') : '—'}
+                    </TableCell>
+                    <TableCell className="px-3 py-2.5 text-[13px] text-ink-2">{itemName}</TableCell>
+                    <TableCell className="px-3 py-2.5 text-right font-mono text-[12.5px]">
+                      {numFmt.num(j.qtyKg, 3)}
+                    </TableCell>
+                    <TableCell className="px-3 py-2.5 text-right font-mono text-[12.5px] text-success">
                       {numFmt.num(ret, 3)}
-                    </td>
-                    <td className="px-4 py-2.5 text-right tabular-nums">
-                      {j.ratePerKg != null ? numFmt.num(j.ratePerKg, 2) : "—"}
-                    </td>
-                    <td className="px-4 py-2.5 text-right tabular-nums font-semibold">
+                    </TableCell>
+                    <TableCell className="px-3 py-2.5 text-right font-mono text-[12.5px]">
+                      {j.ratePerKg != null ? numFmt.num(j.ratePerKg, 2) : '—'}
+                    </TableCell>
+                    <TableCell className="px-3 py-2.5 text-right font-mono text-[12.5px] font-semibold text-ink">
                       ₹ {numFmt.int(j.totalRate || 0)}
-                    </td>
-                    <td className="px-4 py-2.5">
-                      <span
-                        className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
-                          j.status === "COMPLETE"
-                            ? "bg-emerald-50 text-emerald-700"
-                            : "bg-amber-50 text-amber-700"
-                        }`}
-                      >
-                        {j.status || "PENDING"}
-                      </span>
-                    </td>
-                  </tr>
+                    </TableCell>
+                    <TableCell className="px-3 py-2.5">
+                      <Badge variant={j.status === 'COMPLETE' ? 'success' : 'warning'}>{j.status || 'PENDING'}</Badge>
+                    </TableCell>
+                  </TableRow>
                 );
               })}
-            </tbody>
-          </table>
+            </TableBody>
+          </Table>
         </div>
-      </div>
+      </Card>
     </div>
   );
 };

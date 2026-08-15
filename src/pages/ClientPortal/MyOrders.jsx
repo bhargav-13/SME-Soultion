@@ -1,8 +1,22 @@
-import React, { useEffect, useMemo, useState } from "react";
-import { Download } from "lucide-react";
-import SidebarLayout from "../../components/SidebarLayout";
-import PageHeader from "../../components/PageHeader";
-import { clientPortalClientApi, clientPortalInvoicesApi } from "../../services/apiService";
+import { useEffect, useMemo, useState } from 'react';
+import { Download, Inbox } from 'lucide-react';
+import toast from 'react-hot-toast';
+import SidebarLayout from '@/components/SidebarLayout';
+import { PageBody, PageHeader } from '@/components/page-header';
+import { EmptyState, ListSkeleton } from '@/components/states';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import { clientPortalClientApi, clientPortalInvoicesApi } from '@/services/apiService';
 import {
   ORDER_STATUS,
   ORDER_STATUS_TABS,
@@ -12,22 +26,24 @@ import {
   stageFieldFor,
   stageQty,
   sumStage,
-} from "../../utils/clientShop";
-import toast from "react-hot-toast";
+} from '@/utils/clientShop';
 
 const PAGE_SIZE = 10;
 const ORDER_REQUESTS_PAGE_SIZE = 100;
 const INVOICES_PAGE_SIZE = 10;
 
 const TABS = [
-  { key: "ALL", label: "All" },
+  { key: 'ALL', label: 'All' },
   ...ORDER_STATUS_TABS.map((key) => ({ key, label: ORDER_STATUS[key].label })),
 ];
 
 /** Tabs that select whole requests by their approval state rather than by quantity. */
-const REQUEST_STATE_TABS = new Set(["PENDING_APPROVAL", "REJECTED"]);
+const REQUEST_STATE_TABS = new Set(['PENDING_APPROVAL', 'REJECTED']);
 
-const formatDate = (value) => (value ? new Date(value).toLocaleDateString() : "-");
+const formatDate = (value) => (value ? new Date(value).toLocaleDateString() : '-');
+
+const HEAD_CLASS = 'px-4 py-2.5 text-center text-[11.5px] font-semibold tracking-[0.03em] text-ink-3 uppercase whitespace-nowrap';
+const CELL_CLASS = 'px-4 py-2.5 text-center text-[13px] text-ink-2';
 
 const MyOrders = () => {
   const [orders, setOrders] = useState([]);
@@ -36,7 +52,7 @@ const MyOrders = () => {
   const [totalPages, setTotalPages] = useState(0);
   const [totalElements, setTotalElements] = useState(0);
   const [orderRequests, setOrderRequests] = useState([]);
-  const [tab, setTab] = useState("ALL");
+  const [tab, setTab] = useState('ALL');
 
   const [invoices, setInvoices] = useState([]);
   const [invoicesLoading, setInvoicesLoading] = useState(true);
@@ -53,8 +69,8 @@ const MyOrders = () => {
       setTotalPages(result?.totalPages || 0);
       setTotalElements(result?.totalElements || 0);
     } catch (error) {
-      console.error("Error fetching orders:", error);
-      toast.error(error.response?.data?.message || "Failed to fetch orders");
+      console.error('Error fetching orders:', error);
+      toast.error(error.response?.data?.message || 'Failed to fetch orders');
       setOrders([]);
     } finally {
       setLoading(false);
@@ -66,8 +82,8 @@ const MyOrders = () => {
       const response = await clientPortalClientApi.getMyOrderRequests(0, ORDER_REQUESTS_PAGE_SIZE);
       setOrderRequests(response.data?.data || []);
     } catch (error) {
-      console.error("Error fetching order requests:", error);
-      toast.error(error.response?.data?.message || "Failed to fetch order requests");
+      console.error('Error fetching order requests:', error);
+      toast.error(error.response?.data?.message || 'Failed to fetch order requests');
       setOrderRequests([]);
     }
   };
@@ -80,8 +96,8 @@ const MyOrders = () => {
       setInvoices(result?.data || []);
       setInvoiceTotalPages(result?.totalPages || 0);
     } catch (error) {
-      console.error("Error fetching invoices:", error);
-      toast.error(error.response?.data?.message || "Failed to fetch invoices");
+      console.error('Error fetching invoices:', error);
+      toast.error(error.response?.data?.message || 'Failed to fetch invoices');
       setInvoices([]);
     } finally {
       setInvoicesLoading(false);
@@ -104,7 +120,7 @@ const MyOrders = () => {
   const allOrders = useMemo(() => {
     const ordersById = new Map(orders.map((order) => [order.id, order]));
     const linkedOrderIds = new Set(
-      orderRequests.map((req) => req.orderId).filter((id) => id != null)
+      orderRequests.map((req) => req.orderId).filter((id) => id != null),
     );
 
     // Once a request is approved an order exists behind it (req.orderId). Keep the familiar
@@ -130,7 +146,7 @@ const MyOrders = () => {
         key: `erp-${order.id}`,
         label: `Order #${order.id}`,
         orderDate: order.orderDate,
-        requestStatus: "APPROVED",
+        requestStatus: 'APPROVED',
         items: order.items || [],
         hasStages: true,
       }));
@@ -146,7 +162,7 @@ const MyOrders = () => {
    * under In Plating and Ready to Dispatch at once, each time with its own share.
    */
   const visibleOrders = useMemo(() => {
-    if (tab === "ALL") return allOrders;
+    if (tab === 'ALL') return allOrders;
 
     if (REQUEST_STATE_TABS.has(tab)) {
       return allOrders.filter((order) => order.requestStatus === tab);
@@ -167,11 +183,11 @@ const MyOrders = () => {
     try {
       setDownloadingInvoiceId(invoice.id);
       const response = await clientPortalInvoicesApi.getMyInvoicePdf(invoice.id, {
-        responseType: "blob",
+        responseType: 'blob',
       });
-      const blob = new Blob([response.data], { type: "application/pdf" });
+      const blob = new Blob([response.data], { type: 'application/pdf' });
       const url = window.URL.createObjectURL(blob);
-      const link = document.createElement("a");
+      const link = document.createElement('a');
       link.href = url;
       link.download = `${invoice.invoiceNo || `invoice-${invoice.id}`}.pdf`;
       document.body.appendChild(link);
@@ -179,8 +195,8 @@ const MyOrders = () => {
       link.remove();
       window.URL.revokeObjectURL(url);
     } catch (error) {
-      console.error("Error downloading invoice:", error);
-      toast.error(error.response?.data?.message || "Failed to download invoice");
+      console.error('Error downloading invoice:', error);
+      toast.error(error.response?.data?.message || 'Failed to download invoice');
     } finally {
       setDownloadingInvoiceId(null);
     }
@@ -190,48 +206,40 @@ const MyOrders = () => {
 
   return (
     <SidebarLayout>
-      <div className="mx-auto">
-        <div className="mb-8">
-          <PageHeader
-            title="My Orders"
-            description={`You have ${orderCount} order${orderCount === 1 ? "" : "s"}.`}
-          />
-        </div>
+      <PageHeader
+        title="My orders"
+        subtitle={`You have ${orderCount} order${orderCount === 1 ? '' : 's'}.`}
+      />
 
+      <PageBody className="space-y-6">
         {/* Stage filter tabs */}
-        <div className="flex flex-wrap gap-2 mb-4 border-b border-gray-200">
-          {TABS.map((t) => (
-            <button
-              key={t.key}
-              onClick={() => setTab(t.key)}
-              className={`px-4 py-2 text-sm font-medium border-b-2 transition whitespace-nowrap ${
-                tab === t.key
-                  ? "border-gray-900 text-gray-900"
-                  : "border-transparent text-gray-500 hover:text-gray-700"
-              }`}
-            >
-              {t.label}
-            </button>
-          ))}
+        <div className="-mx-1 overflow-x-auto px-1">
+          <Tabs value={tab} onValueChange={setTab}>
+            <TabsList variant="line" className="w-max">
+              {TABS.map((t) => (
+                <TabsTrigger key={t.key} value={t.key}>
+                  {t.label}
+                </TabsTrigger>
+              ))}
+            </TabsList>
+          </Tabs>
         </div>
 
         {stageField && (
-          <p className="text-sm text-gray-500 mb-6">
-            Showing the quantity of each order that is currently{" "}
-            <span className="font-medium text-gray-700">{ORDER_STATUS[tab].label.toLowerCase()}</span>. An
+          <p className="text-[12.5px] text-ink-3">
+            Showing the quantity of each order that is currently{' '}
+            <span className="font-medium text-ink-2">{ORDER_STATUS[tab].label.toLowerCase()}</span>. An
             order can appear under more than one tab while different parts of it are at different
             stages.
           </p>
         )}
 
         {loading ? (
-          <div className="text-center text-gray-500 py-10">Loading...</div>
+          <ListSkeleton rows={4} className="h-28" />
         ) : visibleOrders.length === 0 ? (
-          <div className="bg-white rounded-lg border border-gray-200 p-10 text-center text-gray-500">
-            No orders found
-          </div>
+          <EmptyState icon={Inbox} title="No orders found" description="Orders you place will appear here." />
         ) : (
-          <div className="space-y-6">
+          <div className="space-y-4">
             {visibleOrders.map((order) => (
               <OrderCard
                 key={order.key}
@@ -245,106 +253,103 @@ const MyOrders = () => {
 
         {/* Pagination */}
         {totalPages > 1 && (
-          <div className="flex items-center justify-between mt-6">
-            <p className="text-sm text-gray-500">
+          <div className="flex items-center justify-between">
+            <p className="text-[12.5px] text-ink-3">
               Page {page + 1} of {totalPages}
             </p>
             <div className="flex gap-2">
-              <button
-                onClick={() => setPage((p) => Math.max(0, p - 1))}
-                disabled={page === 0}
-                className="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
+              <Button variant="outline" size="sm" onClick={() => setPage((p) => Math.max(0, p - 1))} disabled={page === 0}>
                 Previous
-              </button>
-              <button
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
                 onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
                 disabled={page >= totalPages - 1}
-                className="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Next
-              </button>
+              </Button>
             </div>
           </div>
         )}
 
         {/* Invoices */}
-        <div className="mt-12">
-          <div className="mb-4">
-            <h2 className="text-lg font-semibold text-gray-900">My Invoices</h2>
-            <p className="text-sm text-gray-500">Download invoices issued to your account.</p>
+        <div className="space-y-4 pt-6">
+          <div>
+            <h2 className="font-heading text-[15px] font-semibold text-ink">My invoices</h2>
+            <p className="text-[12.5px] text-ink-3">Download invoices issued to your account.</p>
           </div>
 
           {invoicesLoading ? (
-            <div className="text-center text-gray-500 py-10">Loading...</div>
+            <ListSkeleton rows={3} className="h-12" />
           ) : invoices.length === 0 ? (
-            <div className="bg-white rounded-lg border border-gray-200 p-10 text-center text-gray-500">
-              No invoices found
-            </div>
+            <EmptyState icon={Inbox} title="No invoices found" />
           ) : (
-            <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b border-gray-200 bg-gray-50">
-                    <th className="px-6 py-3 text-left text-sm font-[550] text-black">Invoice No</th>
-                    <th className="px-6 py-3 text-center text-sm font-[550] text-black">Date</th>
-                    <th className="px-6 py-3 text-center text-sm font-[550] text-black">Type</th>
-                    <th className="px-6 py-3 text-center text-sm font-[550] text-black">Action</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {invoices.map((invoice) => (
-                    <tr key={invoice.id} className="border-b border-gray-100 last:border-0">
-                      <td className="px-6 py-3 text-sm text-gray-700">{invoice.invoiceNo || "-"}</td>
-                      <td className="px-6 py-3 text-sm text-gray-700 text-center">
-                        {formatDate(invoice.invoiceDate)}
-                      </td>
-                      <td className="px-6 py-3 text-sm text-gray-700 text-center">
-                        {invoice.invoiceType || "-"}
-                      </td>
-                      <td className="px-6 py-3 text-sm text-center">
-                        <button
-                          onClick={() => handleDownloadInvoice(invoice)}
-                          disabled={downloadingInvoiceId === invoice.id}
-                          className="inline-flex items-center gap-1.5 text-sm font-medium text-gray-600 hover:text-gray-900 transition disabled:opacity-50"
-                          title="Download Invoice"
-                        >
-                          <Download className="w-4 h-4" />
-                          {downloadingInvoiceId === invoice.id ? "Downloading..." : "Download"}
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <Card className="gap-0 overflow-hidden py-0">
+              <div className="w-full overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="hover:bg-transparent">
+                      <TableHead className={`${HEAD_CLASS} text-left`}>Invoice no</TableHead>
+                      <TableHead className={HEAD_CLASS}>Date</TableHead>
+                      <TableHead className={HEAD_CLASS}>Type</TableHead>
+                      <TableHead className={HEAD_CLASS}>Action</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {invoices.map((invoice) => (
+                      <TableRow key={invoice.id} className="border-line-2">
+                        <TableCell className="px-4 py-2.5 text-left text-[13px] font-medium text-ink">
+                          {invoice.invoiceNo || '-'}
+                        </TableCell>
+                        <TableCell className={CELL_CLASS}>{formatDate(invoice.invoiceDate)}</TableCell>
+                        <TableCell className={CELL_CLASS}>{invoice.invoiceType || '-'}</TableCell>
+                        <TableCell className="px-4 py-2.5 text-center">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleDownloadInvoice(invoice)}
+                            disabled={downloadingInvoiceId === invoice.id}
+                          >
+                            <Download className="size-4" />
+                            {downloadingInvoiceId === invoice.id ? 'Downloading…' : 'Download'}
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </Card>
           )}
 
           {invoiceTotalPages > 1 && (
-            <div className="flex items-center justify-between mt-6">
-              <p className="text-sm text-gray-500">
+            <div className="flex items-center justify-between">
+              <p className="text-[12.5px] text-ink-3">
                 Page {invoicePage + 1} of {invoiceTotalPages}
               </p>
               <div className="flex gap-2">
-                <button
+                <Button
+                  variant="outline"
+                  size="sm"
                   onClick={() => setInvoicePage((p) => Math.max(0, p - 1))}
                   disabled={invoicePage === 0}
-                  className="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Previous
-                </button>
-                <button
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
                   onClick={() => setInvoicePage((p) => Math.min(invoiceTotalPages - 1, p + 1))}
                   disabled={invoicePage >= invoiceTotalPages - 1}
-                  className="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Next
-                </button>
+                </Button>
               </div>
             </div>
           )}
         </div>
-      </div>
+      </PageBody>
     </SidebarLayout>
   );
 };
@@ -358,117 +363,113 @@ const OrderCard = ({ order, stageField, stageLabel }) => {
   const cardTotal = stageField ? sumStage(order.items, stageField) : null;
 
   return (
-    <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-      <div className="bg-gray-100 border-b border-gray-200 px-6 py-3 flex items-center justify-between flex-wrap gap-2">
-        <div className="flex items-center gap-3 flex-wrap">
-          <p className="text-sm font-semibold text-gray-900">{order.label}</p>
+    <Card className="gap-0 overflow-hidden py-0">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line bg-surface-2 px-4 py-3 sm:px-5">
+        <div className="flex flex-wrap items-center gap-2.5">
+          <p className="text-[13.5px] font-semibold text-ink">{order.label}</p>
           {stageField ? (
-            <span className="px-2.5 py-1 rounded-full text-xs font-medium whitespace-nowrap bg-gray-900 text-white">
+            <Badge variant="accent">
               {stageLabel} · {formatStageQty(cardTotal)}
-            </span>
+            </Badge>
           ) : (
             <span
-              className={`px-2.5 py-1 rounded-full text-xs font-medium whitespace-nowrap ${
-                ORDER_STATUS[order.requestStatus]?.className || "bg-gray-100 text-gray-700"
+              className={`inline-flex w-fit items-center rounded-full px-2 py-0.5 text-[11.5px] font-medium whitespace-nowrap ${
+                ORDER_STATUS[order.requestStatus]?.className || 'bg-surface-2 text-ink-3'
               }`}
             >
               {ORDER_STATUS[order.requestStatus]?.label || order.requestStatus}
             </span>
           )}
         </div>
-        <p className="text-sm text-gray-500">{formatDate(order.orderDate)}</p>
+        <p className="text-[12.5px] text-ink-3">{formatDate(order.orderDate)}</p>
       </div>
 
-      <div className="overflow-x-auto">
+      <div className="w-full overflow-x-auto">
         {stageField ? (
           <StageTable items={order.items} field={stageField} stageLabel={stageLabel} />
         ) : (
           <BreakdownTable items={order.items} showStages={order.hasStages} />
         )}
       </div>
-    </div>
+    </Card>
   );
 };
 
 /** A single stage tab: one row per line, one quantity column. */
 const StageTable = ({ items, field, stageLabel }) => (
-  <table className="w-full">
-    <thead>
-      <tr className="border-b border-gray-200">
-        <Th>Item</Th>
-        <Th>Size (Inch)</Th>
-        <Th>Size (mm)</Th>
-        <Th>Plating</Th>
-        <Th>{stageLabel}</Th>
-      </tr>
-    </thead>
-    <tbody>
+  <Table>
+    <TableHeader>
+      <TableRow className="hover:bg-transparent">
+        <TableHead className={HEAD_CLASS}>Item</TableHead>
+        <TableHead className={HEAD_CLASS}>Size (Inch)</TableHead>
+        <TableHead className={HEAD_CLASS}>Size (mm)</TableHead>
+        <TableHead className={HEAD_CLASS}>Plating</TableHead>
+        <TableHead className={HEAD_CLASS}>{stageLabel}</TableHead>
+      </TableRow>
+    </TableHeader>
+    <TableBody>
       {items.map((item) => (
-        <tr key={item.id} className="border-b border-gray-100 last:border-0">
-          <Td>{item.itemName || "-"}</Td>
-          <Td>{item.sizeInInch || "-"}</Td>
-          <Td>{item.sizeInMm || "-"}</Td>
-          <Td>{item.plating || "-"}</Td>
-          <td className="px-6 py-3 text-sm font-semibold text-gray-900 text-center whitespace-nowrap">
+        <TableRow key={item.id} className="border-line-2">
+          <TableCell className={CELL_CLASS}>{item.itemName || '-'}</TableCell>
+          <TableCell className={CELL_CLASS}>{item.sizeInInch || '-'}</TableCell>
+          <TableCell className={CELL_CLASS}>{item.sizeInMm || '-'}</TableCell>
+          <TableCell className={CELL_CLASS}>{item.plating || '-'}</TableCell>
+          <TableCell className="px-4 py-2.5 text-center font-mono text-[13px] font-semibold whitespace-nowrap text-ink">
             {formatStageQty(stageQty(item, field))}
-          </td>
-        </tr>
+          </TableCell>
+        </TableRow>
       ))}
-    </tbody>
-  </table>
+    </TableBody>
+  </Table>
 );
 
 /** The All tab: every line with its quantity across all four stages side by side. */
 const BreakdownTable = ({ items, showStages }) => (
-  <table className="w-full">
-    <thead>
-      <tr className="border-b border-gray-200">
-        <Th>Item</Th>
-        <Th>Size (Inch)</Th>
-        <Th>Size (mm)</Th>
-        <Th>Plating</Th>
-        <Th>Ordered</Th>
+  <Table>
+    <TableHeader>
+      <TableRow className="hover:bg-transparent">
+        <TableHead className={HEAD_CLASS}>Item</TableHead>
+        <TableHead className={HEAD_CLASS}>Size (Inch)</TableHead>
+        <TableHead className={HEAD_CLASS}>Size (mm)</TableHead>
+        <TableHead className={HEAD_CLASS}>Plating</TableHead>
+        <TableHead className={HEAD_CLASS}>Ordered</TableHead>
         {showStages &&
-          STAGE_BUCKETS.map((bucket) => <Th key={bucket.key}>{ORDER_STATUS[bucket.key].label}</Th>)}
-      </tr>
-    </thead>
-    <tbody>
+          STAGE_BUCKETS.map((bucket) => (
+            <TableHead key={bucket.key} className={HEAD_CLASS}>
+              {ORDER_STATUS[bucket.key].label}
+            </TableHead>
+          ))}
+      </TableRow>
+    </TableHeader>
+    <TableBody>
       {items.map((item) => (
-        <tr key={item.id} className="border-b border-gray-100 last:border-0">
-          <Td>{item.itemName || "-"}</Td>
-          <Td>{item.sizeInInch || "-"}</Td>
-          <Td>{item.sizeInMm || "-"}</Td>
-          <Td>{item.plating || "-"}</Td>
-          <Td>
+        <TableRow key={item.id} className="border-line-2">
+          <TableCell className={CELL_CLASS}>{item.itemName || '-'}</TableCell>
+          <TableCell className={CELL_CLASS}>{item.sizeInInch || '-'}</TableCell>
+          <TableCell className={CELL_CLASS}>{item.sizeInMm || '-'}</TableCell>
+          <TableCell className={CELL_CLASS}>{item.plating || '-'}</TableCell>
+          <TableCell className="px-4 py-2.5 text-center font-mono text-[13px] whitespace-nowrap text-ink-2">
             {showStages
-              ? formatStageQty(stageQty(item, "ordered"))
+              ? formatStageQty(stageQty(item, 'ordered'))
               : item.qtyPc != null
                 ? `${item.qtyPc} pc`
-                : "-"}
-          </Td>
+                : '-'}
+          </TableCell>
           {showStages &&
             STAGE_BUCKETS.map((bucket) => (
-              <td
+              <TableCell
                 key={bucket.key}
-                className={`px-6 py-3 text-sm text-center whitespace-nowrap ${
-                  hasQtyAt(item, bucket.field) ? "font-semibold text-gray-900" : "text-gray-300"
+                className={`px-4 py-2.5 text-center font-mono text-[13px] whitespace-nowrap ${
+                  hasQtyAt(item, bucket.field) ? 'font-semibold text-ink' : 'text-ink-3/50'
                 }`}
               >
-                {hasQtyAt(item, bucket.field) ? formatStageQty(stageQty(item, bucket.field)) : "—"}
-              </td>
+                {hasQtyAt(item, bucket.field) ? formatStageQty(stageQty(item, bucket.field)) : '—'}
+              </TableCell>
             ))}
-        </tr>
+        </TableRow>
       ))}
-    </tbody>
-  </table>
-);
-
-const Th = ({ children }) => (
-  <th className="px-6 py-3 text-center text-sm font-[550] text-black whitespace-nowrap">{children}</th>
-);
-
-const Td = ({ children }) => (
-  <td className="px-6 py-3 text-sm text-gray-700 text-center">{children}</td>
+    </TableBody>
+  </Table>
 );
 
 export default MyOrders;

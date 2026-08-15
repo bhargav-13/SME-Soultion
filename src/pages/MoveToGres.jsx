@@ -1,10 +1,11 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
-import { ChevronDown, X } from "lucide-react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import SidebarLayout from "../components/SidebarLayout";
-import PageHeader from "../components/PageHeader";
+import SidebarLayout from "@/components/SidebarLayout";
+import { PageBody, PageHeader } from "@/components/page-header";
+import { Button } from "@/components/ui/button";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 import toast from "react-hot-toast";
-import { partyApi, gresFillingApi, itemBlueprintApi, sizeApi } from "../services/apiService";
+import { partyApi, gresFillingApi, itemBlueprintApi, sizeApi } from "@/services/apiService";
 
 const getNow = () => {
   const d = new Date();
@@ -51,10 +52,10 @@ const EMPTY_CALC = {
 };
 
 // Shared field styles. Labels mirror the client's Excel exactly ("Peti :-" style).
-const LBL = "block text-sm font-medium text-black mb-1";
+const LBL = "mb-1 block text-[12.5px] font-medium text-ink-2";
 const INP =
-  "w-full px-3 py-2 border border-gray-300 rounded-md text-sm bg-white focus:ring-2 focus:ring-gray-900/10 focus:border-gray-400 outline-none placeholder:text-gray-400";
-const RO = "w-full px-3 py-2 border border-gray-200 rounded-md bg-gray-50 text-gray-800 text-sm";
+  "w-full rounded-md border border-line bg-surface px-3 py-2 text-[13px] outline-none transition placeholder:text-ink-3 focus:border-primary focus:ring-2 focus:ring-primary-ring/30";
+const RO = "w-full rounded-md border border-line bg-surface-2 px-3 py-2 text-[13px] text-ink-2";
 
 // Defined at module scope (NOT inside MoveToGres): a component declared inside the parent's render
 // is a brand-new type on every keystroke, so React unmounts/remounts its <input> and the caret is
@@ -69,7 +70,7 @@ const UnitInput = ({ value, onChange, placeholder, unit, step = "0.001" }) => (
       placeholder={placeholder}
       className={`flex-1 min-w-0 ${INP}`}
     />
-    {unit ? <span className="text-sm text-gray-500 w-8 shrink-0">{unit}</span> : null}
+    {unit ? <span className="w-8 shrink-0 text-[13px] text-ink-3">{unit}</span> : null}
   </div>
 );
 
@@ -85,22 +86,12 @@ const MoveToGres = () => {
   const [chithiNoDisplay, setChithiNoDisplay] = useState(""); // "001" — backend-assigned on save
   const [saving, setSaving] = useState(false);
 
-  // Party (vendor) dropdown
+  // Party (vendor) + item/size selection
   const [parties, setParties] = useState([]);
-  const [isPartyOpen, setIsPartyOpen] = useState(false);
-  const [partySearch, setPartySearch] = useState("");
-  const partyRef = useRef(null);
-
-  // Item + size dropdowns
   const [blueprints, setBlueprints] = useState([]);
   const [blueprintId, setBlueprintId] = useState("");
   const [sizes, setSizes] = useState([]);
   const [sizeId, setSizeId] = useState("");
-  const [itemOpen, setItemOpen] = useState(false);
-  const [sizeOpen, setSizeOpen] = useState(false);
-  const [itemSearch, setItemSearch] = useState("");
-  const itemRef = useRef(null);
-  const sizeRef = useRef(null);
 
   // Load vendors + items on mount
   useEffect(() => {
@@ -182,32 +173,31 @@ const MoveToGres = () => {
     };
   }, [editGresId, blueprints]);
 
-  // Close dropdowns on outside click
-  useEffect(() => {
-    const onDown = (e) => {
-      if (partyRef.current && !partyRef.current.contains(e.target)) setIsPartyOpen(false);
-      if (itemRef.current && !itemRef.current.contains(e.target)) setItemOpen(false);
-      if (sizeRef.current && !sizeRef.current.contains(e.target)) setSizeOpen(false);
-    };
-    document.addEventListener("mousedown", onDown);
-    return () => document.removeEventListener("mousedown", onDown);
-  }, []);
-
   const vendorParties = useMemo(
     () => parties.filter((p) => p.partyType === "VENDOR" || p.partyType === "BOTH"),
     [parties]
   );
-  const filteredParties = useMemo(() => {
-    const q = partySearch.trim().toLowerCase();
-    return q ? vendorParties.filter((p) => (p.name || "").toLowerCase().includes(q)) : vendorParties;
-  }, [vendorParties, partySearch]);
-  const filteredItems = useMemo(() => {
-    const q = itemSearch.trim().toLowerCase();
-    return q ? blueprints.filter((b) => (b.itemName || "").toLowerCase().includes(q)) : blueprints;
-  }, [blueprints, itemSearch]);
-
-  const selectedBlueprint = blueprints.find((b) => String(b.id) === String(blueprintId));
-  const selectedSize = sizes.find((s) => String(s.id) === String(sizeId));
+  const vendorOptions = useMemo(
+    () => vendorParties.map((p) => ({ value: String(p.id), label: p.name })),
+    [vendorParties]
+  );
+  const itemOptions = useMemo(
+    () =>
+      blueprints.map((b) => ({
+        value: String(b.id),
+        label: b.itemName,
+        description: b.category?.name || undefined,
+      })),
+    [blueprints]
+  );
+  const sizeOptions = useMemo(
+    () =>
+      sizes.map((s) => ({
+        value: String(s.id),
+        label: `${s.sizeInInch}${s.sizeInMm ? ` (${s.sizeInMm})` : ""}`,
+      })),
+    [sizes]
+  );
 
   const derived = useMemo(() => computeDerived(calc), [calc]);
 
@@ -268,30 +258,20 @@ const MoveToGres = () => {
 
   return (
     <SidebarLayout>
-      <div className="max-w-5xl mx-auto pb-12">
-        <div className="mb-4">
-          <PageHeader
-            title={mode === "edit" ? "Edit Gres Job Work" : "New Gres Job Work"}
-            description="Weigh once, enter Peti + rate — Net Kg and Total Rate work themselves out."
-            action={
-              <button
-                type="button"
-                onClick={() => navigate("/gres")}
-                className="inline-flex items-center justify-center w-9 h-9 rounded-full border border-gray-300 text-gray-600 hover:text-gray-900 hover:border-gray-400 hover:bg-gray-50 transition"
-                aria-label="Close"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            }
-          />
-        </div>
+      <PageHeader
+        title={mode === "edit" ? "Edit gres job work" : "New gres job work"}
+        subtitle="Weigh once, enter Peti + rate — Net Kg and Total Rate work themselves out."
+        backTo="/gres"
+        backLabel="Gres"
+      />
 
-        <form onSubmit={(e) => { e.preventDefault(); handleSave(); }}>
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <PageBody>
+        <form onSubmit={(e) => { e.preventDefault(); handleSave(); }} className="mx-auto max-w-5xl">
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
             {/* LEFT — one card mirroring the Excel "Outside Gris Job-Work" block */}
             <div className="lg:col-span-2">
-              <div className="bg-white rounded-xl border border-gray-300 shadow-sm">
-                <div className="text-center py-3 border-b border-gray-300 font-bold text-black">
+              <div className="rounded-xl border border-line bg-surface shadow-sm">
+                <div className="border-b border-line py-3 text-center font-semibold text-ink">
                   Outside Gris Job-Work
                 </div>
                 <div className="p-6 space-y-5">
@@ -319,54 +299,19 @@ const MoveToGres = () => {
 
                   {/* Row 2: Job Worker Name | Time */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
-                    <div className="relative" ref={partyRef}>
+                    <div>
                       <label className={LBL}>Job Worker Name :-</label>
-                      <div
-                        className={`${INP} cursor-pointer flex items-center justify-between`}
-                        onClick={() => setIsPartyOpen((p) => !p)}
-                      >
-                        <span className={formData.vendorName ? "text-gray-900" : "text-gray-400"}>
-                          {formData.vendorName || "Select vendor"}
-                        </span>
-                        <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${isPartyOpen ? "rotate-180" : ""}`} />
-                      </div>
-                      {isPartyOpen && (
-                        <div className="absolute z-20 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden">
-                          <div className="px-3 py-2 border-b border-gray-100">
-                            <input
-                              type="text"
-                              value={partySearch}
-                              onChange={(e) => setPartySearch(e.target.value)}
-                              placeholder="Search vendor..."
-                              className={INP}
-                              onClick={(e) => e.stopPropagation()}
-                              autoFocus
-                            />
-                          </div>
-                          <div className="max-h-48 overflow-y-auto">
-                            {filteredParties.length === 0 ? (
-                              <p className="px-4 py-2 text-sm text-gray-400">No vendors found</p>
-                            ) : (
-                              filteredParties.map((p) => (
-                                <button
-                                  key={p.id}
-                                  type="button"
-                                  onClick={() => {
-                                    setFormData((prev) => ({ ...prev, vendorName: p.name, vendorId: p.id }));
-                                    setIsPartyOpen(false);
-                                    setPartySearch("");
-                                  }}
-                                  className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-100 ${
-                                    formData.vendorId === p.id ? "font-semibold bg-gray-50" : ""
-                                  }`}
-                                >
-                                  {p.name}
-                                </button>
-                              ))
-                            )}
-                          </div>
-                        </div>
-                      )}
+                      <SearchableSelect
+                        ariaLabel="Job worker name"
+                        placeholder="Select vendor"
+                        searchPlaceholder="Search vendor…"
+                        options={vendorOptions}
+                        value={formData.vendorId ? String(formData.vendorId) : undefined}
+                        onChange={(v) => {
+                          const p = vendorParties.find((x) => String(x.id) === v);
+                          if (p) setFormData((prev) => ({ ...prev, vendorName: p.name, vendorId: p.id }));
+                        }}
+                      />
                     </div>
                     <div>
                       <label className={LBL}>Time :-</label>
@@ -380,106 +325,39 @@ const MoveToGres = () => {
                   </div>
 
                   {/* Row 3+4: Item Name / Size on their own row per Excel (label + input, right column blank) */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4 pt-2 border-t border-gray-100">
-                    <div className="relative" ref={itemRef}>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4 border-t border-line pt-2">
+                    <div>
                       <label className={LBL}>Item Name :-</label>
-                      <div
-                        className={`${INP} cursor-pointer flex items-center justify-between`}
-                        onClick={() => setItemOpen((p) => !p)}
-                      >
-                        <span className={selectedBlueprint ? "text-gray-900" : "text-gray-400"}>
-                          {selectedBlueprint?.itemName || "Select item"}
-                        </span>
-                        <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${itemOpen ? "rotate-180" : ""}`} />
-                      </div>
-                      {itemOpen && (
-                        <div className="absolute z-20 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden">
-                          <div className="px-3 py-2 border-b border-gray-100">
-                            <input
-                              type="text"
-                              value={itemSearch}
-                              onChange={(e) => setItemSearch(e.target.value)}
-                              placeholder="Search item..."
-                              className={INP}
-                              onClick={(e) => e.stopPropagation()}
-                              autoFocus
-                            />
-                          </div>
-                          <div className="max-h-48 overflow-y-auto">
-                            {filteredItems.length === 0 ? (
-                              <p className="px-4 py-2 text-sm text-gray-400">No items</p>
-                            ) : (
-                              filteredItems.map((b) => (
-                                <button
-                                  key={b.id}
-                                  type="button"
-                                  onClick={() => {
-                                    setBlueprintId(String(b.id));
-                                    setSizeId("");
-                                    setItemOpen(false);
-                                    setItemSearch("");
-                                  }}
-                                  className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-100 ${
-                                    String(b.id) === String(blueprintId) ? "font-semibold bg-gray-50" : ""
-                                  }`}
-                                >
-                                  {b.itemName}
-                                  {b.category?.name ? <span className="text-gray-400"> · {b.category.name}</span> : null}
-                                </button>
-                              ))
-                            )}
-                          </div>
-                        </div>
-                      )}
+                      <SearchableSelect
+                        ariaLabel="Item name"
+                        placeholder="Select item"
+                        searchPlaceholder="Search item…"
+                        options={itemOptions}
+                        value={blueprintId ? String(blueprintId) : undefined}
+                        onChange={(v) => {
+                          setBlueprintId(v);
+                          setSizeId("");
+                        }}
+                      />
                     </div>
                     <div />
-                    <div className="relative" ref={sizeRef}>
+                    <div>
                       <label className={LBL}>Size :-</label>
-                      <button
-                        type="button"
+                      <SearchableSelect
+                        ariaLabel="Size"
+                        placeholder={blueprintId ? "Select size" : "Pick item first"}
+                        searchPlaceholder="Search size…"
+                        options={sizeOptions}
+                        value={sizeId ? String(sizeId) : undefined}
                         disabled={!blueprintId}
-                        onClick={() => setSizeOpen((p) => !p)}
-                        className={`${INP} flex items-center justify-between ${!blueprintId ? "opacity-60 cursor-not-allowed" : ""}`}
-                      >
-                        <span className={selectedSize ? "text-gray-900" : "text-gray-400"}>
-                          {selectedSize
-                            ? `${selectedSize.sizeInInch}${selectedSize.sizeInMm ? ` (${selectedSize.sizeInMm})` : ""}`
-                            : blueprintId
-                            ? "Select size"
-                            : "Pick item first"}
-                        </span>
-                        <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${sizeOpen ? "rotate-180" : ""}`} />
-                      </button>
-                      {sizeOpen && blueprintId && (
-                        <div className="absolute z-20 mt-1 w-full max-h-52 overflow-y-auto bg-white border border-gray-200 rounded-lg shadow-lg">
-                          {sizes.length === 0 ? (
-                            <p className="px-4 py-2 text-sm text-gray-400">No sizes</p>
-                          ) : (
-                            sizes.map((s) => (
-                              <button
-                                key={s.id}
-                                type="button"
-                                onClick={() => {
-                                  setSizeId(String(s.id));
-                                  setSizeOpen(false);
-                                }}
-                                className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-100 ${
-                                  String(s.id) === String(sizeId) ? "font-semibold bg-gray-50" : ""
-                                }`}
-                              >
-                                {s.sizeInInch}
-                                {s.sizeInMm ? ` (${s.sizeInMm})` : ""}
-                              </button>
-                            ))
-                          )}
-                        </div>
-                      )}
+                        onChange={(v) => setSizeId(v)}
+                      />
                     </div>
                     <div />
                   </div>
 
                   {/* Row 5+6: Peti | Kgs, then 1 Peti Weight | Net Kg */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4 pt-2 border-t border-gray-100">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4 pt-2 border-t border-line-2">
                     <div>
                       <label className={LBL}>Peti :-</label>
                       <UnitInput
@@ -515,7 +393,7 @@ const MoveToGres = () => {
                   </div>
 
                   {/* Row 7: Rate / Kg | Total Rate */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4 pt-2 border-t border-gray-100">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4 pt-2 border-t border-line-2">
                     <div>
                       <label className={LBL}>Rate / Kg :-</label>
                       <input
@@ -538,46 +416,43 @@ const MoveToGres = () => {
 
             {/* RIGHT — compact summary + actions */}
             <div>
-              <div className="sticky top-4 bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
-                <div className="rounded-lg bg-gray-900 text-white p-4 mb-4 text-center">
-                  <p className="text-xs text-white/60">Total Rate</p>
-                  <p className="text-3xl font-semibold mt-1">
+              <div className="sticky top-4 rounded-xl border border-line bg-surface p-5 shadow-sm">
+                <div className="mb-4 rounded-lg bg-ink p-4 text-center text-white">
+                  <p className="text-[11px] text-white/60">Total Rate</p>
+                  <p className="mt-1 font-mono text-3xl font-semibold">
                     {derived.totalRate != null ? derived.totalRate : "—"}
                   </p>
                 </div>
-                <div className="space-y-2 text-sm">
+                <div className="space-y-2 text-[13px]">
                   {[
                     ["Ch. No.", chithiNoDisplay || "—"],
                     ["Peti", calc.elementCount ? `${calc.elementCount} Peti` : "—"],
                     ["Kgs", calc.grossKg ? `${calc.grossKg} Kg` : "—"],
                     ["Net Kg", derived.netKg != null ? `${derived.netKg} kg` : "—"],
                   ].map(([k, v]) => (
-                    <div key={k} className="flex items-center justify-between px-3 py-2 rounded-md bg-gray-50 border border-gray-100">
-                      <span className="text-gray-500">{k}</span>
-                      <span className="font-semibold text-gray-900">{v}</span>
+                    <div key={k} className="flex items-center justify-between rounded-md border border-line-2 bg-surface-2 px-3 py-2">
+                      <span className="text-ink-3">{k}</span>
+                      <span className="font-mono font-semibold text-ink">{v}</span>
                     </div>
                   ))}
                 </div>
-                <button
-                  type="submit"
-                  disabled={saving}
-                  className="mt-5 w-full py-2.5 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition text-sm font-medium disabled:opacity-60 disabled:cursor-not-allowed"
-                >
-                  {saving ? "Saving…" : mode === "edit" ? "Update Gres" : "Create Gres"}
-                </button>
-                <button
+                <Button type="submit" disabled={saving} className="mt-5 w-full">
+                  {saving ? "Saving…" : mode === "edit" ? "Update gres" : "Create gres"}
+                </Button>
+                <Button
                   type="button"
+                  variant="outline"
                   onClick={() => navigate("/gres")}
                   disabled={saving}
-                  className="mt-2 w-full py-2.5 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition text-sm font-medium"
+                  className="mt-2 w-full"
                 >
                   Cancel
-                </button>
+                </Button>
               </div>
             </div>
           </div>
         </form>
-      </div>
+      </PageBody>
     </SidebarLayout>
   );
 };

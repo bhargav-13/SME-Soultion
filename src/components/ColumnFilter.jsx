@@ -76,68 +76,73 @@ const ColumnFilter = ({ options = [], selected, onChange }) => {
           open ? setOpen(false) : openPopover();
         }}
         title="Filter"
-        className={`ml-1 p-0.5 rounded transition ${
-          active ? "text-blue-600 bg-blue-100" : "text-gray-400 hover:text-gray-700 hover:bg-gray-200"
+        className={`ml-1 rounded p-0.5 transition ${
+          active ? "bg-primary-soft text-primary" : "text-ink-3 hover:bg-surface-2 hover:text-ink"
         }`}
       >
-        <Filter className="w-3.5 h-3.5" fill={active ? "currentColor" : "none"} />
+        <Filter className="size-3.5" fill={active ? "currentColor" : "none"} />
       </button>
 
       {open && (
         <div
           ref={popRef}
-          className="fixed z-[100] w-60 bg-white border border-gray-200 rounded-lg shadow-xl text-left font-normal"
+          className="fixed z-[100] w-60 rounded-lg border border-line bg-surface text-left font-normal shadow-pop"
           style={{ top: pos.top, left: pos.left }}
         >
-          <div className="p-2 border-b border-gray-100">
+          <div className="border-b border-line-2 p-2">
             <div className="relative">
-              <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
+              <Search className="pointer-events-none absolute top-1/2 left-2 size-3.5 -translate-y-1/2 text-ink-3" />
               <input
                 autoFocus
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="Search values"
-                className="w-full pl-7 pr-2 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-gray-400"
+                className="w-full rounded border border-line bg-surface py-1.5 pr-2 pl-7 text-[13px] outline-none focus:ring-1 focus:ring-primary-ring"
               />
             </div>
           </div>
 
-          <label className="flex items-center gap-2 px-3 py-1.5 text-sm border-b border-gray-100 cursor-pointer hover:bg-gray-50 font-medium text-gray-800">
-            <input type="checkbox" checked={allChecked} onChange={toggleAll} />
+          <label className="flex cursor-pointer items-center gap-2 border-b border-line-2 px-3 py-1.5 text-[13px] font-medium text-ink hover:bg-surface-2">
+            <input type="checkbox" checked={allChecked} onChange={toggleAll} className="accent-[var(--primary-base)]" />
             (Select all)
           </label>
 
           <div className="max-h-56 overflow-y-auto py-1">
             {visible.length === 0 ? (
-              <div className="px-3 py-2 text-xs text-gray-400">No values</div>
+              <div className="px-3 py-2 text-[12px] text-ink-3">No values</div>
             ) : (
               visible.map((v) => (
                 <label
                   key={String(v)}
-                  className="flex items-center gap-2 px-3 py-1.5 text-sm cursor-pointer hover:bg-gray-50 text-gray-700"
+                  className="flex cursor-pointer items-center gap-2 px-3 py-1.5 text-[13px] text-ink-2 hover:bg-surface-2"
                 >
-                  <input type="checkbox" checked={effective.has(v)} onChange={() => toggleValue(v)} />
+                  <input
+                    type="checkbox"
+                    checked={effective.has(v)}
+                    onChange={() => toggleValue(v)}
+                    className="accent-[var(--primary-base)]"
+                  />
                   <span className="truncate">{label(v)}</span>
                 </label>
               ))
             )}
           </div>
 
-          <div className="flex justify-between items-center px-3 py-2 border-t border-gray-100">
+          <div className="flex items-center justify-between border-t border-line-2 px-3 py-2">
             <button
               type="button"
               onClick={() => {
                 onChange(null);
                 setOpen(false);
               }}
-              className="text-xs text-gray-500 hover:text-gray-800"
+              className="text-[12px] text-ink-3 hover:text-ink"
             >
               Clear filter
             </button>
             <button
               type="button"
               onClick={() => setOpen(false)}
-              className="text-xs px-2.5 py-1 bg-gray-900 text-white rounded hover:bg-gray-800"
+              className="rounded bg-primary px-2.5 py-1 text-[12px] text-primary-foreground hover:bg-primary-hover"
             >
               Done
             </button>

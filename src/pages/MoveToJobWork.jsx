@@ -1,11 +1,14 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { ChevronLeft, ChevronDown, X, Building2, Home, PencilLine, Package, Scale, Sparkles } from "lucide-react";
+import { ChevronDown, Building2, Home, PencilLine, Package, Scale, Sparkles } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
-import SidebarLayout from "../components/SidebarLayout";
+import SidebarLayout from "@/components/SidebarLayout";
+import { PageBody, PageHeader } from "@/components/page-header";
+import { Button } from "@/components/ui/button";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 import toast from "react-hot-toast";
-import { jobWorkApi, orderApi, partyApi, itemBlueprintApi, inventoryApi, clientInventoryApi, axiosInstance } from "../services/apiService";
-import { upsertOrderJobOverride } from "../utils/orderJobWorkSync";
-import { FINISH_LABELS } from "../constants/finishes";
+import { jobWorkApi, orderApi, partyApi, itemBlueprintApi, inventoryApi, clientInventoryApi, axiosInstance } from "@/services/apiService";
+import { upsertOrderJobOverride } from "@/utils/orderJobWorkSync";
+import { FINISH_LABELS } from "@/constants/finishes";
 
 const JOB_MODES = [
   { value: "OUTSIDE", label: "Out-Side", hint: "Sent to a vendor", icon: Building2 },
@@ -52,13 +55,13 @@ const EMPTY_CALC = {
 
 const ELEMENT_TYPE_OPTIONS = ["PETI", "DRUM"];
 const ELEMENT_TYPE_LABEL = { PETI: "Peti", DRUM: "Drum" };
-const FORM_LABEL_CLASS = "block text-md font-medium text-black mb-2";
+const FORM_LABEL_CLASS = "mb-2 block text-[12.5px] font-medium text-ink-2";
 const FORM_INPUT_CLASS =
-  "w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-500 outline-none placeholder:text-sm placeholder:text-gray-400";
+  "w-full rounded-lg border border-line bg-surface px-4 py-2 text-[13px] outline-none transition placeholder:text-ink-3 focus:border-primary focus:ring-2 focus:ring-primary-ring/30";
 const READONLY_INPUT_CLASS =
-  "w-full px-4 py-2 border border-gray-200 rounded-lg bg-gray-50 text-gray-700 outline-none cursor-not-allowed";
+  "w-full cursor-not-allowed rounded-lg border border-line bg-surface-2 px-4 py-2 text-[13px] text-ink-2 outline-none";
 const FORM_SELECT_CLASS =
-  "w-full h-10 px-3 border border-gray-300 rounded-lg bg-white text-sm flex items-center justify-between focus:ring-2 focus:ring-gray-500 outline-none";
+  "flex h-10 w-full items-center justify-between rounded-lg border border-line bg-surface px-3 text-[13px] outline-none transition focus:border-primary focus:ring-2 focus:ring-primary-ring/30";
 
 const round3 = (n) => Math.round(n * 1000) / 1000;
 const parseNumber = (value) => {
@@ -650,62 +653,40 @@ const MoveToJobWork = () => {
   if (contextError) {
     return (
       <SidebarLayout>
-        <div className="mx-auto max-w-2xl mt-10 bg-white border border-gray-200 rounded-lg p-8 text-center">
-          <p className="text-gray-700">{contextError}</p>
-          <button
-            type="button"
-            onClick={() => navigate("/order")}
-            className="mt-4 px-6 py-2 bg-gray-800 text-white rounded-lg text-sm hover:bg-gray-700 transition"
-          >
-            Back to Orders
-          </button>
-        </div>
+        <PageHeader title="Job work" backTo="/order" backLabel="Orders" />
+        <PageBody>
+          <div className="mx-auto mt-10 max-w-2xl rounded-lg border border-line bg-surface p-8 text-center">
+            <p className="text-ink-2">{contextError}</p>
+            <Button onClick={() => navigate("/order")} className="mt-4">
+              Back to Orders
+            </Button>
+          </div>
+        </PageBody>
       </SidebarLayout>
     );
   }
 
   const ModeIcon = (JOB_MODES.find((m) => m.value === jobWorkType) || JOB_MODES[0]).icon;
-  const LBL = "block text-sm font-medium text-gray-700 mb-1.5";
+  const LBL = "mb-1.5 block text-[12.5px] font-medium text-ink-2";
   const INP =
-    "w-full px-3.5 py-2.5 border border-gray-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-gray-900/10 focus:border-gray-400 outline-none placeholder:text-gray-400";
-  const RO = "w-full px-3.5 py-2.5 border border-gray-200 rounded-lg bg-gray-50 text-gray-700 text-sm";
+    "w-full rounded-lg border border-line bg-surface px-3.5 py-2.5 text-[13px] outline-none transition placeholder:text-ink-3 focus:border-primary focus:ring-2 focus:ring-primary-ring/30";
+  const RO = "w-full rounded-lg border border-line bg-surface-2 px-3.5 py-2.5 text-[13px] text-ink-2";
   const backTo = sourceOrderRow ? "/order" : "/job-work";
 
   const selectedBlueprint = blueprints.find((b) => String(b.id) === String(manualBlueprintId));
 
   return (
     <SidebarLayout>
-      <div className="max-w-6xl mx-auto pb-12">
-        {/* Top bar */}
-        <div className="flex items-center justify-between mb-5">
-          <button
-            type="button"
-            onClick={() => navigate(backTo)}
-            className="inline-flex items-center gap-1.5 text-sm text-gray-600 hover:text-black transition"
-          >
-            <ChevronLeft className="w-4 h-4" /> Back
-          </button>
-          <button
-            type="button"
-            onClick={() => navigate(backTo)}
-            className="inline-flex items-center justify-center w-9 h-9 rounded-full border border-gray-200 text-gray-500 hover:text-gray-900 hover:bg-gray-50 transition"
-            aria-label="Close"
-          >
-            <X className="w-4 h-4" />
-          </button>
-        </div>
+      <PageHeader
+        title={mode === "edit" ? "Edit job work" : "New job work"}
+        subtitle="Weigh the shipment once, enter Peti & rate — pieces, stickers, cartons and the total are worked out for you."
+        backTo={backTo}
+        backLabel={sourceOrderRow ? "Orders" : "Job work"}
+      />
 
-        <div className="mb-6">
-          <h1 className="text-3xl font-semibold text-gray-900">
-            {mode === "edit" ? "Edit Job Work" : "New Job Work"}
-          </h1>
-          <p className="text-sm text-gray-500 mt-1">
-            Weigh the shipment once, enter Peti &amp; rate — pieces, stickers, cartons and the total are worked out for you.
-          </p>
-        </div>
-
+      <PageBody>
         {/* Mode selector */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
+        <div className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-3">
           {JOB_MODES.map((m) => {
             const Icon = m.icon;
             const active = jobWorkType === m.value;
@@ -716,95 +697,63 @@ const MoveToJobWork = () => {
                 type="button"
                 disabled={disabled}
                 onClick={() => switchMode(m.value)}
-                className={`rounded-xl border p-3.5 text-left transition flex items-center gap-3 ${
+                className={`flex items-center gap-3 rounded-xl border p-3.5 text-left transition ${
                   active
-                    ? "border-gray-900 bg-gray-900 text-white shadow-sm"
-                    : "border-gray-200 bg-white text-gray-700 hover:border-gray-400"
-                } ${disabled ? "opacity-60 cursor-not-allowed" : ""}`}
+                    ? "border-ink bg-ink text-white shadow-sm"
+                    : "border-line bg-surface text-ink-2 hover:border-primary/40"
+                } ${disabled ? "cursor-not-allowed opacity-60" : ""}`}
               >
-                <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${active ? "bg-white/15" : "bg-gray-100"}`}>
-                  <Icon className={`w-4 h-4 ${active ? "text-white" : "text-gray-600"}`} />
+                <span className={`flex size-9 shrink-0 items-center justify-center rounded-lg ${active ? "bg-white/15" : "bg-surface-2"}`}>
+                  <Icon className={`size-4 ${active ? "text-white" : "text-ink-3"}`} />
                 </span>
                 <span className="flex flex-col">
-                  <span className="text-sm font-semibold">{m.label}</span>
-                  <span className={`text-xs ${active ? "text-white/70" : "text-gray-400"}`}>{m.hint}</span>
+                  <span className="text-[13px] font-semibold">{m.label}</span>
+                  <span className={`text-[11.5px] ${active ? "text-white/70" : "text-ink-3"}`}>{m.hint}</span>
                 </span>
               </button>
             );
           })}
         </div>
 
-        <form onSubmit={(e) => { e.preventDefault(); handleSave(); }}>
+        <form onSubmit={(e) => { e.preventDefault(); handleSave(); }} className="mx-auto max-w-6xl">
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* LEFT — inputs */}
             <div className="lg:col-span-2 space-y-5">
               {/* Party & Reference */}
-              <div className="bg-white rounded-2xl border border-gray-200 p-5 shadow-sm">
+              <div className="rounded-2xl border border-line bg-surface p-5 shadow-sm">
                 <div className="flex items-center gap-2 mb-4">
-                  <ModeIcon className="w-4 h-4 text-gray-500" />
-                  <h3 className="text-base font-semibold text-gray-900">{jobWorkTypeLabel} — Party &amp; Reference</h3>
+                  <ModeIcon className="size-4 text-ink-3" />
+                  <h3 className="font-heading text-[15px] font-semibold text-ink">{jobWorkTypeLabel} — Party &amp; Reference</h3>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {jobWorkType === "INHOUSE" ? (
                     <div>
                       <label className={LBL}>Party Name</label>
                       <input value={formData.partyName || "—"} readOnly className={RO} />
-                      <p className="text-xs text-gray-400 mt-1">Auto-fetched from the order</p>
+                      <p className="mt-1 text-[11.5px] text-ink-3">Auto-fetched from the order</p>
                     </div>
                   ) : (
-                    <div className="relative" ref={partyRef}>
+                    <div>
                       <label className={LBL}>{isManual ? "Party Name*" : "Job Worker name*"}</label>
-                      <div
-                        className={`${INP} cursor-pointer flex items-center justify-between`}
-                        onClick={() => setIsPartyOpen((prev) => !prev)}
-                      >
-                        <span className={formData.partyName ? "text-gray-900" : "text-gray-400"}>
-                          {formData.partyName || "Select party"}
-                        </span>
-                        <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${isPartyOpen ? "rotate-180" : ""}`} />
-                      </div>
-                      {isPartyOpen && (
-                        <div className="absolute z-20 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden">
-                          <div className="px-3 py-2 border-b border-gray-100">
-                            <input
-                              type="text"
-                              value={partySearch}
-                              onChange={(e) => setPartySearch(e.target.value)}
-                              placeholder="Search party..."
-                              className={INP}
-                              onClick={(e) => e.stopPropagation()}
-                              autoFocus
-                            />
-                          </div>
-                          <div className="max-h-48 overflow-y-auto">
-                            {filteredParties.length === 0 ? (
-                              <p className="px-4 py-2 text-sm text-gray-400">No parties found</p>
-                            ) : (
-                              filteredParties.map((p) => (
-                                <button
-                                  key={p.id}
-                                  type="button"
-                                  onClick={() => {
-                                    setFormData((prev) => ({ ...prev, partyName: p.name, partyId: p.id }));
-                                    setIsPartyOpen(false);
-                                    setPartySearch("");
-                                    // Party drives the Manual item/size list, so clear any prior pick.
-                                    if (isManual) {
-                                      setManualBlueprintId("");
-                                      setManualSizeId("");
-                                      setItemContext((prev) => ({ ...prev, sizeId: "", itemName: "", category: "", sizeLabel: "", pcsWeight: null, pcsPerBox: null, boxPerCarton: null }));
-                                      setCalc((prev) => ({ ...prev, pcsWeight: "" }));
-                                    }
-                                  }}
-                                  className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-100 ${formData.partyId === p.id ? "font-semibold bg-gray-50" : ""}`}
-                                >
-                                  {p.name}
-                                </button>
-                              ))
-                            )}
-                          </div>
-                        </div>
-                      )}
+                      <SearchableSelect
+                        ariaLabel="Party name"
+                        placeholder="Select party"
+                        searchPlaceholder="Search party…"
+                        options={filteredParties.map((p) => ({ value: String(p.id), label: p.name }))}
+                        value={formData.partyId ? String(formData.partyId) : undefined}
+                        onChange={(v) => {
+                          const p = filteredParties.find((x) => String(x.id) === v);
+                          if (!p) return;
+                          setFormData((prev) => ({ ...prev, partyName: p.name, partyId: p.id }));
+                          // Party drives the Manual item/size list, so clear any prior pick.
+                          if (isManual) {
+                            setManualBlueprintId("");
+                            setManualSizeId("");
+                            setItemContext((prev) => ({ ...prev, sizeId: "", itemName: "", category: "", sizeLabel: "", pcsWeight: null, pcsPerBox: null, boxPerCarton: null }));
+                            setCalc((prev) => ({ ...prev, pcsWeight: "" }));
+                          }
+                        }}
+                      />
                     </div>
                   )}
                   <div>
@@ -823,13 +772,13 @@ const MoveToJobWork = () => {
               </div>
 
               {/* Item */}
-              <div className="bg-white rounded-2xl border border-gray-200 p-5 shadow-sm">
+              <div className="rounded-2xl border border-line bg-surface p-5 shadow-sm">
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-2">
-                    <Package className="w-4 h-4 text-gray-500" />
-                    <h3 className="text-base font-semibold text-gray-900">Item Details</h3>
+                    <Package className="size-4 text-ink-3" />
+                    <h3 className="font-heading text-[15px] font-semibold text-ink">Item Details</h3>
                   </div>
-                  <span className="text-xs text-gray-400">
+                  <span className="text-[11.5px] text-ink-3">
                     {itemEditable ? "Pick from the item master" : loadingContext ? "Loading…" : "Fetched from the order"}
                   </span>
                 </div>
@@ -837,90 +786,58 @@ const MoveToJobWork = () => {
                 {itemEditable ? (
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     {/* Item picker */}
-                    <div className="relative">
+                    <div>
                       <label className={LBL}>Item*</label>
-                      <button type="button" onClick={() => setOpenManualItem((v) => !v)} className={`${INP} flex items-center justify-between`}>
-                        <span className={itemContext.itemName ? "text-gray-900" : "text-gray-400"}>{itemContext.itemName || "Select item"}</span>
-                        <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${openManualItem ? "rotate-180" : ""}`} />
-                      </button>
-                      {openManualItem && (
-                        <div className="absolute z-20 mt-1 w-full max-h-52 overflow-y-auto bg-white border border-gray-200 rounded-lg shadow-lg">
-                          {manualBlueprints.length === 0 ? (
-                            <p className="px-4 py-2 text-sm text-gray-400">No items</p>
-                          ) : (
-                            manualBlueprints.map((bp) => (
-                              <button
-                                key={bp.id}
-                                type="button"
-                                onClick={() => {
-                                  setManualBlueprintId(String(bp.id));
-                                  setManualSizeId("");
-                                  setItemContext((prev) => ({ ...prev, sizeId: "", itemName: bp.itemName || "", category: bp.category?.name || "", sizeLabel: "", pcsWeight: null, pcsPerBox: null, boxPerCarton: null }));
-                                  setCalc((prev) => ({ ...prev, pcsWeight: "" }));
-                                  setOpenManualItem(false);
-                                }}
-                                className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-100 ${String(bp.id) === String(manualBlueprintId) ? "font-semibold bg-gray-50" : ""}`}
-                              >
-                                {bp.itemName || `Item #${bp.id}`}
-                                {bp.category?.name ? <span className="text-gray-400"> · {bp.category.name}</span> : null}
-                              </button>
-                            ))
-                          )}
-                        </div>
-                      )}
+                      <SearchableSelect
+                        ariaLabel="Item"
+                        placeholder="Select item"
+                        searchPlaceholder="Search item…"
+                        options={manualBlueprints.map((bp) => ({
+                          value: String(bp.id),
+                          label: bp.itemName || `Item #${bp.id}`,
+                          description: bp.category?.name || undefined,
+                        }))}
+                        value={manualBlueprintId ? String(manualBlueprintId) : undefined}
+                        onChange={(v) => {
+                          const bp = manualBlueprints.find((x) => String(x.id) === v);
+                          if (!bp) return;
+                          setManualBlueprintId(String(bp.id));
+                          setManualSizeId("");
+                          setItemContext((prev) => ({ ...prev, sizeId: "", itemName: bp.itemName || "", category: bp.category?.name || "", sizeLabel: "", pcsWeight: null, pcsPerBox: null, boxPerCarton: null }));
+                          setCalc((prev) => ({ ...prev, pcsWeight: "" }));
+                        }}
+                      />
                     </div>
                     {/* Size picker */}
-                    <div className="relative">
+                    <div>
                       <label className={LBL}>Size*</label>
-                      <button
-                        type="button"
+                      <SearchableSelect
+                        ariaLabel="Size"
+                        placeholder="Select size"
+                        searchPlaceholder="Search size…"
+                        options={manualSizes.map((s) => ({
+                          value: String(s.id),
+                          label: [s.sizeInInch, s.sizeInMm ? `(${s.sizeInMm})` : null].filter(Boolean).join(" "),
+                        }))}
+                        value={manualSizeId ? String(manualSizeId) : undefined}
                         disabled={!manualBlueprintId}
-                        onClick={() => setOpenManualSize((v) => !v)}
-                        className={`${INP} flex items-center justify-between ${!manualBlueprintId ? "opacity-60 cursor-not-allowed" : ""}`}
-                      >
-                        <span className={itemContext.sizeLabel ? "text-gray-900" : "text-gray-400"}>{itemContext.sizeLabel || "Select size"}</span>
-                        <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${openManualSize ? "rotate-180" : ""}`} />
-                      </button>
-                      {openManualSize && manualBlueprintId && (
-                        <div className="absolute z-20 mt-1 w-full max-h-52 overflow-y-auto bg-white border border-gray-200 rounded-lg shadow-lg">
-                          {manualSizes.length === 0 ? (
-                            <p className="px-4 py-2 text-sm text-gray-400">No sizes</p>
-                          ) : (
-                            manualSizes.map((s) => (
-                              <button
-                                key={s.id}
-                                type="button"
-                                onClick={() => { selectManualSize(s, selectedBlueprint); setOpenManualSize(false); }}
-                                className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-100 ${String(s.id) === String(manualSizeId) ? "font-semibold bg-gray-50" : ""}`}
-                              >
-                                {[s.sizeInInch, s.sizeInMm ? `(${s.sizeInMm})` : null].filter(Boolean).join(" ")}
-                              </button>
-                            ))
-                          )}
-                        </div>
-                      )}
+                        onChange={(v) => {
+                          const s = manualSizes.find((x) => String(x.id) === v);
+                          if (s) selectManualSize(s, selectedBlueprint);
+                        }}
+                      />
                     </div>
                     {/* Finish picker */}
-                    <div className="relative">
+                    <div>
                       <label className={LBL}>Finish*</label>
-                      <button type="button" onClick={() => setOpenFinish((v) => !v)} className={`${INP} flex items-center justify-between`}>
-                        <span className={itemContext.finish ? "text-gray-900" : "text-gray-400"}>{itemContext.finish || "Select finish"}</span>
-                        <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${openFinish ? "rotate-180" : ""}`} />
-                      </button>
-                      {openFinish && (
-                        <div className="absolute z-20 mt-1 w-full max-h-52 overflow-y-auto bg-white border border-gray-200 rounded-lg shadow-lg">
-                          {FINISH_LABELS.map((f) => (
-                            <button
-                              key={f}
-                              type="button"
-                              onClick={() => { setItemContext((prev) => ({ ...prev, finish: f })); setOpenFinish(false); }}
-                              className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-100 ${itemContext.finish === f ? "font-semibold bg-gray-50" : ""}`}
-                            >
-                              {f}
-                            </button>
-                          ))}
-                        </div>
-                      )}
+                      <SearchableSelect
+                        ariaLabel="Finish"
+                        placeholder="Select finish"
+                        searchPlaceholder="Search finish…"
+                        options={FINISH_LABELS.map((f) => ({ value: f, label: f }))}
+                        value={itemContext.finish || undefined}
+                        onChange={(v) => setItemContext((prev) => ({ ...prev, finish: v }))}
+                      />
                     </div>
                   </div>
                 ) : (
@@ -945,12 +862,12 @@ const MoveToJobWork = () => {
               </div>
 
               {/* Weighing */}
-              <div className="bg-white rounded-2xl border border-gray-200 p-5 shadow-sm">
+              <div className="rounded-2xl border border-line bg-surface p-5 shadow-sm">
                 <div className="flex items-center gap-2 mb-1">
-                  <Scale className="w-4 h-4 text-gray-500" />
-                  <h3 className="text-base font-semibold text-gray-900">Weighing, Peti &amp; Rate</h3>
+                  <Scale className="size-4 text-ink-3" />
+                  <h3 className="font-heading text-[15px] font-semibold text-ink">Weighing, Peti &amp; Rate</h3>
                 </div>
-                <p className="text-xs text-gray-400 mb-4">Net Kg = Gross − Peti × tare. Total Pcs = Net ÷ 1-pc weight.</p>
+                <p className="text-[11.5px] text-ink-3 mb-4">Net Kg = Gross − Peti × tare. Total Pcs = Net ÷ 1-pc weight.</p>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div>
                     <label className={LBL}>Gross Kg (weighed)*</label>
@@ -960,21 +877,12 @@ const MoveToJobWork = () => {
                     <label className={LBL}>Peti Count</label>
                     <div className="grid grid-cols-2 gap-2">
                       <input type="number" step="1" value={calc.elementCount} onChange={(e) => updateCalc({ elementCount: e.target.value })} className={INP} placeholder="5" />
-                      <div className="relative">
-                        <button type="button" onClick={() => setOpenElementType((prev) => !prev)} className={`${INP} flex items-center justify-between`}>
-                          <span>{ELEMENT_TYPE_LABEL[calc.elementType]}</span>
-                          <ChevronDown className={`w-4 h-4 transition-transform ${openElementType ? "rotate-180" : ""}`} />
-                        </button>
-                        {openElementType && (
-                          <div className="absolute z-10 mt-1 w-full rounded-lg border border-gray-200 bg-white overflow-hidden shadow">
-                            {ELEMENT_TYPE_OPTIONS.map((opt) => (
-                              <button key={opt} type="button" onClick={() => { updateCalc({ elementType: opt }); setOpenElementType(false); }} className="w-full px-3 py-2 text-left text-sm hover:bg-gray-100">
-                                {ELEMENT_TYPE_LABEL[opt]}
-                              </button>
-                            ))}
-                          </div>
-                        )}
-                      </div>
+                      <SearchableSelect
+                        ariaLabel="Element type"
+                        options={ELEMENT_TYPE_OPTIONS.map((opt) => ({ value: opt, label: ELEMENT_TYPE_LABEL[opt] }))}
+                        value={calc.elementType}
+                        onChange={(v) => updateCalc({ elementType: v })}
+                      />
                     </div>
                   </div>
                   <div>
@@ -984,7 +892,7 @@ const MoveToJobWork = () => {
                   <div>
                     <label className={LBL}>1 Pcs Weight (Kg)</label>
                     <input type="number" step="0.0001" value={calc.pcsWeight} onChange={(e) => updateCalc({ pcsWeight: e.target.value })} className={INP} placeholder="0.292" />
-                    <p className="text-xs text-gray-400 mt-1">From item — editable</p>
+                    <p className="text-[11.5px] text-ink-3 mt-1">From item — editable</p>
                   </div>
                   <div>
                     <label className={LBL}>Rate / Kg</label>
@@ -996,14 +904,14 @@ const MoveToJobWork = () => {
 
             {/* RIGHT — live summary */}
             <div>
-              <div className="sticky top-4 bg-white rounded-2xl border border-gray-200 p-5 shadow-sm">
+              <div className="sticky top-4 rounded-2xl border border-line bg-surface p-5 shadow-sm">
                 <div className="flex items-center gap-2 mb-4">
-                  <Sparkles className="w-4 h-4 text-gray-500" />
-                  <h3 className="text-base font-semibold text-gray-900">Summary</h3>
+                  <Sparkles className="size-4 text-ink-3" />
+                  <h3 className="font-heading text-[15px] font-semibold text-ink">Summary</h3>
                 </div>
-                <div className="rounded-xl bg-gray-900 text-white p-4 mb-4">
-                  <p className="text-xs text-white/60">Total Rate</p>
-                  <p className="text-3xl font-semibold mt-1">₹ {fmt(derived.totalRate, 0)}</p>
+                <div className="mb-4 rounded-xl bg-ink p-4 text-white">
+                  <p className="text-[11.5px] text-white/60">Total Rate</p>
+                  <p className="mt-1 font-mono text-3xl font-semibold">₹ {fmt(derived.totalRate, 0)}</p>
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   {[
@@ -1012,32 +920,23 @@ const MoveToJobWork = () => {
                     ["Sticker Qty", fmt(derived.stickerQty, 0)],
                     ["Total Carton", fmt(derived.totalCarton, 2)],
                   ].map(([k, v]) => (
-                    <div key={k} className="rounded-xl border border-gray-100 bg-gray-50 p-3">
-                      <p className="text-xs text-gray-400">{k}</p>
-                      <p className="text-lg font-semibold text-gray-900 mt-0.5">{v}</p>
+                    <div key={k} className="rounded-xl border border-line-2 bg-surface-2 p-3">
+                      <p className="text-[11.5px] text-ink-3">{k}</p>
+                      <p className="mt-0.5 font-mono text-lg font-semibold text-ink">{v}</p>
                     </div>
                   ))}
                 </div>
-                <button
-                  type="submit"
-                  disabled={saving || loadingContext}
-                  className="mt-5 w-full py-2.5 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition text-sm font-medium disabled:opacity-60 disabled:cursor-not-allowed"
-                >
-                  {saving ? "Saving…" : mode === "edit" ? "Update Job Work" : "Create Job Work"}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => navigate(backTo)}
-                  disabled={saving}
-                  className="mt-2 w-full py-2.5 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition text-sm font-medium"
-                >
+                <Button type="submit" disabled={saving || loadingContext} className="mt-5 w-full">
+                  {saving ? "Saving…" : mode === "edit" ? "Update job work" : "Create job work"}
+                </Button>
+                <Button type="button" variant="outline" onClick={() => navigate(backTo)} disabled={saving} className="mt-2 w-full">
                   Cancel
-                </button>
+                </Button>
               </div>
             </div>
           </div>
         </form>
-      </div>
+      </PageBody>
     </SidebarLayout>
   );
 };

@@ -1,134 +1,100 @@
-import React from "react";
-import { SquarePen, Trash2, Eye } from "lucide-react";
+import { Eye, SquarePen, Trash2 } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 
-const ItemsTable = ({
-  items = [],
-  onEdit,
-  onView,
-  onDelete,
-  showActions = true,
-}) => {
-  const getStockColor = (status) => {
-    return status === "Low Stock"
-      ? "bg-[#FFEBEB] text-[#FF0101]"
-      : "bg-[#D1FFE2] text-[#275B22]";
-  };
+const HEAD = 'px-4 py-3 text-center text-[11.5px] font-semibold tracking-[0.03em] text-ink-3 uppercase whitespace-nowrap';
+const CELL = 'px-4 py-3 text-center text-[13px] text-ink-2';
+
+const ItemsTable = ({ items = [], onEdit, onView, onDelete, showActions = true }) => {
+  const colCount = showActions ? 7 : 6;
 
   return (
-    <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
-  <table className="w-full">
-    <thead className="bg-gray-50 border-b border-gray-200">
-      <tr>
-        <th className="px-6 py-3 text-center text-sm font-semibold text-gray-900">
-          In Inch
-        </th>
-        <th className="px-6 py-3 text-center text-sm font-semibold text-gray-900">
-          In mm
-        </th>
-        <th className="px-6 py-3 text-center text-sm font-semibold text-gray-900">
-          Category
-        </th>
+    <Card className="gap-0 overflow-hidden py-0">
+      <div className="w-full overflow-x-auto">
+        <Table>
+          <TableHeader>
+            <TableRow className="hover:bg-transparent">
+              <TableHead className={HEAD}>In inch</TableHead>
+              <TableHead className={HEAD}>In mm</TableHead>
+              <TableHead className={HEAD}>Category</TableHead>
+              <TableHead className={HEAD}>Total Kg</TableHead>
+              <TableHead className={HEAD}>Dozen weight</TableHead>
+              <TableHead className={HEAD}>Low stock</TableHead>
+              {showActions && <TableHead className={HEAD}>Action</TableHead>}
+            </TableRow>
+          </TableHeader>
 
-        <th className="px-6 py-3 text-center text-sm font-semibold text-gray-900">
-          Total Kg
-        </th>
-        <th className="px-6 py-3 text-center text-sm font-semibold text-gray-900">
-          Dozen Weight
-        </th>
-        <th className="px-6 py-3 text-center text-sm font-semibold text-gray-900">
-          Low Stock
-        </th>
-        {showActions && (
-          <th className="px-6 py-3 text-center text-sm font-semibold text-gray-900">
-            Action
-          </th>
-        )}
-      </tr>
-    </thead>
+          <TableBody>
+            {items && items.length > 0 ? (
+              items.map((item) => (
+                <TableRow
+                  key={item.id}
+                  className="cursor-pointer border-line-2"
+                  onDoubleClick={() => (onView ? onView(item) : onEdit && onEdit(item))}
+                >
+                  <TableCell className="px-4 py-3 text-center text-[13px] font-medium text-ink">
+                    {item.sizeInch}
+                  </TableCell>
+                  <TableCell className={CELL}>{item.sizeMM}</TableCell>
+                  <TableCell className={CELL}>{item.category}</TableCell>
+                  <TableCell className={`${CELL} font-mono`}>{item.totalKg}</TableCell>
+                  <TableCell className={`${CELL} font-mono`}>{item.dozenWeight}</TableCell>
+                  <TableCell className="px-4 py-3 text-center">
+                    <Badge variant={item.lowStock === 'Low Stock' ? 'danger' : 'success'}>
+                      {item.lowStock}
+                    </Badge>
+                  </TableCell>
 
-    <tbody className="divide-y divide-gray-200">
-      {items && items.length > 0 ? (
-        items.map((item) => (
-          <tr
-            key={item.id}
-            className="hover:bg-gray-50 transition cursor-pointer"
-            onDoubleClick={() => (onView ? onView(item) : onEdit && onEdit(item))}
-          >
-            <td className="px-6 py-4 text-sm text-gray-900 text-center">
-              {item.sizeInch}
-            </td>
-            <td className="px-6 py-4 text-sm text-gray-900 text-center">
-              {item.sizeMM}
-            </td>
-            <td className="px-6 py-4 text-sm text-gray-900 text-center">
-              {item.category}
-            </td>
-
-            <td className="px-6 py-4 text-sm text-gray-900 text-center">
-              {item.totalKg}
-            </td>
-            <td className="px-6 py-4 text-sm text-gray-900 text-center">
-              {item.dozenWeight}
-            </td>
-            <td className="px-6 py-4 text-sm text-center">
-              <span
-                className={`inline-flex items-center justify-center px-5 py-2 rounded-full text-xs font-medium ${getStockColor(
-                  item.lowStock
-                )}`}
-              >
-                {item.lowStock}
-              </span>
-            </td>
-
-            {showActions && (
-              <td className="px-6 py-4 text-sm">
-                <div className="flex items-center justify-center gap-1">
-                  {onEdit && (
-                    <button
-                      onClick={() => onEdit(item)}
-                      className="p-1 text-black rounded transition"
-                      title="Edit"
-                    >
-                      <SquarePen className="w-4 h-4" />
-                    </button>
+                  {showActions && (
+                    <TableCell className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                      <div className="flex items-center justify-center gap-1">
+                        {onEdit && (
+                          <Button variant="ghost" size="icon-sm" onClick={() => onEdit(item)} title="Edit" aria-label="Edit">
+                            <SquarePen className="size-4 text-ink-3" />
+                          </Button>
+                        )}
+                        {onView && (
+                          <Button variant="ghost" size="icon-sm" onClick={() => onView(item)} title="View" aria-label="View">
+                            <Eye className="size-4 text-ink-3" />
+                          </Button>
+                        )}
+                        {onDelete && (
+                          <Button
+                            variant="ghost"
+                            size="icon-sm"
+                            onClick={() => onDelete(item)}
+                            title="Delete"
+                            aria-label="Delete"
+                            className="text-danger hover:text-danger"
+                          >
+                            <Trash2 className="size-4" />
+                          </Button>
+                        )}
+                      </div>
+                    </TableCell>
                   )}
-                  {onView && (
-                    <button
-                      onClick={() => onView(item)}
-                      className="p-1 text-black hover:bg-gray-50 rounded transition"
-                      title="View"
-                    >
-                      <Eye className="w-4 h-4" />
-                    </button>
-                  )}
-                  {onDelete && (
-                    <button
-                      onClick={() => onDelete(item)}
-                      className="p-1 text-red-600 hover:bg-red-50 rounded transition"
-                      title="Delete"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  )}
-                </div>
-              </td>
+                </TableRow>
+              ))
+            ) : (
+              <TableRow className="hover:bg-transparent">
+                <TableCell colSpan={colCount} className="px-4 py-8 text-center text-[13px] text-ink-3">
+                  No items found
+                </TableCell>
+              </TableRow>
             )}
-          </tr>
-        ))
-      ) : (
-        <tr>
-          <td
-            colSpan={showActions ? 7 : 6}
-            className="px-6 py-8 text-center text-gray-500"
-          >
-            No items found
-          </td>
-        </tr>
-      )}
-    </tbody>
-  </table>
-</div>
-
+          </TableBody>
+        </Table>
+      </div>
+    </Card>
   );
 };
 

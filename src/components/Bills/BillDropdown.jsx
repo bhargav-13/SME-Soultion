@@ -1,75 +1,46 @@
-import React, { useEffect, useMemo, useState } from "react";
-import { ChevronDown } from "lucide-react";
+import { useMemo } from 'react';
+import { Field } from '@/components/form-field';
+import { SearchableSelect } from '@/components/ui/searchable-select';
 
+/**
+ * Generic labelled picker for the bill forms. Wraps the shared {@link SearchableSelect} so it
+ * matches the rest of the console, while keeping this component's original contract: options are
+ * `{ value, label }`, and `onSelect` receives the full option object.
+ */
 const BillDropdown = ({
   label,
   value,
   options = [],
-  placeholder = "Select...",
+  placeholder = 'Select…',
   onSelect,
   disabled = false,
   required = false,
-  labelClassName = "block text-md font-medium text-black mb-2",
-  buttonClassName = "w-full border border-gray-300 rounded-md px-3 py-2.5 text-md bg-white focus:outline-none focus:ring-1 focus:ring-gray-400 flex items-center justify-between",
-  optionListClassName = "absolute z-20 mt-1 w-full max-h-60 overflow-y-auto bg-white border border-gray-200 rounded-lg shadow-lg",
+  // Back-compat: callers that render this inside a table row hide the label via `labelClassName="sr-only"`.
+  labelClassName,
 }) => {
-  const [open, setOpen] = useState(false);
-
-  const selectedOption = useMemo(
-    () => options.find((opt) => opt.value === value),
-    [options, value]
+  const selectOptions = useMemo(
+    () => options.map((opt) => ({ value: String(opt.value), label: opt.label })),
+    [options],
   );
 
-  useEffect(() => {
-    if (disabled) setOpen(false);
-  }, [disabled]);
+  const hideLabel = labelClassName?.includes('sr-only');
 
   return (
-    <div>
-      <label className={labelClassName}>
-        {label}
-        {required ? <span className="text-red-400">*</span> : null}
-      </label>
-      <div className="relative">
-        <button
-          type="button"
-          disabled={disabled}
-          onClick={() => !disabled && setOpen((prev) => !prev)}
-          className={`${buttonClassName} ${disabled ? "bg-gray-50 text-gray-500 cursor-not-allowed" : ""}`}
-        >
-          <span className={selectedOption ? "text-black" : "text-gray-500"}>
-            {selectedOption?.label || placeholder}
-          </span>
-          <ChevronDown className={`w-4 h-4 text-gray-500 transition-transform ${open ? "rotate-180" : ""}`} />
-        </button>
-
-        {open && !disabled && (
-          <div className={optionListClassName}>
-            {options.length === 0 ? (
-              <p className="px-4 py-2 text-sm text-gray-400">No options found</p>
-            ) : (
-              options.map((option) => (
-                <button
-                  key={option.value}
-                  type="button"
-                  onClick={() => {
-                    onSelect(option);
-                    setOpen(false);
-                  }}
-                  className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-100 transition ${
-                    option.value === value ? "font-semibold bg-gray-50" : ""
-                  }`}
-                >
-                  {option.label}
-                </button>
-              ))
-            )}
-          </div>
-        )}
-      </div>
-    </div>
+    <Field label={hideLabel ? undefined : label} required={required}>
+      <SearchableSelect
+        ariaLabel={label}
+        placeholder={placeholder}
+        searchPlaceholder="Search…"
+        options={selectOptions}
+        value={value != null ? String(value) : undefined}
+        onChange={(v) => {
+          const option = options.find((o) => String(o.value) === v);
+          if (option) onSelect(option);
+        }}
+        disabled={disabled}
+      />
+    </Field>
   );
 };
 
 export default BillDropdown;
-

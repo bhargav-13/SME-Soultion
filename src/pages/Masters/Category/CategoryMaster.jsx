@@ -1,37 +1,38 @@
-import React, { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
-import {
-  SquarePen,
-  Trash2,
-  Plus,
-} from "lucide-react";
-import SidebarLayout from "../../../components/SidebarLayout";
-import ConfirmationDialog from "../../../components/ConfirmationDialog";
-import AddCategoryDialog from "../../../components/Category/AddCategoryDialog";
-import SearchFilter from "../../../components/SearchFilter";
-import StatsCard from "../../../components/StatsCard";
-import PageHeader from "../../../components/PageHeader";
-import PrimaryActionButton from "../../../components/PrimaryActionButton";
-import { categoryApi } from "../../../services/apiService";
-import toast from "react-hot-toast";
-import Loader from "../../../components/Loader";
+import { useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Plus, SquarePen, Tags, Trash2 } from 'lucide-react';
+import toast from 'react-hot-toast';
+import SidebarLayout from '@/components/SidebarLayout';
+import AddCategoryDialog from '@/components/Category/AddCategoryDialog';
+import { ConfirmDialog, ConfirmName } from '@/components/confirm-dialog';
+import { DataTable, SortableHeader } from '@/components/data-table';
+import { ListToolbar } from '@/components/list-toolbar';
+import { PageBody, PageHeader } from '@/components/page-header';
+import { RowActions } from '@/components/row-actions';
+import { EmptyState } from '@/components/states';
+import { Button } from '@/components/ui/button';
+import { matchesSearch, useListFilters } from '@/hooks/use-list-filters';
+import { pluralize } from '@/lib/format';
+import { categoryApi } from '@/services/apiService';
 
 const CategoryMaster = () => {
   const navigate = useNavigate();
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [isError, setIsError] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [deleteDialog, setDeleteDialog] = useState({
     isOpen: false,
     categoryId: null,
-    categoryName: "",
+    categoryName: '',
   });
   const [addCategoryDialog, setAddCategoryDialog] = useState({
     isOpen: false,
     isEdit: false,
     data: null,
   });
-  const [searchQuery, setSearchQuery] = useState("");
-  const [typeFilter, setTypeFilter] = useState("");
+
+  const { search, onSearchChange, debouncedSearch, clearFilters, hasActiveFilters } = useListFilters();
 
   useEffect(() => {
     fetchCategories();
@@ -40,6 +41,7 @@ const CategoryMaster = () => {
   const fetchCategories = async () => {
     try {
       setLoading(true);
+      setIsError(false);
       const response = await categoryApi.getAllCategories();
       const categoriesData = response.data;
 
@@ -50,27 +52,20 @@ const CategoryMaster = () => {
 
       setCategories(transformedCategories);
     } catch (error) {
-      console.error("Error fetching categories:", error);
-      toast.error(error.response?.data?.message || "Failed to fetch categories");
+      console.error('Error fetching categories:', error);
+      setIsError(true);
+      toast.error(error.response?.data?.message || 'Failed to fetch categories');
     } finally {
       setLoading(false);
     }
   };
 
   const handleAddCategory = () => {
-    setAddCategoryDialog({
-      isOpen: true,
-      isEdit: false,
-      data: null,
-    });
+    setAddCategoryDialog({ isOpen: true, isEdit: false, data: null });
   };
 
   const handleEditCategory = (category) => {
-    setAddCategoryDialog({
-      isOpen: true,
-      isEdit: true,
-      data: category,
-    });
+    setAddCategoryDialog({ isOpen: true, isEdit: true, data: category });
   };
 
   const handleSaveCategory = async (formData) => {
@@ -79,17 +74,17 @@ const CategoryMaster = () => {
         await categoryApi.updateCategory(addCategoryDialog.data.id, {
           name: formData.categoryName,
         });
-        toast.success("Category updated successfully!");
+        toast.success('Category updated successfully!');
       } else {
         await categoryApi.createCategory({ name: formData.categoryName });
-        toast.success("Category added successfully!");
+        toast.success('Category added successfully!');
       }
 
       setAddCategoryDialog({ isOpen: false, isEdit: false, data: null });
       await fetchCategories();
     } catch (error) {
-      console.error("Error saving category:", error);
-      toast.error(error.response?.data?.message || "Failed to save category");
+      console.error('Error saving category:', error);
+      toast.error(error.response?.data?.message || 'Failed to save category');
     }
   };
 
@@ -103,127 +98,186 @@ const CategoryMaster = () => {
 
   const handleConfirmDelete = async () => {
     try {
+      setDeleting(true);
       await categoryApi.deleteCategory(deleteDialog.categoryId);
       await fetchCategories();
-      setDeleteDialog({ isOpen: false, categoryId: null, categoryName: "" });
-      toast.success("Category deleted successfully!");
+      setDeleteDialog({ isOpen: false, categoryId: null, categoryName: '' });
+      toast.success('Category deleted successfully!');
     } catch (error) {
-      console.error("Error deleting category:", error);
-      toast.error(error.response?.data?.message || "Failed to delete category");
+      console.error('Error deleting category:', error);
+      toast.error(error.response?.data?.message || 'Failed to delete category');
+    } finally {
+      setDeleting(false);
     }
   };
 
-  const handleCancelDelete = () => {
-    setDeleteDialog({ isOpen: false, categoryId: null, categoryName: "" });
-  };
+  const openInventory = (category) =>
+    navigate('/inventory', {
+      state: { categoryId: category.id, categoryName: category.categoryName },
+    });
 
-  // Filter categories based on search
-  const filteredCategories = categories.filter((category) =>
-    category.categoryName.toLowerCase().includes(searchQuery.toLowerCase())
+  const filteredCategories = useMemo(
+    () => categories.filter((c) => matchesSearch(c, debouncedSearch, ['categoryName'])),
+    [categories, debouncedSearch],
+  );
+
+  const columns = useMemo(
+    () => [
+      {
+        id: 'categoryName',
+        accessorKey: 'categoryName',
+        header: ({ column }) => <SortableHeader column={column}>Category</SortableHeader>,
+        cell: ({ row }) => (
+          <div className="flex min-w-0 items-center gap-2.5">
+            <span className="grid size-7 shrink-0 place-items-center rounded-md border border-line bg-surface-2">
+              <Tags className="size-3.5 text-ink-3" aria-hidden="true" />
+            </span>
+            <span className="truncate font-medium text-ink">{row.original.categoryName}</span>
+          </div>
+        ),
+      },
+      {
+        id: 'id',
+        accessorKey: 'id',
+        header: ({ column }) => <SortableHeader column={column}>ID</SortableHeader>,
+        cell: ({ row }) => <span className="font-mono text-[12.5px] text-ink-3">#{row.original.id}</span>,
+        size: 100,
+      },
+      {
+        id: 'actions',
+        header: () => <span className="sr-only">Actions</span>,
+        cell: ({ row }) => (
+          <RowActions
+            actions={[
+              { label: 'View stock', icon: Tags, onSelect: () => openInventory(row.original) },
+              { label: 'Edit', icon: SquarePen, onSelect: () => handleEditCategory(row.original) },
+              {
+                label: 'Delete',
+                icon: Trash2,
+                destructive: true,
+                separatorBefore: true,
+                onSelect: () => handleDeleteClick(row.original),
+              },
+            ]}
+          />
+        ),
+        size: 60,
+      },
+    ],
+    [],
   );
 
   return (
     <SidebarLayout>
-      <div className="mx-auto">
-        <div className="mb-8">
-          <PageHeader
-            title="Category Master"
-            description="Organise items into categories for structured inventory management."
-            action={
-              <PrimaryActionButton
-                onClick={handleAddCategory}
-                icon={Plus}
-                className="border-black"
-              >
-                Add Category
-              </PrimaryActionButton>
-            }
-          />
-        </div>
+      <PageHeader
+        title="Category master"
+        subtitle={
+          loading ? 'Organise items into categories' : `${pluralize(categories.length, 'category', 'categories')}`
+        }
+        actions={
+          <Button size="sm" onClick={handleAddCategory}>
+            <Plus className="size-4" />
+            <span className="hidden sm:inline">Add category</span>
+          </Button>
+        }
+      />
 
-        {/* Stats Card */}
-        <div className="mb-8">
-          <StatsCard
-            label="Total Categories"
-            value={categories.length}
-            className="border-gray-200 max-w-xs"
-          />
-        </div>
-
-        {/* Search */}
-        <SearchFilter
-          searchQuery={searchQuery}
-          setSearchQuery={setSearchQuery}
-          typeFilter={typeFilter}
-          setTypeFilter={setTypeFilter}
-          filterOptions={[]}
-          filterPlaceholder="Filter"
+      <PageBody>
+        <ListToolbar
+          search={{ value: search, onChange: onSearchChange, placeholder: 'Search categories…' }}
+          onClear={clearFilters}
+          hasActiveFilters={hasActiveFilters}
         />
 
-        {/* Categories Grid */}
-        <div className="grid grid-cols-3 gap-4 mt-6">
-          {loading ? (
-            <div className="col-span-3">
-              <Loader text="Loading categories..." />
-            </div>
-          ) : filteredCategories.length === 0 ? (
-            <div className="col-span-3 p-6 text-center text-gray-500">
-              No categories found
-            </div>
-          ) : (
-            filteredCategories.map((category) => (
-              <div
-                key={category.id}
-                onClick={() => navigate("/inventory", { state: { categoryId: category.id, categoryName: category.categoryName } })}
-                className="bg-white rounded-lg border border-gray-200 px-4 py-3 flex items-center justify-between hover:shadow-md hover:border-gray-400 cursor-pointer transition"
-              >
-                <span className="text-sm font-medium text-gray-800">
-                  {category.categoryName}
+        <DataTable
+          columns={columns}
+          data={filteredCategories}
+          getRowId={(c) => String(c.id)}
+          isPending={loading}
+          isError={isError}
+          onRetry={fetchCategories}
+          errorText="Could not load the categories."
+          initialPageSize={50}
+          onRowClick={openInventory}
+          renderMobileCard={(c) => (
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex min-w-0 items-center gap-2.5">
+                <span className="grid size-8 shrink-0 place-items-center rounded-md border border-line bg-surface-2">
+                  <Tags className="size-4 text-ink-3" aria-hidden="true" />
                 </span>
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={(e) => { e.stopPropagation(); handleEditCategory(category); }}
-                    className="text-gray-500 hover:text-gray-800 transition"
-                    title="Edit"
-                  >
-                    <SquarePen className="w-4 h-4" />
-                  </button>
-                  <button
-                    onClick={(e) => { e.stopPropagation(); handleDeleteClick(category); }}
-                    className="text-red-500 hover:text-red-700 transition"
-                    title="Delete"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
+                <div className="min-w-0">
+                  <p className="truncate text-[13.5px] font-medium text-ink">{c.categoryName}</p>
+                  <p className="font-mono text-[11px] text-ink-3">#{c.id}</p>
                 </div>
               </div>
-            ))
+              <RowActions
+                actions={[
+                  { label: 'Edit', icon: SquarePen, onSelect: () => handleEditCategory(c) },
+                  {
+                    label: 'Delete',
+                    icon: Trash2,
+                    destructive: true,
+                    separatorBefore: true,
+                    onSelect: () => handleDeleteClick(c),
+                  },
+                ]}
+              />
+            </div>
           )}
-        </div>
-
-        {/* Add/Edit Category Dialog */}
-        <AddCategoryDialog
-          isOpen={addCategoryDialog.isOpen}
-          onClose={() =>
-            setAddCategoryDialog({ isOpen: false, isEdit: false, data: null })
+          empty={
+            hasActiveFilters ? (
+              <EmptyState
+                icon={Tags}
+                title="No categories match"
+                description="Nothing here matches that search."
+                action={
+                  <Button variant="outline" size="sm" onClick={clearFilters}>
+                    Clear search
+                  </Button>
+                }
+              />
+            ) : (
+              <EmptyState
+                icon={Tags}
+                title="No categories yet"
+                description="Items need a category before they can be created, so this is the first thing to set up."
+                action={
+                  <Button size="sm" onClick={handleAddCategory}>
+                    <Plus className="size-4" />
+                    Create the first category
+                  </Button>
+                }
+              />
+            )
           }
-          onSave={handleSaveCategory}
-          initialData={addCategoryDialog.data}
-          isEdit={addCategoryDialog.isEdit}
         />
+      </PageBody>
 
-        {/* Delete Confirmation Dialog */}
-        <ConfirmationDialog
-          isOpen={deleteDialog.isOpen}
-          title="Delete Category"
-          message={`Are you sure you want to delete "${deleteDialog.categoryName}"? This action cannot be undone.`}
-          confirmText="Delete"
-          cancelText="Cancel"
-          onConfirm={handleConfirmDelete}
-          onCancel={handleCancelDelete}
-          isDangerous={true}
-        />
-      </div>
+      <AddCategoryDialog
+        isOpen={addCategoryDialog.isOpen}
+        onClose={() => setAddCategoryDialog({ isOpen: false, isEdit: false, data: null })}
+        onSave={handleSaveCategory}
+        initialData={addCategoryDialog.data}
+        isEdit={addCategoryDialog.isEdit}
+      />
+
+      <ConfirmDialog
+        open={deleteDialog.isOpen}
+        onOpenChange={(open) => {
+          if (!open) setDeleteDialog({ isOpen: false, categoryId: null, categoryName: '' });
+        }}
+        title="Delete this category?"
+        description={
+          <>
+            <ConfirmName>{deleteDialog.categoryName}</ConfirmName> will be removed from the master. Items already
+            filed under it will be left without a category. This cannot be undone.
+          </>
+        }
+        confirmLabel="Delete"
+        busyLabel="Deleting…"
+        isPending={deleting}
+        onConfirm={handleConfirmDelete}
+      />
     </SidebarLayout>
   );
 };

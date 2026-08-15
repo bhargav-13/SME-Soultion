@@ -1,73 +1,65 @@
-import React from "react";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { cn } from "@/lib/utils";
+
+const LABEL = "mb-1 block text-[12.5px] font-medium text-ink-2";
 
 const ImporterSection = ({ title, prefix, formData, onChange, disabled }) => {
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-      
-      {/* 1. Country Field (Likely missing previously) */}
+    <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+      {/* 1. Country / To The Order */}
       <div className="md:col-span-2">
-        <label className="block font-medium text-black mb-1">
-        To The Order
-        </label>
-        <input
+        <label className={LABEL}>To The Order</label>
+        <Input
           type="text"
           name={`${prefix}Country`}
           value={formData[`${prefix}Country`] || ""}
           onChange={onChange}
           disabled={disabled}
           placeholder="Enter Country"
-          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent disabled:bg-gray-100 placeholder:text-gray-500 placeholder:text-sm"
+          className={cn(disabled && "bg-surface-2")}
         />
       </div>
 
-      {/* 2. To The Order Field (Likely missing previously) */}
-      
-
-      {/* 3. Company / Party Name */}
+      {/* 2. Company / Party Name */}
       <div>
-        <label className="block font-medium text-black mb-1">
-          {title}
-        </label>
-        <input
+        <label className={LABEL}>{title}</label>
+        <Input
           type="text"
           name={`${prefix}Name`}
           value={formData[`${prefix}Name`] || ""}
           onChange={onChange}
           disabled={disabled}
           placeholder="Enter Party Name"
-          className="w-full  px-4 py-2  border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent disabled:bg-gray-100 placeholder:text-gray-500 placeholder:text-sm"
+          className={cn(disabled && "bg-surface-2")}
         />
       </div>
 
-      {/* 4. Contact Number */}
+      {/* 3. Contact Number */}
       <div>
-        <label className="block font-medium text-black mb-1">
-          Contact No.
-        </label>
-        <input
+        <label className={LABEL}>Contact No.</label>
+        <Input
           type="text"
           name={`${prefix}ContactNo`}
           value={formData[`${prefix}ContactNo`] || ""}
           onChange={onChange}
           disabled={disabled}
           placeholder="Enter Number"
-          className="w-full  px-4 py-2  border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent disabled:bg-gray-100 placeholder:text-gray-500 placeholder:text-sm"
+          className={cn(disabled && "bg-surface-2")}
         />
       </div>
 
-      {/* 5. Address */}
+      {/* 4. Address */}
       <div className="md:col-span-2">
-        <label className="block font-medium text-black mb-1">
-          Address
-        </label>
-        <textarea
+        <label className={LABEL}>Address</label>
+        <Textarea
           name={`${prefix}Address`}
           value={formData[`${prefix}Address`] || ""}
           onChange={onChange}
           disabled={disabled}
           rows="1"
           placeholder="Enter Address"
-          className="w-full px-4 py-2  border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent disabled:bg-gray-100 placeholder:text-gray-500 placeholder:text-sm"
+          className={cn("resize-none", disabled && "bg-surface-2")}
         />
       </div>
     </div>

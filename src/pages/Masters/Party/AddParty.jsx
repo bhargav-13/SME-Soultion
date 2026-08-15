@@ -1,50 +1,62 @@
-import React, { useState, useEffect } from "react";
-import { X, Users } from "lucide-react";
-import { useNavigate } from "react-router-dom";
-import SidebarLayout from "../../../components/SidebarLayout";
-import ConfirmationDialog from "../../../components/ConfirmationDialog";
-import PartiesTable from "../../../components/Party/PartiesTable";
-import EditPartyDialog from "../../../components/Party/EditPartyDialog";
-import GroupPicker, { NEW_GROUP } from "../../../components/Party/GroupPicker";
-import GroupLoginsModal from "../../../components/Party/GroupLoginsModal";
-import PageHeader from "../../../components/PageHeader";
-import { partyApi, partyGroupApi } from "../../../services/apiService";
-import toast from "react-hot-toast";
+import { useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Users } from 'lucide-react';
+import toast from 'react-hot-toast';
+import SidebarLayout from '@/components/SidebarLayout';
+import PartiesTable from '@/components/Party/PartiesTable';
+import EditPartyDialog from '@/components/Party/EditPartyDialog';
+import GroupPicker, { NEW_GROUP } from '@/components/Party/GroupPicker';
+import GroupLoginsModal from '@/components/Party/GroupLoginsModal';
+import { ConfirmDialog, ConfirmName } from '@/components/confirm-dialog';
+import { Field, FieldGrid } from '@/components/form-field';
+import { PageBody, PageHeader, Section } from '@/components/page-header';
+import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { SearchableSelect } from '@/components/ui/searchable-select';
+import { matchesSearch, useListFilters } from '@/hooks/use-list-filters';
+import { partyApi, partyGroupApi } from '@/services/apiService';
+
+const PARTY_TYPES = [
+  { label: 'Customer', value: 'CUSTOMER' },
+  { label: 'Vendor', value: 'VENDOR' },
+  { label: 'Both', value: 'BOTH' },
+];
+
+const typeLabel = (partyType) => PARTY_TYPES.find((t) => t.value === partyType)?.label || partyType || '';
+
+const EMPTY_FORM = {
+  partyName: '',
+  email: '',
+  phone: '',
+  gstNumber: '',
+  partyType: '',
+};
 
 const AddParty = () => {
   const navigate = useNavigate();
-  const [formData, setFormData] = useState({
-    partyName: "",
-    email: "",
-    phone: "",
-    gstNumber: "",
-    partyType: "",
-  });
+  const [formData, setFormData] = useState(EMPTY_FORM);
 
   const [parties, setParties] = useState([]);
   const [groups, setGroups] = useState([]);
-  const [groupChoice, setGroupChoice] = useState(""); // "" | groupId | NEW_GROUP
-  const [newGroupName, setNewGroupName] = useState("");
+  const [groupChoice, setGroupChoice] = useState(''); // "" | groupId | NEW_GROUP
+  const [newGroupName, setNewGroupName] = useState('');
   const [groupModalOpen, setGroupModalOpen] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [typeFilter, setTypeFilter] = useState("");
-  const [isTypeOpen, setIsTypeOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const [deleteDialog, setDeleteDialog] = useState({
     isOpen: false,
     partyId: null,
-    partyName: "",
+    partyName: '',
   });
   const [editDialog, setEditDialog] = useState({
     isOpen: false,
     data: null,
   });
-  const PARTY_TYPES = [
-    { label: "Customer", value: "CUSTOMER" },
-    { label: "Vendor", value: "VENDOR" },
-    { label: "Both", value: "BOTH" },
-  ];
+
+  const { filters, setFilter, search, onSearchChange, debouncedSearch, clearFilters, hasActiveFilters } =
+    useListFilters({ defaults: { type: '', group: '' } });
 
   useEffect(() => {
     fetchParties();
@@ -73,15 +85,16 @@ const AddParty = () => {
         phone: party.contactNo,
         contact: party.contactNo,
         gstin: party.gst,
-        type: party.partyType,
-        groupId: party.groupId ?? "",
-        groupName: party.groupName || "",
+        type: typeLabel(party.partyType),
+        partyType: party.partyType,
+        groupId: party.groupId ?? '',
+        groupName: party.groupName || '',
       }));
 
       setParties(transformedParties);
     } catch (error) {
-      console.error("Error fetching parties:", error);
-      toast.error(error.response?.data?.message || "Failed to fetch parties");
+      console.error('Error fetching parties:', error);
+      toast.error(error.response?.data?.message || 'Failed to fetch parties');
     } finally {
       setLoading(false);
     }
@@ -92,19 +105,18 @@ const AddParty = () => {
    * creating the group first when needed. Returns null for "no group".
    */
   const resolveGroupId = async (choice, name) => {
-    if (choice === "" || choice == null) return null;
+    if (choice === '' || choice == null) return null;
     if (choice === NEW_GROUP) {
       if (!name.trim()) {
-        toast.error("Enter a name for the new group");
-        throw new Error("missing group name");
+        toast.error('Enter a name for the new group');
+        throw new Error('missing group name');
       }
       const res = await partyGroupApi.create({ name: name.trim() });
       await fetchGroups();
       if (res.data?.username && res.data?.initialPassword) {
-        toast.success(
-          `Group login created — ${res.data.username} / ${res.data.initialPassword}`,
-          { duration: 8000 }
-        );
+        toast.success(`Group login created — ${res.data.username} / ${res.data.initialPassword}`, {
+          duration: 8000,
+        });
       }
       return res.data.id;
     }
@@ -122,11 +134,11 @@ const AddParty = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!formData.partyName.trim()) {
-      toast.error("Please enter party name");
+      toast.error('Please enter party name');
       return;
     }
     if (!formData.partyType) {
-      toast.error("Please select party type");
+      toast.error('Please select party type');
       return;
     }
 
@@ -148,22 +160,16 @@ const AddParty = () => {
         await partyGroupApi.assignParty(created.data.id, groupId);
       }
 
-      toast.success("Party added successfully!");
-      setFormData({
-        partyName: "",
-        email: "",
-        phone: "",
-        gstNumber: "",
-        partyType: "",
-      });
-      setGroupChoice("");
-      setNewGroupName("");
+      toast.success('Party added successfully!');
+      setFormData(EMPTY_FORM);
+      setGroupChoice('');
+      setNewGroupName('');
 
       await fetchParties();
     } catch (error) {
-      console.error("Error adding party:", error);
-      if (error?.message !== "missing group name") {
-        toast.error(error.response?.data?.message || "Failed to add party");
+      console.error('Error adding party:', error);
+      if (error?.message !== 'missing group name') {
+        toast.error(error.response?.data?.message || 'Failed to add party');
       }
     } finally {
       setLoading(false);
@@ -171,46 +177,36 @@ const AddParty = () => {
   };
 
   const handleCancel = () => {
-    setFormData({
-      partyName: "",
-      email: "",
-      phone: "",
-      gstNumber: "",
-      partyType: "",
-    });
-    setIsTypeOpen(false); // Close the dropdown
+    setFormData(EMPTY_FORM);
   };
 
   const handleEdit = (party) => {
-    setEditDialog({
-      isOpen: true,
-      data: party,
-    });
+    setEditDialog({ isOpen: true, data: party });
   };
 
-  const handleSaveEdit = async (formData) => {
+  const handleSaveEdit = async (edited) => {
     try {
       const updateData = {
-        name: formData.name,
-        email: formData.email,
-        contactNo: formData.phone,
-        gst: formData.gstin,
-        partyType: formData.partyType,
+        name: edited.name,
+        email: edited.email,
+        contactNo: edited.phone,
+        gst: edited.gstin,
+        partyType: edited.partyType,
       };
 
       await partyApi.updateParty(editDialog.data.id, updateData);
 
       // Apply group membership change (create new group if requested; null removes from group).
-      const groupId = await resolveGroupId(formData.groupChoice, formData.newGroupName || "");
+      const groupId = await resolveGroupId(edited.groupChoice, edited.newGroupName || '');
       await partyGroupApi.assignParty(editDialog.data.id, groupId);
 
       await fetchParties();
       setEditDialog({ isOpen: false, data: null });
-      toast.success("Party updated successfully!");
+      toast.success('Party updated successfully!');
     } catch (error) {
-      console.error("Error updating party:", error);
-      if (error?.message !== "missing group name") {
-        toast.error(error.response?.data?.message || "Failed to update party");
+      console.error('Error updating party:', error);
+      if (error?.message !== 'missing group name') {
+        toast.error(error.response?.data?.message || 'Failed to update party');
       }
     }
   };
@@ -225,261 +221,185 @@ const AddParty = () => {
 
   const handleConfirmDelete = async () => {
     try {
+      setDeleting(true);
       await partyApi.deleteParty(deleteDialog.partyId);
       await fetchParties();
 
-      setDeleteDialog({ isOpen: false, partyId: null, partyName: "" });
-      toast.success("Party deleted successfully!");
+      setDeleteDialog({ isOpen: false, partyId: null, partyName: '' });
+      toast.success('Party deleted successfully!');
     } catch (error) {
-      console.error("Error deleting party:", error);
-      toast.error(error.response?.data?.message || "Failed to delete party");
+      console.error('Error deleting party:', error);
+      toast.error(error.response?.data?.message || 'Failed to delete party');
+    } finally {
+      setDeleting(false);
     }
   };
 
-  const handleCancelDelete = () => {
-    setDeleteDialog({ isOpen: false, partyId: null, partyName: "" });
-  };
+  const filteredParties = useMemo(
+    () =>
+      parties.filter((party) => {
+        const bySearch = matchesSearch(party, debouncedSearch, ['name', 'email', 'gstin']);
+        const byType = !filters.type || party.type.toLowerCase() === filters.type.toLowerCase();
+        const byGroup = !filters.group || String(party.groupId) === String(filters.group);
+        return bySearch && byType && byGroup;
+      }),
+    [parties, debouncedSearch, filters.type, filters.group],
+  );
 
-  const filteredParties = parties.filter((party) => {
-    const matchesSearch =
-      party.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      party.email.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesType =
-      !typeFilter ||
-      party.type.toLowerCase().includes(typeFilter.toLowerCase());
-    return matchesSearch && matchesType;
-  });
+  const groupOptions = useMemo(() => groups.map((g) => ({ value: String(g.id), label: g.name })), [groups]);
+  const typeOptions = useMemo(() => PARTY_TYPES.map((t) => ({ value: t.value, label: t.label })), []);
 
   return (
     <SidebarLayout>
-      <div className="mx-auto">
-        {/* Header */}
+      <PageHeader
+        title="Add new party"
+        subtitle="Customers and vendors for purchase and sales operations"
+        backTo="/masters/party"
+        backLabel="Party master"
+        actions={
+          <Button variant="outline" size="sm" onClick={() => setGroupModalOpen(true)}>
+            <Users className="size-4" />
+            <span className="hidden sm:inline">Group logins</span>
+          </Button>
+        }
+      />
 
-        <div className="mb-6">
-          <PageHeader
-            title="Add New Party"
-            description="Add and manage customer or vendor information for smooth purchase and sales operations."
-            action={
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => setGroupModalOpen(true)}
-                  className="inline-flex items-center gap-2 px-3 h-9 rounded-lg border border-gray-300 text-sm text-gray-700 hover:bg-gray-50 transition"
-                >
-                  <Users className="w-4 h-4" /> Group Logins
-                </button>
-                <button
-                  type="button"
-                  onClick={() => navigate("/masters/party")}
-                  className="inline-flex items-center justify-center w-9 h-9 rounded-full border border-gray-300 text-gray-600 hover:text-gray-900 hover:border-gray-400 hover:bg-gray-50 transition cursor-pointer"
-                  aria-label="Close and go back to invoices"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-            }
-          />
-        </div>
-
-        {/* Form */}
-        <form
-          onSubmit={handleSubmit}
-          className="bg-white rounded-lg shadow p-6 mb-8"
-        >
-          <div className="grid grid-cols-2 gap-6 mb-6">
-            {/* Party Name */}
-            <div>
-              <label className="block font-medium text-black mb-2">
-                Name <span className="text-black">*</span>
-              </label>
-              <input
-                type="text"
-                name="partyName"
-                value={formData.partyName}
-                onChange={handleChange}
-                required
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-500 focus:border-transparent outline-none transition placeholder:text-sm placeholder:text-gray-500 "
-                placeholder="Enter Party Name"
-              />
-            </div>
-
-            {/* GSTIN */}
-            <div>
-              <label className="block  font-medium text-black mb-2">
-                GSTIN
-              </label>
-              <input
-                type="text"
-                name="gstNumber"
-                value={formData.gstNumber}
-                onChange={handleChange}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-500 focus:border-transparent outline-none transition  placeholder:text-sm placeholder:text-gray-500 "
-                placeholder="Enter GSTIN"
-              />
-            </div>
-
-            {/* Contact Number */}
-            <div>
-              <label className="block text-md font-medium text-black mb-2">
-                Contact Number
-              </label>
-              <input
-                type="tel"
-                name="phone"
-                value={formData.phone}
-                onChange={handleChange}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-500 focus:border-transparent outline-none transition  placeholder:text-sm placeholder:text-gray-500 "
-                placeholder="Enter Contact Number"
-              />
-            </div>
-
-            {/* Email ID */}
-            <div>
-              <label className="block text-md font-medium text-black mb-2">
-                Email ID
-              </label>
-              <input
-                type="email"
-                name="email"
-                value={formData.email}
-                onChange={handleChange}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-500 focus:border-transparent outline-none transition  placeholder:text-sm placeholder:text-gray-500 "
-                placeholder="Enter Email ID"
-              />
-            </div>
-          </div>
-
-          {/* Type */}
-          <div className="mb-8 relative">
-            <label className="block text-md font-medium text-black mb-2">
-              Type <span className="text-black">*</span>
-            </label>
-
-            <button
-              type="button"
-              onClick={() => setIsTypeOpen(!isTypeOpen)}
-              className="w-full flex items-center justify-between px-4 py-2 border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-gray-500 transition  placeholder:text-sm placeholder:text-gray-500 "
-            >
-              <span
-                className={
-                  formData.partyType === "" ? "text-gray-500 test-sm" : "text-black"
-                }
-              >
-                {formData.partyType === "" ? "Select Type" : formData.partyType}
-              </span>
-
-              <svg
-                className={`w-4 h-4 text-gray-500 transition-transform ${
-                  isTypeOpen ? "rotate-180" : ""
-                }`}
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M19 9l-7 7-7-7"
+      <PageBody className="space-y-6">
+        <Card className="gap-0 p-4 sm:p-6">
+          <form onSubmit={handleSubmit} className="space-y-5">
+            <FieldGrid columns={2}>
+              <Field label="Name" htmlFor="party-name" required>
+                <Input
+                  id="party-name"
+                  type="text"
+                  name="partyName"
+                  value={formData.partyName}
+                  onChange={handleChange}
+                  required
+                  placeholder="Enter party name"
                 />
-              </svg>
-            </button>
+              </Field>
 
-            {isTypeOpen && (
-              <div className="absolute z-20 mt-2 w-full bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden">
-                {PARTY_TYPES.map((item) => (
-                  <button
-                    key={item.label}
-                    type="button"
-                    onClick={() => {
-                      setFormData((prev) => ({
-                        ...prev,
-                        partyType: item.value,
-                      }));
-                      setIsTypeOpen(false);
-                    }}
-                    className="w-full text-left px-4 py-2 text-md hover:bg-gray-100 transition"
-                  >
-                    {item.label}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
+              <Field label="GSTIN" htmlFor="party-gst">
+                <Input
+                  id="party-gst"
+                  type="text"
+                  name="gstNumber"
+                  value={formData.gstNumber}
+                  onChange={handleChange}
+                  placeholder="24AAAAA0000A1Z5"
+                  className="font-mono"
+                />
+              </Field>
 
-          {/* Group (shared login across companies) */}
-          <div className="mb-8">
-            <GroupPicker
-              groups={groups}
-              value={groupChoice}
-              onChange={setGroupChoice}
-              newName={newGroupName}
-              onNewNameChange={setNewGroupName}
-            />
-          </div>
+              <Field label="Contact number" htmlFor="party-phone">
+                <Input
+                  id="party-phone"
+                  type="tel"
+                  name="phone"
+                  value={formData.phone}
+                  onChange={handleChange}
+                  placeholder="Enter contact number"
+                  className="font-mono"
+                />
+              </Field>
 
-          {/* Action Buttons */}
-          <div className="flex gap-4 justify-center">
-            <button
-              type="submit"
-              disabled={loading}
-              className="px-12 py-2 bg-black text-white rounded-xl hover:bg-gray-900 transition font-medium disabled:opacity-50"
-            >
-              {loading ? "Saving..." : "Save"}
-            </button>
-            <button
-              type="button"
-              onClick={handleCancel}
-              className="px-12 py-2 border border-black text-black rounded-xl hover:bg-gray-50 transition font-medium"
-            >
-              Cancel
-            </button>
-          </div>
-        </form>
+              <Field label="Email ID" htmlFor="party-email">
+                <Input
+                  id="party-email"
+                  type="email"
+                  name="email"
+                  value={formData.email}
+                  onChange={handleChange}
+                  placeholder="name@example.com"
+                />
+              </Field>
 
-        {/* Search and Filter */}
-        <PartiesTable
-          filteredParties={filteredParties}
-          searchQuery={searchQuery}
-          setSearchQuery={setSearchQuery}
-          typeFilter={typeFilter}
-          setTypeFilter={setTypeFilter}
-          handleEdit={handleEdit}
-          handleDeleteClick={handleDeleteClick}
-          loading={loading}
-        />
+              <Field label="Type" required>
+                <SearchableSelect
+                  ariaLabel="Party type"
+                  options={typeOptions}
+                  value={formData.partyType}
+                  onChange={(value) => setFormData((prev) => ({ ...prev, partyType: value }))}
+                  placeholder="Select type"
+                  searchPlaceholder="Search types…"
+                  className="w-full"
+                />
+              </Field>
 
-        {/* Edit Party Dialog */}
-        <EditPartyDialog
-          isOpen={editDialog.isOpen}
-          onClose={() => setEditDialog({ isOpen: false, data: null })}
-          onSave={handleSaveEdit}
-          initialData={editDialog.data}
-          groups={groups}
-        />
+              <GroupPicker
+                groups={groups}
+                value={groupChoice}
+                onChange={setGroupChoice}
+                newName={newGroupName}
+                onNewNameChange={setNewGroupName}
+              />
+            </FieldGrid>
 
-        {/* Group Logins management */}
-        <GroupLoginsModal
-          isOpen={groupModalOpen}
-          onClose={() => setGroupModalOpen(false)}
-          onChanged={() => {
-            fetchGroups();
-            fetchParties();
-          }}
-        />
+            <div className="flex flex-col-reverse gap-2 border-t border-line pt-4 sm:flex-row sm:justify-end">
+              <Button type="button" variant="outline" onClick={handleCancel}>
+                Clear
+              </Button>
+              <Button type="submit" disabled={loading}>
+                {loading ? 'Saving…' : 'Save party'}
+              </Button>
+            </div>
+          </form>
+        </Card>
 
-        {/* Confirmation Dialog */}
-        <ConfirmationDialog
-          isOpen={deleteDialog.isOpen}
-          title="Delete Party"
-          message={`Are you sure you want to delete "${deleteDialog.partyName}"? This action cannot be undone.`}
-          confirmText="Delete"
-          cancelText="Cancel"
-          onConfirm={handleConfirmDelete}
-          onCancel={handleCancelDelete}
-          isDangerous={true}
-        />
-      </div>
+        <Section title="Existing parties" description="Everything already in the master, so you can spot duplicates before adding.">
+          <PartiesTable
+            filteredParties={filteredParties}
+            searchQuery={search}
+            setSearchQuery={onSearchChange}
+            typeFilter={filters.type}
+            setTypeFilter={(v) => setFilter('type', v)}
+            groupFilter={filters.group}
+            setGroupFilter={(v) => setFilter('group', v)}
+            groupOptions={groupOptions}
+            onClearFilters={clearFilters}
+            hasActiveFilters={hasActiveFilters}
+            handleEdit={handleEdit}
+            handleDeleteClick={handleDeleteClick}
+            loading={loading}
+          />
+        </Section>
+      </PageBody>
+
+      <EditPartyDialog
+        isOpen={editDialog.isOpen}
+        onClose={() => setEditDialog({ isOpen: false, data: null })}
+        onSave={handleSaveEdit}
+        initialData={editDialog.data}
+        groups={groups}
+      />
+
+      <GroupLoginsModal
+        isOpen={groupModalOpen}
+        onClose={() => setGroupModalOpen(false)}
+        onChanged={() => {
+          fetchGroups();
+          fetchParties();
+        }}
+      />
+
+      <ConfirmDialog
+        open={deleteDialog.isOpen}
+        onOpenChange={(open) => {
+          if (!open) setDeleteDialog({ isOpen: false, partyId: null, partyName: '' });
+        }}
+        title="Delete this party?"
+        description={
+          <>
+            <ConfirmName>{deleteDialog.partyName}</ConfirmName> will be removed from the master. This cannot be
+            undone.
+          </>
+        }
+        confirmLabel="Delete"
+        busyLabel="Deleting…"
+        isPending={deleting}
+        onConfirm={handleConfirmDelete}
+      />
     </SidebarLayout>
   );
 };

@@ -1,4 +1,5 @@
-import React from "react";
+import { Input } from '@/components/ui/input';
+import { cn } from '@/lib/utils';
 
 const FormInput = ({
   label,
@@ -6,30 +7,29 @@ const FormInput = ({
   value,
   onChange,
   placeholder,
-  type = "text",
+  type = 'text',
   required = false,
-  className = "",
-  colSpan = "1",
+  className = '',
+  colSpan = '1',
   disabled = false,
 }) => {
   return (
     <div className={colSpan}>
-      <label className="block text-black font-medium mb-1">
+      <label className="mb-1 block text-[12.5px] font-medium text-ink-2">
         {label}
-        {required && <span className="text-black">*</span>}
+        {required && <span className="text-danger">*</span>}
       </label>
-      <input
+      <Input
         type={type}
         name={name}
         value={value}
         onChange={onChange}
         disabled={disabled}
         placeholder={placeholder}
-        className={`w-full border border-gray-200 rounded-lg px-4 py-2  focus:outline-none focus:ring-2 focus:ring-gray-500 placeholder:text-gray-500 placeholder:text-sm ${disabled ? 'bg-gray-50 text-gray-600' : ''} ${className}`}
+        className={cn(disabled && 'bg-surface-2', className)}
       />
     </div>
   );
 };
 
 export default FormInput;
-

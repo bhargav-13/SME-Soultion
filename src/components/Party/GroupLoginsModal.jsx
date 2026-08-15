@@ -1,7 +1,15 @@
-import React, { useEffect, useState } from "react";
-import { X, KeyRound, Building2, Copy, Plus } from "lucide-react";
-import toast from "react-hot-toast";
-import { partyGroupApi } from "../../services/apiService";
+import { useEffect, useState } from 'react';
+import { Building2, Copy, KeyRound, Plus, Users } from 'lucide-react';
+import toast from 'react-hot-toast';
+import { ConfirmDialog, ConfirmName } from '@/components/confirm-dialog';
+import { ViewDialog } from '@/components/form-dialog';
+import { Notice } from '@/components/notice';
+import { EmptyState, ListSkeleton } from '@/components/states';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { partyGroupApi } from '@/services/apiService';
 
 /**
  * Manage the shared logins for party groups: view each group's login, reset its password, create a
@@ -12,8 +20,10 @@ const GroupLoginsModal = ({ isOpen, onClose, onChanged }) => {
   const [groups, setGroups] = useState([]);
   const [loading, setLoading] = useState(false);
   const [creating, setCreating] = useState(false);
-  const [newName, setNewName] = useState("");
+  const [resetting, setResetting] = useState(false);
+  const [newName, setNewName] = useState('');
   const [credentials, setCredentials] = useState(null); // { username, password }
+  const [toReset, setToReset] = useState(null);
 
   const load = async () => {
     try {
@@ -21,7 +31,7 @@ const GroupLoginsModal = ({ isOpen, onClose, onChanged }) => {
       const res = await partyGroupApi.getAll();
       setGroups(res.data || []);
     } catch (error) {
-      toast.error(error.response?.data?.message || "Failed to load groups");
+      toast.error(error.response?.data?.message || 'Failed to load groups');
     } finally {
       setLoading(false);
     }
@@ -31,150 +41,173 @@ const GroupLoginsModal = ({ isOpen, onClose, onChanged }) => {
     if (isOpen) {
       load();
       setCredentials(null);
-      setNewName("");
+      setNewName('');
     }
   }, [isOpen]);
 
-  if (!isOpen) return null;
-
   const handleCreate = async () => {
     if (!newName.trim()) {
-      toast.error("Enter a group name");
+      toast.error('Enter a group name');
       return;
     }
     try {
       setCreating(true);
       const res = await partyGroupApi.create({ name: newName.trim() });
-      toast.success("Group created");
-      setNewName("");
+      toast.success('Group created');
+      setNewName('');
       setCredentials({ username: res.data.username, password: res.data.initialPassword });
       await load();
       onChanged?.();
     } catch (error) {
-      toast.error(error.response?.data?.message || "Failed to create group");
+      toast.error(error.response?.data?.message || 'Failed to create group');
     } finally {
       setCreating(false);
     }
   };
 
-  const handleReset = async (group) => {
-    if (!window.confirm(`Reset login for "${group.name}"?`)) return;
+  const handleReset = async () => {
+    if (!toReset) return;
     try {
-      const res = await partyGroupApi.resetCredentials(group.id);
+      setResetting(true);
+      const res = await partyGroupApi.resetCredentials(toReset.id);
       setCredentials({ username: res.data.username, password: res.data.password });
+      setToReset(null);
       await load();
     } catch (error) {
-      toast.error(error.response?.data?.message || "Failed to reset credentials");
+      toast.error(error.response?.data?.message || 'Failed to reset credentials');
+    } finally {
+      setResetting(false);
     }
   };
 
   const copy = (text) => {
     navigator.clipboard?.writeText(text);
-    toast.success("Copied");
+    toast.success('Copied');
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-lg max-h-[90vh] flex flex-col">
-        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
-          <h3 className="text-base font-semibold text-gray-900">Group Logins</h3>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-700" aria-label="Close">
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-
-        <div className="px-5 py-4 overflow-y-auto space-y-4">
+    <>
+      <ViewDialog
+        open={isOpen}
+        onOpenChange={(open) => {
+          if (!open) onClose();
+        }}
+        title="Group logins"
+        description="One shared login per group. Which companies belong to a group is set on each party."
+        size="lg"
+      >
+        <div className="space-y-4">
+          {/* A password is only ever shown once, at the moment it is generated. */}
           {credentials && (
-            <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 flex items-center justify-between">
-              <div className="text-sm">
-                <div>
-                  <span className="text-gray-500">Username:</span>{" "}
-                  <span className="font-medium">{credentials.username}</span>
+            <Notice tone="success" title="New credentials — copy them now">
+              <div className="mt-1.5 flex flex-wrap items-center justify-between gap-2">
+                <div className="space-y-0.5 text-[12.5px]">
+                  <div>
+                    <span className="text-ink-3">Username </span>
+                    <span className="font-mono font-semibold text-ink">{credentials.username}</span>
+                  </div>
+                  <div>
+                    <span className="text-ink-3">Password </span>
+                    <span className="font-mono font-semibold text-ink">{credentials.password}</span>
+                  </div>
                 </div>
-                <div>
-                  <span className="text-gray-500">Password:</span>{" "}
-                  <span className="font-mono font-medium">{credentials.password}</span>
-                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => copy(`${credentials.username} / ${credentials.password}`)}
+                >
+                  <Copy className="size-4" />
+                  Copy
+                </Button>
               </div>
-              <button
-                onClick={() => copy(`${credentials.username} / ${credentials.password}`)}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-gray-300 rounded-lg text-sm hover:bg-gray-100"
-              >
-                <Copy className="w-4 h-4" /> Copy
-              </button>
-            </div>
+            </Notice>
           )}
 
           {/* Create group */}
-          <div className="flex gap-2">
-            <input
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              handleCreate();
+            }}
+            className="flex gap-2"
+          >
+            <Input
               type="text"
               placeholder="New group name (e.g. Mahaveer)"
               value={newName}
               onChange={(e) => setNewName(e.target.value)}
-              className="flex-1 text-sm border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-gray-900 focus:border-transparent outline-none"
+              className="flex-1"
             />
-            <button
-              onClick={handleCreate}
-              disabled={creating}
-              className="inline-flex items-center gap-1.5 px-3 py-2 bg-gray-900 text-white text-sm font-medium rounded-lg hover:bg-gray-800 disabled:opacity-50"
-            >
-              <Plus className="w-4 h-4" /> Create
-            </button>
-          </div>
+            <Button type="submit" disabled={creating}>
+              <Plus className="size-4" />
+              {creating ? 'Creating…' : 'Create'}
+            </Button>
+          </form>
 
           {/* Groups list */}
           {loading ? (
-            <div className="text-center text-gray-500 py-6">Loading...</div>
+            <ListSkeleton rows={3} />
           ) : groups.length === 0 ? (
-            <div className="text-center text-gray-400 text-sm py-6">
-              No groups yet. Create one above, then assign companies to it from each party.
-            </div>
+            <EmptyState
+              icon={Users}
+              title="No groups yet"
+              description="Create one above, then assign companies to it from each party."
+            />
           ) : (
-            <div className="space-y-2">
+            <div className="space-y-2.5">
               {groups.map((group) => (
-                <div key={group.id} className="border border-gray-200 rounded-lg p-3">
-                  <div className="flex items-center justify-between">
+                <Card key={group.id} className="gap-0 rounded-lg p-3.5">
+                  <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm font-semibold text-gray-900">{group.name}</span>
-                        {group.credentialsPending && (
-                          <span className="px-2 py-0.5 rounded-full text-[11px] font-medium bg-amber-100 text-amber-700">
-                            Password pending
-                          </span>
-                        )}
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="text-[13.5px] font-semibold text-ink">{group.name}</span>
+                        {group.credentialsPending && <Badge variant="warning">Password pending</Badge>}
                       </div>
-                      <div className="text-xs text-gray-500">Login: {group.username}</div>
+                      <p className="mt-0.5 truncate font-mono text-[11.5px] text-ink-3">{group.username}</p>
                     </div>
-                    <button
-                      onClick={() => handleReset(group)}
-                      className="shrink-0 inline-flex items-center gap-1.5 px-2.5 py-1.5 border border-gray-300 rounded-lg text-xs hover:bg-gray-50"
-                    >
-                      <KeyRound className="w-3.5 h-3.5" /> Reset
-                    </button>
+                    <Button variant="outline" size="sm" className="shrink-0" onClick={() => setToReset(group)}>
+                      <KeyRound className="size-3.5" />
+                      Reset
+                    </Button>
                   </div>
-                  <div className="flex flex-wrap gap-1.5 mt-2">
+
+                  <div className="mt-2.5 flex flex-wrap gap-1.5">
                     {(group.parties || []).length === 0 ? (
-                      <span className="text-xs text-gray-400">No companies assigned yet</span>
+                      <span className="text-[11.5px] text-ink-3">No companies assigned yet</span>
                     ) : (
                       group.parties.map((c) => (
-                        <span
-                          key={c.partyId}
-                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-gray-100 text-gray-700"
-                        >
-                          <Building2 className="w-3 h-3" />
+                        <Badge key={c.partyId} variant="muted" className="gap-1">
+                          <Building2 className="size-3" />
                           {c.partyName}
-                        </span>
+                        </Badge>
                       ))
                     )}
                   </div>
-                </div>
+                </Card>
               ))}
             </div>
           )}
         </div>
-      </div>
-    </div>
+      </ViewDialog>
+
+      <ConfirmDialog
+        open={toReset !== null}
+        onOpenChange={(open) => {
+          if (!open) setToReset(null);
+        }}
+        title="Reset this group's login?"
+        description={
+          <>
+            A new password is generated for <ConfirmName>{toReset?.name}</ConfirmName> and the old one stops working
+            immediately. It is shown once — copy it before closing this dialog.
+          </>
+        }
+        confirmLabel="Reset password"
+        busyLabel="Resetting…"
+        isPending={resetting}
+        onConfirm={handleReset}
+      />
+    </>
   );
 };
 

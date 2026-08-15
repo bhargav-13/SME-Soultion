@@ -1,11 +1,10 @@
-import React from "react";
-import PlatingAnalytics from "./PlatingAnalytics";
+import PlatingAnalytics from './PlatingAnalytics';
 
 const InHousePlating = () => (
   <PlatingAnalytics
     jobWorkType="INHOUSE"
-    title="In-House Plating"
-    subtitle="Party-wise analytics for In-Side job work. Click a party to drill in."
+    title="In-house plating"
+    subtitle="Party-wise analytics for In-Side job work — open a party to drill in"
     accent="green"
   />
 );
