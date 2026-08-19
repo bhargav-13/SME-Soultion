@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { BriefcaseBusiness, CheckCircle2, Clock, Download, Languages, Plus } from 'lucide-react';
+import { BriefcaseBusiness, CheckCircle2, Clock, Download, Languages, PackageCheck, Plus } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import SidebarLayout from '@/components/SidebarLayout';
@@ -18,10 +18,41 @@ import { Button } from '@/components/ui/button';
 import { FILTER_ALL, matchesSearch } from '@/hooks/use-list-filters';
 import { useDebouncedValue } from '@/hooks/use-debounced-value';
 import { fmtNumber } from '@/lib/format';
-import { jobWorkApi, jobWorkReturnApi, axiosInstance, exportApi } from '@/services/apiService';
+import {
+  jobWorkApi,
+  jobWorkReturnApi,
+  axiosInstance,
+  exportApi,
+  appSettingsApi,
+  jobWorkBajaarApi,
+  FIXED_BAJAAR_KEY,
+} from '@/services/apiService';
 import { normalizeJobWorkLabel, removeOrderJobOverride, upsertOrderJobOverride } from '@/utils/orderJobWorkSync';
 
 const PAGE_SIZE = 10;
+
+const RETURN_STATES = [
+  { value: 'PENDING', label: 'Pending' },
+  { value: 'PARTIALLY_RETURNED', label: 'Partially returned' },
+  { value: 'FULLY_RETURNED', label: 'Fully returned' },
+];
+
+const round3 = (n) => Math.round(n * 1000) / 1000;
+
+/**
+ * Which of the three buckets a chitthi is in, using the same arithmetic the card prints: what came
+ * back is the net returned kg plus the ghati, measured against what went out.
+ *
+ * Mirrors `JobWorkReturnState` on the server so the order-scoped view (filtered on the client) and
+ * the global view (filtered in SQL) agree.
+ */
+const returnStateOf = (jw) => {
+  const returned = round3(
+    (jw.jobWorkReturns || []).reduce((sum, r) => sum + (r.returnKg || 0) + (r.ghati || 0), 0),
+  );
+  if (returned <= 0) return 'PENDING';
+  return returned >= (jw.qtyKg || 0) ? 'FULLY_RETURNED' : 'PARTIALLY_RETURNED';
+};
 
 const JobWork = () => {
   const location = useLocation();
@@ -35,6 +66,10 @@ const JobWork = () => {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [typeFilter, setTypeFilter] = useState(FILTER_ALL);
+  // How much of the chitthi is back: nothing / some / all. Derived from the return records, not
+  // from the status column — status only ever says "a return exists", which cannot tell 10 Kg of
+  // 300 back from a finished job.
+  const [returnFilter, setReturnFilter] = useState(FILTER_ALL);
   const [returnTarget, setReturnTarget] = useState(null); // jw object for return dialog
   const [editingReturn, setEditingReturn] = useState(null); // specific return record being edited (null = new)
   const [deleteTarget, setDeleteTarget] = useState(null); // jw object for confirm delete
@@ -42,6 +77,9 @@ const JobWork = () => {
   const [deleteReturnTarget, setDeleteReturnTarget] = useState(null); // { jw, ret } for deleting a specific return
   const [deletingReturn, setDeletingReturn] = useState(false);
   const [statementOpen, setStatementOpen] = useState(false);
+  // The single house rate every FIXED-bajaar chitthi is priced at. Read once here rather than per
+  // card, since it is the same number on all of them.
+  const [fixedBajaar, setFixedBajaar] = useState(null);
   const [translationOpen, setTranslationOpen] = useState(false);
 
   // ── Server-side pagination (global view only) ───────────────────────────────
@@ -49,26 +87,38 @@ const JobWork = () => {
   const [page, setPage] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
   const [totalElements, setTotalElements] = useState(0);
-  const [serverStats, setServerStats] = useState({ total: 0, completed: 0, pending: 0 });
+  const [serverStats, setServerStats] = useState({
+    total: 0,
+    pending: 0,
+    partiallyReturned: 0,
+    fullyReturned: 0,
+  });
 
   // Map the UI type filter to the backend JobWorkType enum (ALL = no narrowing).
   const typeParam = typeFilter === 'IN_HOUSE' ? 'INHOUSE' : typeFilter === 'JOB_WORK' ? 'JOB_WORK' : '';
+  const returnParam = returnFilter === FILTER_ALL ? '' : returnFilter;
 
   // Debounce the search box so we don't hit the server on every keystroke.
   const debouncedSearchRaw = useDebouncedValue(searchTerm, 350);
   const debouncedSearch = debouncedSearchRaw.trim();
 
-  const hasActiveFilters = debouncedSearch !== '' || typeFilter !== FILTER_ALL;
+  const hasActiveFilters =
+    debouncedSearch !== '' || typeFilter !== FILTER_ALL || returnFilter !== FILTER_ALL;
 
   const clearFilters = () => {
     setSearchTerm('');
     setTypeFilter(FILTER_ALL);
+    setReturnFilter(FILTER_ALL);
   };
+
+  /** Clicking the card that is already selected clears it, so the cards act as a toggle group. */
+  const toggleReturnFilter = (state) =>
+    setReturnFilter((prev) => (prev === state ? FILTER_ALL : state));
 
   // Any filter change resets to the first page (global view is server-paginated).
   useEffect(() => {
     setPage(0);
-  }, [debouncedSearch, typeParam, isGlobal]);
+  }, [debouncedSearch, typeParam, returnParam, isGlobal]);
 
   const mergeSavedJobWork = useCallback(
     (list) => {
@@ -115,12 +165,22 @@ const JobWork = () => {
         // the response carries orderItemId (null for manual jobs) plus embedded returns, party and
         // size, so no per-order-item fan-out is needed. The stat cards come from a separate counts
         // endpoint so they reflect the whole (filtered) dataset, not just this page.
+        // The stat cards are how the return state is picked, so they deliberately ignore
+        // `returnState` — otherwise choosing "Partially returned" would zero the other two cards
+        // and there would be no way back.
         const filterParams = {
           ...(debouncedSearch ? { search: debouncedSearch } : {}),
           ...(typeParam ? { jobWorkType: typeParam } : {}),
         };
         const [listRes, statsRes] = await Promise.all([
-          axiosInstance.get(`/api/v1/job-works`, { params: { ...filterParams, page, size: PAGE_SIZE } }),
+          axiosInstance.get(`/api/v1/job-works`, {
+            params: {
+              ...filterParams,
+              ...(returnParam ? { returnState: returnParam } : {}),
+              page,
+              size: PAGE_SIZE,
+            },
+          }),
           axiosInstance.get(`/api/v1/job-works/stats`, { params: filterParams }),
         ]);
         const data = listRes.data;
@@ -128,18 +188,28 @@ const JobWork = () => {
         setJobWorks(mergeSavedJobWork(list.map((jw) => ({ ...jw, orderItemId: jw.orderItemId ?? null }))));
         setTotalPages(data?.totalPages ?? 0);
         setTotalElements(data?.totalElements ?? list.length);
-        setServerStats(statsRes.data || { total: 0, completed: 0, pending: 0 });
+        setServerStats(
+          statsRes.data || { total: 0, pending: 0, partiallyReturned: 0, fullyReturned: 0 },
+        );
       }
     } catch (err) {
       toast.error(err?.response?.data?.message || 'Failed to load job works');
     } finally {
       setLoading(false);
     }
-  }, [orderRow, mergeSavedJobWork, page, debouncedSearch, typeParam]);
+  }, [orderRow, mergeSavedJobWork, page, debouncedSearch, typeParam, returnParam]);
 
   useEffect(() => {
     loadJobWorks();
   }, [loadJobWorks]);
+
+  useEffect(() => {
+    // Best effort: a card with no fixed rate to show simply prints a dash.
+    appSettingsApi
+      .getAll()
+      .then((res) => setFixedBajaar(res.data?.[FIXED_BAJAAR_KEY] ?? null))
+      .catch(() => setFixedBajaar(null));
+  }, []);
 
   // ── Status update ───────────────────────────────────────────────────────────
   const handleStatusChange = async (jw, newStatus) => {
@@ -167,6 +237,30 @@ const JobWork = () => {
       if (isGlobal && typeParam) loadJobWorks(); // resync when a type filter is active
     } catch (err) {
       toast.error(err?.response?.data?.message || 'Failed to update type');
+    }
+  };
+
+  // ── Bajaar (market rate) ────────────────────────────────────────────────────
+  const handleBajaarChange = async (jw, bajaarType, bajaarValue) => {
+    // Optimistic: the dropdown and its amount box are a single control to the user, and waiting
+    // for a round trip between choosing "Rojnu" and being able to type in the box reads as broken.
+    const previous = { bajaarType: jw.bajaarType, bajaarValue: jw.bajaarValue };
+    setJobWorks((prev) =>
+      prev.map((j) => (j.id === jw.id ? { ...j, bajaarType, bajaarValue } : j)),
+    );
+    try {
+      const res = await jobWorkBajaarApi.update(jw.id, { bajaarType, bajaarValue });
+      const saved = res.data || {};
+      setJobWorks((prev) =>
+        prev.map((j) =>
+          j.id === jw.id
+            ? { ...j, bajaarType: saved.bajaarType ?? bajaarType, bajaarValue: saved.bajaarValue ?? null }
+            : j,
+        ),
+      );
+    } catch (err) {
+      setJobWorks((prev) => prev.map((j) => (j.id === jw.id ? { ...j, ...previous } : j)));
+      toast.error(err?.response?.data?.message || 'Failed to update bajaar');
     }
   };
 
@@ -227,6 +321,10 @@ const JobWork = () => {
       });
     }
 
+    if (returnFilter !== FILTER_ALL) {
+      filteredList = filteredList.filter((jw) => returnStateOf(jw) === returnFilter);
+    }
+
     return filteredList.filter((jw) =>
       matchesSearch(jw, debouncedSearch, [
         (r) => r.party?.name,
@@ -239,25 +337,29 @@ const JobWork = () => {
         'id',
       ]),
     );
-  }, [jobWorks, debouncedSearch, typeFilter, isGlobal]);
+  }, [jobWorks, debouncedSearch, typeFilter, returnFilter, isGlobal]);
 
   // Global view: counts come from the server (whole filtered dataset). Order-scoped view: count the
   // small client-held list.
-  const stats = useMemo(
-    () =>
-      isGlobal
-        ? {
-            totalJobWorks: serverStats.total,
-            completedJobWorks: serverStats.completed,
-            pendingJobWorks: serverStats.pending,
-          }
-        : {
-            totalJobWorks: filtered.length,
-            completedJobWorks: filtered.filter((jw) => jw.status === 'COMPLETE').length,
-            pendingJobWorks: filtered.filter((jw) => jw.status === 'PENDING').length,
-          },
-    [filtered, isGlobal, serverStats],
-  );
+  const stats = useMemo(() => {
+    if (isGlobal) {
+      return {
+        total: serverStats.total,
+        pending: serverStats.pending,
+        partiallyReturned: serverStats.partiallyReturned,
+        fullyReturned: serverStats.fullyReturned,
+      };
+    }
+    // Order-scoped view holds the whole (small) list, so the buckets are counted here. They are
+    // counted before the return filter is applied, for the same reason the server ignores it.
+    const byState = jobWorks.map(returnStateOf);
+    return {
+      total: jobWorks.length,
+      pending: byState.filter((st) => st === 'PENDING').length,
+      partiallyReturned: byState.filter((st) => st === 'PARTIALLY_RETURNED').length,
+      fullyReturned: byState.filter((st) => st === 'FULLY_RETURNED').length,
+    };
+  }, [jobWorks, isGlobal, serverStats]);
 
   const fields = useMemo(
     () => [
@@ -269,6 +371,12 @@ const JobWork = () => {
           { value: 'IN_HOUSE', label: 'In-house' },
           { value: 'JOB_WORK', label: 'Job work' },
         ],
+      },
+      {
+        key: 'returnState',
+        label: 'Return',
+        allLabel: 'All returns',
+        options: RETURN_STATES,
       },
     ],
     [],
@@ -316,36 +424,54 @@ const JobWork = () => {
           </Notice>
         )}
 
-        <div className="mb-5 grid grid-cols-1 gap-3 sm:grid-cols-3">
+        {/* The cards double as the return-state filter: clicking one narrows the list, clicking it
+            again clears it. The counts stay whole so the other buckets remain reachable. */}
+        <div className="mb-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
           <StatCard
             label="Total job works"
-            value={fmtNumber(stats.totalJobWorks)}
+            value={fmtNumber(stats.total)}
             icon={BriefcaseBusiness}
             tone="primary"
             isPending={loading}
-          />
-          <StatCard
-            label="Completed"
-            value={fmtNumber(stats.completedJobWorks)}
-            icon={CheckCircle2}
-            tone="success"
-            isPending={loading}
+            onClick={() => setReturnFilter(FILTER_ALL)}
+            className={returnFilter === FILTER_ALL ? 'ring-2 ring-primary/40' : undefined}
           />
           <StatCard
             label="Pending"
-            value={fmtNumber(stats.pendingJobWorks)}
+            value={fmtNumber(stats.pending)}
             icon={Clock}
             tone="warning"
             isPending={loading}
+            onClick={() => toggleReturnFilter('PENDING')}
+            className={returnFilter === 'PENDING' ? 'ring-2 ring-primary/40' : undefined}
+          />
+          <StatCard
+            label="Partially returned"
+            value={fmtNumber(stats.partiallyReturned)}
+            icon={PackageCheck}
+            tone="info"
+            isPending={loading}
+            onClick={() => toggleReturnFilter('PARTIALLY_RETURNED')}
+            className={returnFilter === 'PARTIALLY_RETURNED' ? 'ring-2 ring-primary/40' : undefined}
+          />
+          <StatCard
+            label="Fully returned"
+            value={fmtNumber(stats.fullyReturned)}
+            icon={CheckCircle2}
+            tone="success"
+            isPending={loading}
+            onClick={() => toggleReturnFilter('FULLY_RETURNED')}
+            className={returnFilter === 'FULLY_RETURNED' ? 'ring-2 ring-primary/40' : undefined}
           />
         </div>
 
         <ListToolbar
           search={{ value: searchTerm, onChange: setSearchTerm, placeholder: 'Search party, finish, chitthi…' }}
           fields={fields}
-          values={{ type: typeFilter }}
+          values={{ type: typeFilter, returnState: returnFilter }}
           onChange={(key, value) => {
             if (key === 'type') setTypeFilter(value);
+            if (key === 'returnState') setReturnFilter(value);
           }}
           onClear={clearFilters}
           hasActiveFilters={hasActiveFilters}
@@ -372,7 +498,7 @@ const JobWork = () => {
             title={hasActiveFilters ? 'No job work matches' : 'No job work records yet'}
             description={
               hasActiveFilters
-                ? 'Nothing here matches that search or type.'
+                ? 'Nothing here matches that search, type or return state.'
                 : 'Move an order line to job work, or add a manual chitthi.'
             }
             action={
@@ -397,8 +523,10 @@ const JobWork = () => {
               <JobWorkCard
                 key={jw.id}
                 jw={jw}
+                fixedBajaar={fixedBajaar}
                 onStatusChange={handleStatusChange}
                 onTypeChange={handleTypeChange}
+                onBajaarChange={handleBajaarChange}
                 onReturnRecord={() => {
                   setReturnTarget(jw);
                   setEditingReturn(null);

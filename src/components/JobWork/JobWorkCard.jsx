@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { ChevronDown, CircleCheck, SquarePen, Trash2 } from 'lucide-react';
+import { ChevronDown, CircleCheck, Merge, SquarePen, Trash2 } from 'lucide-react';
+import JobWorkBajaarControl from './JobWorkBajaarControl';
 import JobWorkStatusDropdown from './JobWorkStatusDropdown';
 import JobWorkTypeDropdown from './JobWorkTypeDropdown';
 import { PrintSizeButton } from '@/components/PrintSizeButton';
@@ -44,8 +45,10 @@ const Cell = ({ label, children, align = 'left' }) => (
  */
 const JobWorkCard = ({
   jw,
+  fixedBajaar,
   onStatusChange,
   onTypeChange,
+  onBajaarChange,
   onReturnRecord,
   onEditReturn,
   onDeleteReturn,
@@ -53,6 +56,7 @@ const JobWorkCard = ({
   onDelete,
 }) => {
   const returns = jw.jobWorkReturns || [];
+  const mergedCount = (jw.mergedOrderItemIds || []).length;
   const [printingKey, setPrintingKey] = useState(null);
   const [returnExpanded, setReturnExpanded] = useState(false);
 
@@ -92,6 +96,20 @@ const JobWorkCard = ({
             <span>
               Finish <span className="font-semibold text-ink">{fmt(jw.finish)}</span>
             </span>
+            {mergedCount > 1 && (
+              <>
+                <span className="inline-block size-1 rounded-full bg-ink-3/50" />
+                {/* One batch, several orders. Worth saying on the card: the Net Kg below is the
+                    whole chitthi, not any one line's share. */}
+                <span
+                  className="inline-flex items-center gap-1 rounded-full bg-primary-soft px-2 py-0.5 text-[11px] font-semibold text-primary"
+                  title={`Covers order lines ${jw.mergedOrderItemIds.join(', ')}`}
+                >
+                  <Merge className="size-3" />
+                  Merged · {mergedCount} orders
+                </span>
+              </>
+            )}
           </div>
         </div>
 
@@ -282,6 +300,12 @@ const JobWorkCard = ({
             Pending when the last one is deleted, so the dropdown stays available for corrections. */}
         <JobWorkStatusDropdown value={jw.status} onChange={(v) => onStatusChange(jw, v)} />
         <JobWorkTypeDropdown value={jw.jobWorkType} onChange={(v) => onTypeChange(jw, v)} />
+        <JobWorkBajaarControl
+          value={jw.bajaarType}
+          amount={jw.bajaarValue}
+          fixedAmount={fixedBajaar}
+          onChange={(type, amount) => onBajaarChange(jw, type, amount)}
+        />
         <Button size="sm" variant="secondary" onClick={onReturnRecord} className="gap-1.5">
           Return record
           <CircleCheck className="size-4" />

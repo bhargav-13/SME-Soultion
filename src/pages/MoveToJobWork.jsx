@@ -164,6 +164,10 @@ const MoveToJobWork = () => {
   const editJobWorkId = location.state?.jobWorkId || null;
   const editOrderItemId = location.state?.orderItemId || null;
   const manualMode = location.state?.jobWorkMode === "MANUAL";
+  // Order lines this one chitthi covers, when the user arrived here through Merge on the order
+  // page. The first is the primary (the line the job work is created against); the server splits
+  // the weighed Kg back across all of them.
+  const mergedOrderItemIds = location.state?.mergedOrderItemIds || null;
 
   const [jobWorkType, setJobWorkType] = useState(() => {
     if (manualMode) return "MANUAL";
@@ -613,6 +617,10 @@ const MoveToJobWork = () => {
       chitthiNo: formData.chithiNo || undefined,
       chitthiDate: formData.date || undefined,
       orderTime: formData.time || undefined,
+      mergedOrderItemIds:
+        mergedOrderItemIds && mergedOrderItemIds.length > 1
+          ? mergedOrderItemIds.map(Number)
+          : undefined,
     };
 
     setSaving(true);
@@ -630,16 +638,28 @@ const MoveToJobWork = () => {
         toast.success("Job work updated!");
       } else {
         await jobWorkApi.createJobWork(orderItemId, payload);
-        toast.success("Job work created!");
+        toast.success(
+          mergedOrderItemIds && mergedOrderItemIds.length > 1
+            ? `Job work created across ${mergedOrderItemIds.length} order lines!`
+            : "Job work created!",
+        );
       }
 
       if (orderItemId && !isManual) {
-        upsertOrderJobOverride({
-          orderItemId: Number(orderItemId),
-          orderId: sourceOrderRow?.orderId ?? null,
-          jobWork: jobWorkTypeLabel,
-          platingStatus: true,
-        });
+        // Every merged line is now out for plating, so each needs its own marker — otherwise the
+        // order page would still show the others as untouched.
+        const touched =
+          mergedOrderItemIds && mergedOrderItemIds.length > 1
+            ? mergedOrderItemIds
+            : [orderItemId];
+        touched.forEach((id) =>
+          upsertOrderJobOverride({
+            orderItemId: Number(id),
+            orderId: sourceOrderRow?.orderId ?? null,
+            jobWork: jobWorkTypeLabel,
+            platingStatus: true,
+          }),
+        );
       }
 
       navigate("/job-work", { state: sourceOrderRow ? { orderRow: sourceOrderRow } : undefined });

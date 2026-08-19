@@ -54,7 +54,7 @@ const columns = [
   { key: "sizeInInch", label: "Size In INCH",          type: "suggest"  },
   { key: "sizeInMm",   label: "Size In MM",            type: "suggest"  },
   { key: "dozenWeight",label: "Doz. Weight",           type: "suggest"  },
-  { key: "pcsWeight",  label: "PCS Weight",            type: "readonly" },
+  { key: "pcsWeight",  label: "PCS Weight",            type: "number"   },
   { key: "stockStatus",label: "Stock Status",          type: "status"   },
   { key: "pcsPerBox",      label: "Box / Pcs",              type: "number" },
   { key: "boxPerCarton",   label: "Box / Cartoon",          type: "number" },
@@ -862,11 +862,18 @@ const Inventory = () => {
     setSaving(true);
     let successCount = 0;
     let errorCount = 0;
+    // Sizes written during this save, so the row's cached `_sizes` can be refreshed without a
+    // full re-fetch (the next edit compares against them to decide whether to PUT again).
+    const touchedSizes = [];
 
     for (const { row } of rowsToSave) {
       try {
         const { payload, inchVal, mmVal, dozenVal } = buildPayload(row);
         const hasSizeData = inchVal && mmVal;
+        const rawPcsWeight = row.pcsWeight;
+        const parsedPcsWeight =
+          rawPcsWeight === "" || rawPcsWeight == null ? null : parseFloat(rawPcsWeight);
+        const pcsWeightVal = Number.isNaN(parsedPcsWeight) ? null : parsedPcsWeight;
 
         // If size fields are filled, check existing or create new
         if (hasSizeData) {
@@ -880,12 +887,23 @@ const Inventory = () => {
             return inchMatch && mmMatch && dozenMatch;
           });
 
+          // PCS weight belongs to the size, not to this inventory row, so it goes to the size
+          // endpoint. That also means it is shared: every client price sheet reads the same
+          // size, so changing it here changes it for all of them — which is the intent.
+          const sizePayload = { sizeInInch: inchVal, sizeInMm: mmVal };
+          if (dozenVal !== null) sizePayload.dozenWeight = dozenVal;
+          if (pcsWeightVal !== null) sizePayload.pcsWeight = pcsWeightVal;
+
           if (!matchingSize) {
-            const newSizePayload = { sizeInInch: inchVal, sizeInMm: mmVal };
-            if (dozenVal !== null) {
-              newSizePayload.dozenWeight = dozenVal;
-            }
-            await sizeApi.createSize(Number(row._itemId), newSizePayload);
+            const created = await sizeApi.createSize(Number(row._itemId), sizePayload);
+            if (created?.data?.id) touchedSizes.push({ rowKey: row, size: created.data });
+          } else if (round3(matchingSize.pcsWeight ?? 0) !== round3(pcsWeightVal ?? 0)) {
+            const updated = await sizeApi.updateSize(
+              Number(row._itemId),
+              Number(matchingSize.id),
+              sizePayload,
+            );
+            touchedSizes.push({ rowKey: row, size: updated?.data || { ...matchingSize, pcsWeight: pcsWeightVal } });
           }
         }
 
@@ -913,10 +931,15 @@ const Inventory = () => {
     }
 
     // Mark saved rows as non-editing instead of re-fetching everything
+    const sizeByRow = new Map(touchedSizes.map(({ rowKey, size }) => [rowKey, size]));
     setTableData((prev) =>
-      prev.map((row) =>
-        row._editing && row._itemId ? { ...row, _editing: false } : row
-      )
+      prev.map((row) => {
+        if (!(row._editing && row._itemId)) return row;
+        const saved = sizeByRow.get(row);
+        if (!saved) return { ...row, _editing: false };
+        const others = (row._sizes || []).filter((s) => String(s.id) !== String(saved.id));
+        return { ...row, _editing: false, _sizes: [...others, saved] };
+      })
     );
     setSaving(false);
     _setEditingCell(null);

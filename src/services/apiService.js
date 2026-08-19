@@ -356,6 +356,25 @@ export const updateApiClients = () => {
     clientPortalInvoicesApi = new ClientPortalInvoicesApi(createClientPortalMgmtConfig(), config.API_BASE_URL, axiosInstance);
 };
 
+/**
+ * Console-wide settings, as a flat key/value map.
+ *
+ * Hand-rolled rather than generated: the server deliberately keeps these out of the OpenAPI
+ * contract (they are a handful of scalars, not a resource), so there is no client to generate.
+ */
+export const FIXED_BAJAAR_KEY = 'jobwork.fixed.bajaar';
+
+export const appSettingsApi = {
+    getAll: () => axiosInstance.get('/api/v1/app-settings'),
+    put: (key, value) => axiosInstance.put(`/api/v1/app-settings/${key}`, { value }),
+};
+
+/** Which market rate a chitthi is priced against. Keyed on the job work alone — see the server. */
+export const jobWorkBajaarApi = {
+    update: (jobWorkId, { bajaarType, bajaarValue }) =>
+        axiosInstance.put(`/api/v1/job-works/${jobWorkId}/bajaar`, { bajaarType, bajaarValue }),
+};
+
 // Export API clients
 export {
     partyApi,

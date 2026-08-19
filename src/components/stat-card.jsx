@@ -18,7 +18,17 @@ const TONES = {
  * on it. Deliberately not a "KPI card with a trend arrow": nothing here exposes history, so a
  * percentage change would be invented.
  */
-export function StatCard({ label, value, hint, icon: Icon, to, tone = 'primary', isPending = false, onClick }) {
+export function StatCard({
+  label,
+  value,
+  hint,
+  icon: Icon,
+  to,
+  tone = 'primary',
+  isPending = false,
+  onClick,
+  className: extraClassName,
+}) {
   const body = (
     <>
       <div className="flex items-start justify-between gap-3">
@@ -51,6 +61,7 @@ export function StatCard({ label, value, hint, icon: Icon, to, tone = 'primary',
   const className = cn(
     'group block rounded-xl border border-line bg-surface p-4 text-left shadow-sm transition-all',
     (to || onClick) && 'hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md',
+    extraClassName,
   );
 
   if (to) {

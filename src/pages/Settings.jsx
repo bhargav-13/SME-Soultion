@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import {
   Boxes,
   ChevronRight,
+  IndianRupee,
   KeyRound,
   Languages,
   LogOut,
@@ -15,6 +16,7 @@ import {
 import SidebarLayout from '@/components/SidebarLayout';
 import GroupLoginsModal from '@/components/Party/GroupLoginsModal';
 import TranslationDialog from '@/components/JobWork/TranslationDialog';
+import FixedBajaarDialog from '@/components/Settings/FixedBajaarDialog';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { PageBody, PageHeader, Section } from '@/components/page-header';
 import { ReadOnlyField } from '@/components/form-field';
@@ -69,6 +71,7 @@ const Settings = () => {
   const [groupsOpen, setGroupsOpen] = useState(false);
   const [translationsOpen, setTranslationsOpen] = useState(false);
   const [signOutOpen, setSignOutOpen] = useState(false);
+  const [fixedBajaarOpen, setFixedBajaarOpen] = useState(false);
 
   const email = user?.email ?? '—';
 
@@ -123,6 +126,15 @@ const Settings = () => {
               />
             </Section>
 
+            <Section title="Job work" description="Rates that apply to every chitthi, not just one.">
+              <SettingRow
+                icon={IndianRupee}
+                title="Fixed bajaar"
+                description="The standing market rate shown on every job work set to “Fixed bajaar”."
+                onClick={() => setFixedBajaarOpen(true)}
+              />
+            </Section>
+
             <Section title="Printing" description="What the job-work and gres chitthis print.">
               <SettingRow
                 icon={Languages}
@@ -171,6 +183,7 @@ const Settings = () => {
 
       <GroupLoginsModal isOpen={groupsOpen} onClose={() => setGroupsOpen(false)} onChanged={() => {}} />
       <TranslationDialog isOpen={translationsOpen} onClose={() => setTranslationsOpen(false)} />
+      <FixedBajaarDialog isOpen={fixedBajaarOpen} onClose={() => setFixedBajaarOpen(false)} />
 
       <ConfirmDialog
         open={signOutOpen}

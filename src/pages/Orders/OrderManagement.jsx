@@ -3,6 +3,7 @@ import {
   BriefcaseBusiness,
   ChevronDown,
   Eye,
+  Merge,
   Package,
   Plus,
   SquarePen,
@@ -38,6 +39,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { SearchableSelect } from '@/components/ui/searchable-select';
+import MergeJobWorkDialog from '@/components/Order/MergeJobWorkDialog';
 import { axiosInstance, partyApi, orderDispatchApi, orderApi } from '@/services/apiService';
 import {
   normalizeJobWorkLabel,
@@ -66,6 +68,10 @@ const flattenOrders = (apiData) => {
           [item.itemSize?.sizeInInch, item.itemSize?.sizeInMm ? `(${item.itemSize.sizeInMm})` : '']
             .filter(Boolean)
             .join(' ') || '—',
+        // The item master calls this column "Doz."; the order sheet follows the same wording so a
+        // line can be matched back to the stock master by eye.
+        itemName: item.itemSize?.itemName || '—',
+        dozenWeight: item.itemSize?.dozenWeight ?? null,
         plating: item.plating ?? '_',
         qtyPc: item.qtyPc ?? '—',
         // Fall back to the item's own master data (weight/pc, pcs-per-box, etc.) whenever the
@@ -184,6 +190,7 @@ const OrderManagement = () => {
   const [expandedGroups, setExpandedGroups] = useState({});
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [moveToJobWorkRow, setMoveToJobWorkRow] = useState(null);
+  const [mergeOpen, setMergeOpen] = useState(false);
   const [selectedMoveType, setSelectedMoveType] = useState('OUTSIDE');
 
   // ── Parties + Dispatch ────────────────────────────────────────────────────
@@ -372,6 +379,48 @@ const OrderManagement = () => {
   const getRowOverride = (row) => {
     if (!row) return null;
     return orderJobOverrides[`item-${row.id}`] || orderJobOverrides[`order-${row.orderId}`] || null;
+  };
+
+  /**
+   * The rows the merge dialog may offer, with the local "already sent" markers applied.
+   *
+   * Drawn from every loaded line rather than the filtered view: merging is a decision about the
+   * party's whole book, and a search term typed to find one line should not quietly hide the
+   * other line it could be merged with.
+   */
+  const mergeCandidates = useMemo(
+    () =>
+      orders.map((row) => {
+        const override = orderJobOverrides[`item-${row.id}`] || orderJobOverrides[`order-${row.orderId}`] || null;
+        return { ...row, platingStatus: override?.platingStatus ?? row.platingStatus };
+      }),
+    [orders, orderJobOverrides],
+  );
+
+  /**
+   * Hands the chosen lines to the job-work form as one chitthi.
+   *
+   * The first line is the primary — the one the job work is created against — and the rest ride
+   * along as `mergedOrderItemIds`. The form still asks for the gross weighing, because the merged
+   * total is what was *ordered*, not what the drum weighs; the server splits whatever is actually
+   * weighed back across these lines.
+   */
+  const handleMerge = (rows, totals) => {
+    if (!rows || rows.length < 2) return;
+    const [primary, ...rest] = rows;
+    setMergeOpen(false);
+    navigate('/job-work/move', {
+      state: {
+        mode: 'create',
+        prefillOrderRow: {
+          ...primary,
+          qtyKg: totals.totalKg,
+          qtyPc: totals.totalPc,
+          mergedFrom: rows.map((r) => r.id),
+        },
+        mergedOrderItemIds: [primary.id, ...rest.map((r) => r.id)],
+      },
+    });
   };
 
   const toggleJobUpdateStatus = (row) => {
@@ -675,6 +724,10 @@ const OrderManagement = () => {
         subtitle="Simplifying order processing from start to delivery"
         actions={
           <>
+            <Button variant="outline" size="sm" onClick={() => setMergeOpen(true)}>
+              <Merge className="size-4" />
+              <span className="hidden md:inline">Merge job work</span>
+            </Button>
             <Button variant="outline" size="sm" onClick={() => navigate('/job-work')}>
               <BriefcaseBusiness className="size-4" />
               <span className="hidden md:inline">All job works</span>
@@ -768,6 +821,9 @@ const OrderManagement = () => {
                         </button>
                       </th>
                       <th rowSpan={2} className={TH}>
+                        {renderHeaderLabel('Doz.', 'item-name')}
+                      </th>
+                      <th rowSpan={2} className={TH}>
                         {renderHeaderLabel('Size', 'size')}
                       </th>
                       <th rowSpan={2} className={TH}>
@@ -812,13 +868,13 @@ const OrderManagement = () => {
                   <tbody>
                     {loading ? (
                       <tr>
-                        <td colSpan={15}>
+                        <td colSpan={16}>
                           <PageLoader text="Loading orders…" />
                         </td>
                       </tr>
                     ) : groupedFilteredOrders.length === 0 ? (
                       <tr>
-                        <td colSpan={15} className="px-3 py-8 text-center text-[13px] text-ink-3">
+                        <td colSpan={16} className="px-3 py-8 text-center text-[13px] text-ink-3">
                           No orders found.
                         </td>
                       </tr>
@@ -875,6 +931,7 @@ const OrderManagement = () => {
                                   {row.date}
                                 </td>
                               )}
+                              <td className={`${TD} text-ink`}>{row.itemName}</td>
                               <td className={`${TD} whitespace-normal`}>
                                 <span className="inline-flex flex-col leading-tight">
                                   <span className="whitespace-nowrap">{sizeParts.main}</span>
@@ -1187,6 +1244,13 @@ const OrderManagement = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <MergeJobWorkDialog
+        isOpen={mergeOpen}
+        onClose={() => setMergeOpen(false)}
+        rows={mergeCandidates}
+        onMerge={handleMerge}
+      />
     </SidebarLayout>
   );
 };
