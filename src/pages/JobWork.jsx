@@ -23,9 +23,6 @@ import {
   jobWorkReturnApi,
   axiosInstance,
   exportApi,
-  appSettingsApi,
-  jobWorkBajaarApi,
-  FIXED_BAJAAR_KEY,
 } from '@/services/apiService';
 import { normalizeJobWorkLabel, removeOrderJobOverride, upsertOrderJobOverride } from '@/utils/orderJobWorkSync';
 
@@ -77,9 +74,6 @@ const JobWork = () => {
   const [deleteReturnTarget, setDeleteReturnTarget] = useState(null); // { jw, ret } for deleting a specific return
   const [deletingReturn, setDeletingReturn] = useState(false);
   const [statementOpen, setStatementOpen] = useState(false);
-  // The single house rate every FIXED-bajaar chitthi is priced at. Read once here rather than per
-  // card, since it is the same number on all of them.
-  const [fixedBajaar, setFixedBajaar] = useState(null);
   const [translationOpen, setTranslationOpen] = useState(false);
 
   // ── Server-side pagination (global view only) ───────────────────────────────
@@ -203,14 +197,6 @@ const JobWork = () => {
     loadJobWorks();
   }, [loadJobWorks]);
 
-  useEffect(() => {
-    // Best effort: a card with no fixed rate to show simply prints a dash.
-    appSettingsApi
-      .getAll()
-      .then((res) => setFixedBajaar(res.data?.[FIXED_BAJAAR_KEY] ?? null))
-      .catch(() => setFixedBajaar(null));
-  }, []);
-
   // ── Status update ───────────────────────────────────────────────────────────
   const handleStatusChange = async (jw, newStatus) => {
     try {
@@ -237,30 +223,6 @@ const JobWork = () => {
       if (isGlobal && typeParam) loadJobWorks(); // resync when a type filter is active
     } catch (err) {
       toast.error(err?.response?.data?.message || 'Failed to update type');
-    }
-  };
-
-  // ── Bajaar (market rate) ────────────────────────────────────────────────────
-  const handleBajaarChange = async (jw, bajaarType, bajaarValue) => {
-    // Optimistic: the dropdown and its amount box are a single control to the user, and waiting
-    // for a round trip between choosing "Rojnu" and being able to type in the box reads as broken.
-    const previous = { bajaarType: jw.bajaarType, bajaarValue: jw.bajaarValue };
-    setJobWorks((prev) =>
-      prev.map((j) => (j.id === jw.id ? { ...j, bajaarType, bajaarValue } : j)),
-    );
-    try {
-      const res = await jobWorkBajaarApi.update(jw.id, { bajaarType, bajaarValue });
-      const saved = res.data || {};
-      setJobWorks((prev) =>
-        prev.map((j) =>
-          j.id === jw.id
-            ? { ...j, bajaarType: saved.bajaarType ?? bajaarType, bajaarValue: saved.bajaarValue ?? null }
-            : j,
-        ),
-      );
-    } catch (err) {
-      setJobWorks((prev) => prev.map((j) => (j.id === jw.id ? { ...j, ...previous } : j)));
-      toast.error(err?.response?.data?.message || 'Failed to update bajaar');
     }
   };
 
@@ -523,10 +485,8 @@ const JobWork = () => {
               <JobWorkCard
                 key={jw.id}
                 jw={jw}
-                fixedBajaar={fixedBajaar}
                 onStatusChange={handleStatusChange}
                 onTypeChange={handleTypeChange}
-                onBajaarChange={handleBajaarChange}
                 onReturnRecord={() => {
                   setReturnTarget(jw);
                   setEditingReturn(null);

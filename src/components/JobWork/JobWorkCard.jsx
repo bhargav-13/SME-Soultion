@@ -1,11 +1,11 @@
 import { useState } from 'react';
 import { ChevronDown, CircleCheck, Merge, SquarePen, Trash2 } from 'lucide-react';
-import JobWorkBajaarControl from './JobWorkBajaarControl';
 import JobWorkStatusDropdown from './JobWorkStatusDropdown';
 import JobWorkTypeDropdown from './JobWorkTypeDropdown';
 import { PrintSizeButton } from '@/components/PrintSizeButton';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { titleCase } from '@/lib/format';
 import { printJobWorkChitthi } from '@/utils/jobWorkChitthi';
 import { cn } from '@/lib/utils';
 
@@ -45,10 +45,8 @@ const Cell = ({ label, children, align = 'left' }) => (
  */
 const JobWorkCard = ({
   jw,
-  fixedBajaar,
   onStatusChange,
   onTypeChange,
-  onBajaarChange,
   onReturnRecord,
   onEditReturn,
   onDeleteReturn,
@@ -83,13 +81,22 @@ const JobWorkCard = ({
           <p className="font-mono text-[14px] font-semibold text-ink">{jw.jobWorkLabel || `JW-${jw.id}`}</p>
           <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[12.5px] text-ink-3">
             <span>{jw.party?.name || '—'}</span>
+            {/* The list is ordered by item, so the item is what the eye scans down — it gets the
+                emphasis, and the category that used to carry it now trails behind. Title-cased
+                because the masters hold the same item shouted, lower-case and mixed, which would
+                otherwise read as three different items in one ordered run. */}
+            {jw.size?.itemName && (
+              <>
+                <span className="inline-block size-1 rounded-full bg-ink-3/50" />
+                <span className="rounded-md bg-brass-soft px-1.5 py-0.5 text-[12.5px] font-semibold text-brass">
+                  {titleCase(jw.size.itemName)}
+                </span>
+              </>
+            )}
             {jw.size?.category && (
               <>
                 <span className="inline-block size-1 rounded-full bg-ink-3/50" />
-                <span>
-                  {jw.size.itemName ? `${jw.size.itemName} — ` : ''}
-                  {jw.size.category}
-                </span>
+                <span>{jw.size.category}</span>
               </>
             )}
             <span className="inline-block size-1 rounded-full bg-ink-3/50" />
@@ -300,12 +307,6 @@ const JobWorkCard = ({
             Pending when the last one is deleted, so the dropdown stays available for corrections. */}
         <JobWorkStatusDropdown value={jw.status} onChange={(v) => onStatusChange(jw, v)} />
         <JobWorkTypeDropdown value={jw.jobWorkType} onChange={(v) => onTypeChange(jw, v)} />
-        <JobWorkBajaarControl
-          value={jw.bajaarType}
-          amount={jw.bajaarValue}
-          fixedAmount={fixedBajaar}
-          onChange={(type, amount) => onBajaarChange(jw, type, amount)}
-        />
         <Button size="sm" variant="secondary" onClick={onReturnRecord} className="gap-1.5">
           Return record
           <CircleCheck className="size-4" />

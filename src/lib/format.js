@@ -69,6 +69,20 @@ export function humanize(value) {
   return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
+/**
+ * Item and party names as the masters hold them → Title Case: "FORAM grip" → "Foram Grip".
+ *
+ * The masters are typed by hand over years, so the same item turns up shouted, lower-case and
+ * mixed. Casing them on the way out is what makes a list ordered by item read as one run per item
+ * rather than three.
+ */
+export function titleCase(value) {
+  if (value === null || value === undefined || value === '') return '—';
+  return String(value)
+    .toLowerCase()
+    .replace(/(^|[\s\-/(])([a-z])/g, (_, before, letter) => before + letter.toUpperCase());
+}
+
 /** Initials for an avatar fallback: "Ishita Industries" → "II". */
 export function initials(value) {
   if (!value) return '?';

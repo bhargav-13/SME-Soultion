@@ -789,6 +789,8 @@ components:
         orderDate:
           type: string
           format: date
+        scrap:
+          $ref: '#/components/schemas/OrderScrap'
         items:
           type: array
           items:
@@ -803,6 +805,17 @@ components:
         orderDate:
           type: string
           format: date
+        scrap:
+          $ref: '#/components/schemas/OrderScrap'
+        status:
+          $ref: '#/components/schemas/OrderStatus'
+        mergedFrom:
+          type: array
+          description: >-
+            The orders folded into this one, oldest first. Empty for an ordinary order. Each keeps
+            its own P/O date, which is why a merged order shows several dates rather than one.
+          items:
+            $ref: '#/components/schemas/MergedOrderSource'
         orderItems:
           type: array
           items:
@@ -810,6 +823,60 @@ components:
         createdAt:
           type: string
           format: date
+
+    OrderStatus:
+      type: string
+      description: >-
+        How far an order has moved, derived from the works rather than stored: CREATED while no
+        line has been sent to a job work and nothing has been dispatched, IN_JOB_WORK once any line
+        has gone out, DISPATCHED once every line has gone. Derived because a stored status has to
+        be rewritten on every job-work and dispatch create *and* delete, and silently goes wrong
+        the first time one is missed.
+      enum: [ CREATED, IN_JOB_WORK, DISPATCHED ]
+
+    MergedOrderSource:
+      type: object
+      properties:
+        orderId:
+          type: integer
+          format: int64
+        orderDate:
+          type: string
+          format: date
+        scrap:
+          $ref: '#/components/schemas/OrderScrap'
+
+    MergeOrdersRequest:
+      type: object
+      required:
+        - orderIds
+      properties:
+        orderIds:
+          type: array
+          description: >-
+            The orders to fold together. Two or more, all of the same party, and every one still
+            CREATED — an order with goods already at the plater or already gone cannot be merged,
+            because its quantity is no longer just a number on a sheet.
+          items:
+            type: integer
+            format: int64
+        scrap:
+          $ref: '#/components/schemas/OrderScrap'
+
+    OrderScrap:
+      type: number
+      format: double
+      description: >-
+        The scrap agreed with the party for this order, in rupees. One figure for the whole order
+        rather than per line — it is settled once, when the order is taken, and every line on the
+        order is covered by it. Null until someone enters it: an order can be placed before the
+        scrap has been agreed, and a 0 there would read as "agreed at nothing".
+
+    UpdateOrderScrap:
+      type: object
+      properties:
+        scrap:
+          $ref: '#/components/schemas/OrderScrap'
 
     PartyOrdersResponse:
       type: object
@@ -954,6 +1021,15 @@ components:
         lastUpdatedAt:
           type: string
           format: date-time
+        mergedFromItemIds:
+          type: array
+          description: >-
+            The order lines this one sums. Present only on a line that actually combines two or
+            more — a line carried across a merge untouched has none, which is what separates
+            "this quantity was added together" from "this rode along".
+          items:
+            type: integer
+            format: int64
 
     OrderItemSize:
       type: object

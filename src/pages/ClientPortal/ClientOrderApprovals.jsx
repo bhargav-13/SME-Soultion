@@ -10,6 +10,16 @@ import { ConfirmDialog, ConfirmName } from '@/components/confirm-dialog';
 import OrderStatusBadge from '@/components/ClientPortal/OrderStatusBadge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { Field } from '@/components/form-field';
+import { Input } from '@/components/ui/input';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   Table,
@@ -46,7 +56,10 @@ const ClientOrderApprovals = () => {
   const [pendingCount, setPendingCount] = useState(0);
   const [tab, setTab] = useState('ALL');
   const [expandedId, setExpandedId] = useState(null);
-  const [confirmDialog, setConfirmDialog] = useState({ isOpen: false, id: null, action: null });
+  const [rejectTarget, setRejectTarget] = useState(null);
+  // Approving is the only moment the request is seen as a whole, so it is where the scrap gets
+  // settled — hence a form rather than a plain confirmation.
+  const [approveDialog, setApproveDialog] = useState(null);
   const [processing, setProcessing] = useState(false);
 
   const loadRequests = async (pageNum = 0) => {
@@ -113,27 +126,36 @@ const ClientOrderApprovals = () => {
 
   const clearClientFilter = () => setSearchParams({});
 
-  const handleAction = (id, action) => {
-    setConfirmDialog({ isOpen: true, id, action });
-  };
-
-  const handleConfirm = async () => {
-    const { id, action } = confirmDialog;
-    const newStatus = action === 'approve' ? 'APPROVED' : 'REJECTED';
+  const applyStatus = async (id, status, scrap, onDone) => {
     try {
       setProcessing(true);
-      await clientPortalAdminApi.updateOrderRequestStatus(id, { status: newStatus });
+      await clientPortalAdminApi.updateOrderRequestStatus(id, { status, scrap });
       await loadRequests(page);
       await loadPendingCount();
-      toast.success(action === 'approve' ? 'Order request approved' : 'Order request rejected');
+      toast.success(status === 'APPROVED' ? 'Order request approved' : 'Order request rejected');
+      onDone();
     } catch (error) {
       console.error('Error updating order request status:', error);
       toast.error(error.response?.data?.message || 'Failed to update order request');
     } finally {
       setProcessing(false);
-      setConfirmDialog({ isOpen: false, id: null, action: null });
     }
   };
+
+  const handleApprove = async () => {
+    const { id, scrap } = approveDialog;
+    const trimmed = String(scrap).trim();
+    // Blank is "not agreed yet", which the order carries as null rather than as a scrap of zero.
+    const amount = trimmed === '' ? null : Number(trimmed);
+    if (amount != null && !Number.isFinite(amount)) {
+      toast.error('Scrap must be a number');
+      return;
+    }
+    await applyStatus(id, 'APPROVED', amount, () => setApproveDialog(null));
+  };
+
+  const handleReject = () =>
+    applyStatus(rejectTarget.id, 'REJECTED', undefined, () => setRejectTarget(null));
 
   return (
     <SidebarLayout>
@@ -196,6 +218,12 @@ const ClientOrderApprovals = () => {
                       Client: <span className="font-medium text-ink-2">{req.username || '-'}</span>
                       {' · '}
                       {req.orderDate ? new Date(req.orderDate).toLocaleDateString() : '-'}
+                      {req.scrap != null && (
+                        <>
+                          {' · '}
+                          Scrap <span className="font-mono font-medium text-ink-2">{req.scrap}</span>
+                        </>
+                      )}
                     </p>
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
@@ -211,13 +239,19 @@ const ClientOrderApprovals = () => {
                       <>
                         <Button
                           size="sm"
-                          onClick={() => handleAction(req.id, 'approve')}
+                          onClick={() =>
+                            setApproveDialog({
+                              id: req.id,
+                              partyName: req.partyName,
+                              scrap: req.scrap == null ? '' : String(req.scrap),
+                            })
+                          }
                           className="bg-success text-white hover:bg-success/90"
                         >
                           <Check className="size-4" />
                           Approve
                         </Button>
-                        <Button variant="outline" size="sm" onClick={() => handleAction(req.id, 'reject')}>
+                        <Button variant="outline" size="sm" onClick={() => setRejectTarget(req)}>
                           <XIcon className="size-4" />
                           Reject
                         </Button>
@@ -314,28 +348,65 @@ const ClientOrderApprovals = () => {
           </div>
         )}
 
+        {/* Approving is where the scrap is agreed: it is the one point at which the whole request
+            is in front of the admin, and the order this creates carries the figure from here. */}
+        <Dialog open={Boolean(approveDialog)} onOpenChange={(open) => !open && setApproveDialog(null)}>
+          <DialogContent className="sm:max-w-[26rem]">
+            <DialogHeader>
+              <DialogTitle>Approve order request</DialogTitle>
+              <DialogDescription>
+                This marks the request as approved and creates the order for{' '}
+                {approveDialog?.partyName || 'the client'}. The scrap is settled once for the whole
+                order — leave it blank if it has not been agreed yet.
+              </DialogDescription>
+            </DialogHeader>
+
+            <Field label="Scrap">
+              <Input
+                type="number"
+                step="any"
+                min="0"
+                inputMode="decimal"
+                autoFocus
+                value={approveDialog?.scrap ?? ''}
+                placeholder="Not agreed"
+                onChange={(e) => setApproveDialog((prev) => ({ ...prev, scrap: e.target.value }))}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') handleApprove();
+                }}
+                className="font-mono"
+              />
+            </Field>
+
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setApproveDialog(null)} disabled={processing}>
+                Cancel
+              </Button>
+              <Button
+                onClick={handleApprove}
+                disabled={processing}
+                className="bg-success text-white hover:bg-success/90"
+              >
+                {processing ? 'Approving…' : 'Approve'}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
         <ConfirmDialog
-          open={confirmDialog.isOpen}
-          onOpenChange={(open) => !open && setConfirmDialog({ isOpen: false, id: null, action: null })}
-          title={confirmDialog.action === 'approve' ? 'Approve order request' : 'Reject order request'}
+          open={Boolean(rejectTarget)}
+          onOpenChange={(open) => !open && setRejectTarget(null)}
+          title="Reject order request"
           description={
-            confirmDialog.action === 'approve' ? (
-              <>
-                This will mark the order request as <ConfirmName>approved</ConfirmName> and notify the client.
-                Continue?
-              </>
-            ) : (
-              <>
-                This will <ConfirmName>reject</ConfirmName> the order request. The client will be notified.
-                Continue?
-              </>
-            )
+            <>
+              This will <ConfirmName>reject</ConfirmName> the order request. The client will be
+              notified. Continue?
+            </>
           }
-          confirmLabel={confirmDialog.action === 'approve' ? 'Approve' : 'Reject'}
-          busyLabel={confirmDialog.action === 'approve' ? 'Approving…' : 'Rejecting…'}
+          confirmLabel="Reject"
+          busyLabel="Rejecting…"
           isPending={processing}
-          destructive={confirmDialog.action === 'reject'}
-          onConfirm={handleConfirm}
+          onConfirm={handleReject}
         />
       </PageBody>
     </SidebarLayout>

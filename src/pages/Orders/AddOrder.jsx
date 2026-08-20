@@ -106,6 +106,7 @@ const AddOrder = () => {
   const selectedParty = location.state?.selectedParty || null;
 
   const [poDate, setPoDate] = useState('');
+  const [scrap, setScrap] = useState('');
   const [items, setItems] = useState([createEmptyItem()]);
   const [saving, setSaving] = useState(false);
   const [allItems, setAllItems] = useState([]);
@@ -243,6 +244,10 @@ const AddOrder = () => {
       toast.error('P/O Date is required');
       return;
     }
+    if (scrap.trim() !== '' && !Number.isFinite(Number(scrap))) {
+      toast.error('Scrap must be a number');
+      return;
+    }
     const validItems = items.filter((it) => it.selectedSize);
     if (validItems.length === 0) {
       toast.error('Select at least one size');
@@ -253,6 +258,9 @@ const AddOrder = () => {
     try {
       const payload = {
         orderDate: poDate,
+        // Blank is not zero: an order can be placed before the scrap has been agreed, and the
+        // sheet shows "+ Add" for that rather than a rate of nothing.
+        scrap: scrap.trim() === '' ? null : Number(scrap),
         items: validItems.map((it) => ({
           itemSizeId: it.selectedSize.id,
           plating: it.finish || null,
@@ -292,6 +300,21 @@ const AddOrder = () => {
             </Field>
             <Field label="P/O date" htmlFor="po-date" required>
               <Input id="po-date" type="date" value={poDate} onChange={(e) => setPoDate(e.target.value)} />
+            </Field>
+            {/* One figure for the whole order — it is settled once with the party when the order is
+                taken, not per line and not per chitthi. */}
+            <Field label="Scrap" htmlFor="scrap" hint="Leave blank if not agreed yet">
+              <Input
+                id="scrap"
+                type="number"
+                step="any"
+                min="0"
+                inputMode="decimal"
+                value={scrap}
+                onChange={(e) => setScrap(e.target.value)}
+                placeholder="Enter scrap"
+                className="font-mono"
+              />
             </Field>
           </FieldGrid>
         </Card>

@@ -39,8 +39,8 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { SearchableSelect } from '@/components/ui/searchable-select';
-import MergeJobWorkDialog from '@/components/Order/MergeJobWorkDialog';
-import { axiosInstance, partyApi, orderDispatchApi, orderApi } from '@/services/apiService';
+import MergeOrdersDialog from '@/components/Order/MergeOrdersDialog';
+import { axiosInstance, partyApi, orderDispatchApi, orderApi, orderScrapApi, orderMergeApi } from '@/services/apiService';
 import {
   normalizeJobWorkLabel,
   readOrderJobOverrides,
@@ -64,6 +64,16 @@ const flattenOrders = (apiData) => {
         // display fields
         partyName: partyResp.party?.name || '—',
         date: order.orderDate || '—',
+        // One figure for the whole order, so every line of it carries the same number.
+        scrap: order.scrap ?? null,
+        // Derived by the server from the works, not stored — see OrderStatus.
+        status: order.status ?? null,
+        // The orders folded into this one, each keeping its own P/O date. Empty for an ordinary
+        // order, which is why the Date cell usually shows a single date.
+        mergedFrom: order.mergedFrom ?? [],
+        // Set only on a line that genuinely sums two or more; a line that rode across a merge
+        // untouched has none, so the marker lands on the items that were actually added together.
+        mergedFromItemIds: item.mergedFromItemIds ?? [],
         size:
           [item.itemSize?.sizeInInch, item.itemSize?.sizeInMm ? `(${item.itemSize.sizeInMm})` : '']
             .filter(Boolean)
@@ -199,6 +209,10 @@ const OrderManagement = () => {
   // ── Selected party (orders are shown one party at a time, like Client Management) ──
   const [selectedParty, setSelectedParty] = useState(null);
   const [dispatchDialog, setDispatchDialog] = useState(null);
+  const [scrapDialog, setScrapDialog] = useState(null);
+  const [merging, setMerging] = useState(false);
+  const [unmergeTarget, setUnmergeTarget] = useState(null);
+  const [unmerging, setUnmerging] = useState(false);
   const [savingEdit, setSavingEdit] = useState(false);
 
   // ── Debounce search ───────────────────────────────────────────────────────
@@ -398,29 +412,41 @@ const OrderManagement = () => {
   );
 
   /**
-   * Hands the chosen lines to the job-work form as one chitthi.
+   * Folds the chosen orders into one.
    *
-   * The first line is the primary — the one the job work is created against — and the rest ride
-   * along as `mergedOrderItemIds`. The form still asks for the gross weighing, because the merged
-   * total is what was *ordered*, not what the drum weighs; the server splits whatever is actually
-   * weighed back across these lines.
+   * The server creates a NEW order carrying the combined lines and leaves the originals untouched
+   * behind it — so this only has to reload, and un-merging later needs nothing but the merged
+   * order id.
    */
-  const handleMerge = (rows, totals) => {
-    if (!rows || rows.length < 2) return;
-    const [primary, ...rest] = rows;
-    setMergeOpen(false);
-    navigate('/job-work/move', {
-      state: {
-        mode: 'create',
-        prefillOrderRow: {
-          ...primary,
-          qtyKg: totals.totalKg,
-          qtyPc: totals.totalPc,
-          mergedFrom: rows.map((r) => r.id),
-        },
-        mergedOrderItemIds: [primary.id, ...rest.map((r) => r.id)],
-      },
-    });
+  const handleMerge = async (orderIds, scrap) => {
+    if (!orderIds || orderIds.length < 2) return;
+    setMerging(true);
+    try {
+      await orderMergeApi.merge(orderIds, scrap);
+      setMergeOpen(false);
+      toast.success(`Merged ${orderIds.length} orders`);
+      triggerFetch(debouncedSearch.current, page);
+    } catch (err) {
+      toast.error(err?.response?.data?.message || 'Failed to merge orders');
+    } finally {
+      setMerging(false);
+    }
+  };
+
+  const handleUnmerge = async () => {
+    const orderId = unmergeTarget?.orderId;
+    if (!orderId) return;
+    setUnmerging(true);
+    try {
+      await orderMergeApi.unmerge(orderId);
+      setUnmergeTarget(null);
+      toast.success('Orders un-merged');
+      triggerFetch(debouncedSearch.current, page);
+    } catch (err) {
+      toast.error(err?.response?.data?.message || 'Failed to un-merge');
+    } finally {
+      setUnmerging(false);
+    }
   };
 
   const toggleJobUpdateStatus = (row) => {
@@ -574,6 +600,40 @@ const OrderManagement = () => {
     }
   };
 
+  // ── Scrap ─────────────────────────────────────────────────────────────────
+  // Settled once with the party for the whole order, so it is edited against the order rather
+  // than the line the user happened to click, and every row of that order moves with it.
+  const openScrapDialog = (row) => {
+    setScrapDialog({
+      orderId: row.orderId,
+      partyName: row.partyName,
+      value: row.scrap == null ? '' : String(row.scrap),
+      saving: false,
+    });
+  };
+
+  const handleSaveScrap = async () => {
+    const { orderId, value } = scrapDialog;
+    const trimmed = String(value).trim();
+    // Cleared means "not agreed yet" again, which is not the same as agreed at zero.
+    const scrap = trimmed === '' ? null : Number(trimmed);
+    if (scrap != null && !Number.isFinite(scrap)) {
+      toast.error('Scrap must be a number');
+      return;
+    }
+
+    setScrapDialog((prev) => ({ ...prev, saving: true }));
+    try {
+      await orderScrapApi.update(orderId, scrap);
+      setOrders((prev) => prev.map((r) => (r.orderId === orderId ? { ...r, scrap } : r)));
+      setScrapDialog(null);
+      toast.success('Scrap saved');
+    } catch (err) {
+      toast.error(err?.response?.data?.message || 'Failed to save scrap');
+      setScrapDialog((prev) => ({ ...prev, saving: false }));
+    }
+  };
+
   const MoveOption = ({ value, label, description }) => {
     const isSelected = selectedMoveType === value;
     return (
@@ -615,6 +675,7 @@ const OrderManagement = () => {
     const fields = [
       ['Party Name', 'partyName'],
       ['Date', 'date'],
+      ['Scrap', 'scrap'],
       ['Size', 'size'],
       ['Plating', 'plating'],
       ['Qty Pc', 'qtyPc'],
@@ -703,6 +764,18 @@ const OrderManagement = () => {
             );
           }
 
+          // Editing an order resends every line; the scrap is one number for the whole order and
+          // is set from the Date column, so it is not offered a second, line-shaped way in here.
+          if (key === 'scrap') {
+            return (
+              <Field key={key} label={label}>
+                <p className="rounded-md border border-line bg-surface-2 px-3 py-2 text-[13px] text-ink-3 italic">
+                  Manage via Scrap under the order&apos;s date
+                </p>
+              </Field>
+            );
+          }
+
           return (
             <Field key={key} label={label}>
               <Input
@@ -726,7 +799,7 @@ const OrderManagement = () => {
           <>
             <Button variant="outline" size="sm" onClick={() => setMergeOpen(true)}>
               <Merge className="size-4" />
-              <span className="hidden md:inline">Merge job work</span>
+              <span className="hidden md:inline">Merge orders</span>
             </Button>
             <Button variant="outline" size="sm" onClick={() => navigate('/job-work')}>
               <BriefcaseBusiness className="size-4" />
@@ -912,6 +985,16 @@ const OrderManagement = () => {
                                 <td rowSpan={groupRowSpan} className={`${TD} align-top text-ink`}>
                                   <div className="inline-flex cursor-pointer items-center gap-1">
                                     <span>{row.partyName}</span>
+                                    {(row.mergedFrom || []).length > 0 && (
+                                      <button
+                                        type="button"
+                                        onClick={() => setUnmergeTarget(row)}
+                                        title={`Merged from ${row.mergedFrom.length} orders — click to un-merge`}
+                                        className="rounded-full bg-primary-soft px-1.5 py-0.5 text-[10.5px] font-semibold text-primary"
+                                      >
+                                        Merged
+                                      </button>
+                                    )}
                                     {isMultiItem ? (
                                       <button
                                         type="button"
@@ -928,10 +1011,55 @@ const OrderManagement = () => {
                               )}
                               {showGroupedColumns && (
                                 <td rowSpan={groupRowSpan} className={`${TD} align-top`}>
-                                  {row.date}
+                                  <div className="flex flex-col items-center gap-0.5">
+                                    {/* A merged order keeps every source P/O date — that is a fact
+                                        about the party's purchase order and cannot be averaged
+                                        into one. */}
+                                    {(row.mergedFrom || []).length > 0 ? (
+                                      (row.mergedFrom || []).map((source) => (
+                                        <span key={source.orderId} className="whitespace-nowrap">
+                                          {source.orderDate}
+                                        </span>
+                                      ))
+                                    ) : (
+                                      <span>{row.date}</span>
+                                    )}
+                                    {/* The scrap belongs to the order, and so does this cell — it
+                                        already spans the order's lines. */}
+                                    <button
+                                      type="button"
+                                      onClick={() => openScrapDialog(row)}
+                                      title={row.scrap == null ? 'Add scrap' : 'Edit scrap'}
+                                      className="text-[12px] hover:text-ink"
+                                    >
+                                      {row.scrap == null ? (
+                                        <span className="inline-flex items-center gap-0.5 text-ink-3">
+                                          <Plus className="size-3" />
+                                          Scrap
+                                        </span>
+                                      ) : (
+                                        <span className="font-mono font-medium text-ink-2">
+                                          <span className="text-[11px] text-ink-3">Scrap </span>
+                                          {row.scrap}
+                                        </span>
+                                      )}
+                                    </button>
+                                  </div>
                                 </td>
                               )}
-                              <td className={`${TD} text-ink`}>{row.itemName}</td>
+                              <td className={`${TD} text-ink`}>
+                                {row.itemName}
+                                {/* Only lines that genuinely sum two or more; a line that rode
+                                    across the merge untouched is not marked. */}
+                                {(row.mergedFromItemIds || []).length > 1 && (
+                                  <span
+                                    title={`Sums ${row.mergedFromItemIds.length} order lines`}
+                                    className="ml-1.5 rounded-full bg-primary-soft px-1.5 py-0.5 text-[10.5px] font-semibold text-primary"
+                                  >
+                                    Merged
+                                  </span>
+                                )}
+                              </td>
                               <td className={`${TD} whitespace-normal`}>
                                 <span className="inline-flex flex-col leading-tight">
                                   <span className="whitespace-nowrap">{sizeParts.main}</span>
@@ -1245,11 +1373,71 @@ const OrderManagement = () => {
         </DialogContent>
       </Dialog>
 
-      <MergeJobWorkDialog
+      {/* Scrap */}
+      <Dialog open={Boolean(scrapDialog)} onOpenChange={(open) => !open && setScrapDialog(null)}>
+        <DialogContent className="sm:max-w-[26rem]">
+          <DialogHeader>
+            <DialogTitle>Scrap</DialogTitle>
+            <DialogDescription>
+              The scrap agreed with {scrapDialog?.partyName || 'the party'} for this order. One
+              figure for the whole order, so it shows against every line on it. Leave it blank if it
+              has not been agreed yet.
+            </DialogDescription>
+          </DialogHeader>
+
+          <Field label="Amount">
+            <Input
+              type="number"
+              step="any"
+              min="0"
+              inputMode="decimal"
+              autoFocus
+              value={scrapDialog?.value ?? ''}
+              placeholder="Not set"
+              onChange={(e) => setScrapDialog((prev) => ({ ...prev, value: e.target.value }))}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') handleSaveScrap();
+              }}
+              className="font-mono"
+            />
+          </Field>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setScrapDialog(null)} disabled={scrapDialog?.saving}>
+              Cancel
+            </Button>
+            <Button onClick={handleSaveScrap} disabled={scrapDialog?.saving}>
+              {scrapDialog?.saving ? 'Saving…' : 'Save'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Un-merge. Only offered while the merged order is still Created — after that its lines
+          carry chitthis and dispatches belonging to the combined quantity, and there is no honest
+          way to divide that history back across the orders it came from. */}
+      <ConfirmDialog
+        open={Boolean(unmergeTarget)}
+        onOpenChange={(open) => !open && setUnmergeTarget(null)}
+        title="Un-merge this order?"
+        description={
+          <>
+            The {unmergeTarget?.mergedFrom?.length ?? 0} orders this was made from come back exactly
+            as they were — they were never altered. The merged order itself is removed.
+          </>
+        }
+        confirmLabel="Un-merge"
+        busyLabel="Un-merging…"
+        isPending={unmerging}
+        onConfirm={handleUnmerge}
+      />
+
+      <MergeOrdersDialog
         isOpen={mergeOpen}
         onClose={() => setMergeOpen(false)}
         rows={mergeCandidates}
         onMerge={handleMerge}
+        isMerging={merging}
       />
     </SidebarLayout>
   );

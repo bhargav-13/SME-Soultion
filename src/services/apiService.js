@@ -357,22 +357,26 @@ export const updateApiClients = () => {
 };
 
 /**
- * Console-wide settings, as a flat key/value map.
+ * The scrap agreed for an order. Keyed on the order alone — the scrap belongs to the order, and
+ * both callers (the orders sheet and the approvals screen) reach it by id without a party in hand.
  *
- * Hand-rolled rather than generated: the server deliberately keeps these out of the OpenAPI
- * contract (they are a handful of scalars, not a resource), so there is no client to generate.
+ * Hand-rolled rather than generated: the endpoint is an add-on to the orders resource, so it lives
+ * outside the OpenAPI paths the client is generated from — the same arrangement the other
+ * single-field order/job-work updates use.
  */
-export const FIXED_BAJAAR_KEY = 'jobwork.fixed.bajaar';
-
-export const appSettingsApi = {
-    getAll: () => axiosInstance.get('/api/v1/app-settings'),
-    put: (key, value) => axiosInstance.put(`/api/v1/app-settings/${key}`, { value }),
+export const orderScrapApi = {
+    update: (orderId, scrap) => axiosInstance.put(`/api/v1/orders/${orderId}/scrap`, { scrap }),
 };
 
-/** Which market rate a chitthi is priced against. Keyed on the job work alone — see the server. */
-export const jobWorkBajaarApi = {
-    update: (jobWorkId, { bajaarType, bajaarValue }) =>
-        axiosInstance.put(`/api/v1/job-works/${jobWorkId}/bajaar`, { bajaarType, bajaarValue }),
+/**
+ * Folding a party's orders into one, and putting them back.
+ *
+ * Merging creates a NEW order carrying the combined lines — the originals are kept untouched and
+ * simply hidden from this sheet — which is why un-merging needs nothing but the merged order's id.
+ */
+export const orderMergeApi = {
+    merge: (orderIds, scrap) => axiosInstance.post('/api/v1/orders/merge', { orderIds, scrap }),
+    unmerge: (orderId) => axiosInstance.post(`/api/v1/orders/${orderId}/unmerge`),
 };
 
 // Export API clients

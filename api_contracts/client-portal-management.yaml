@@ -1170,6 +1170,12 @@ components:
           type: integer
           format: int64
           description: ID of the order created in Order Management once approved, if any.
+        scrap:
+          type: number
+          format: double
+          description: >-
+            The scrap agreed for this order, read back from the order the request became. Null
+            while the request is still pending, or when it was approved without one.
         items:
           type: array
           items:
@@ -1205,6 +1211,14 @@ components:
       properties:
         status:
           $ref: '#/components/schemas/OrderRequestStatus'
+        scrap:
+          type: number
+          format: double
+          description: >-
+            The scrap agreed for this order, in rupees. Approving is the only moment the admin
+            sees the request as a whole, so it is settled here and written onto the order that
+            approval creates. Ignored when the status is anything but APPROVED; omit it to leave
+            an already-approved order's scrap alone.
 
     ClientInvoiceType:
       type: string
