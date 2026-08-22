@@ -5,7 +5,6 @@ import { useAuth } from '@/context/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Field } from '@/components/form-field';
-import logo from '@/assets/logo.png';
 
 const Login = () => {
   const navigate = useNavigate();
@@ -84,12 +83,11 @@ const Login = () => {
         />
 
         <div className="relative flex items-center gap-3">
-          <span className="grid size-11 place-items-center rounded-xl bg-white/12 backdrop-blur">
-            <img src={logo} alt="" className="h-7 w-auto object-contain brightness-0 invert" />
-          </span>
           <span className="grid leading-tight">
-            <span className="font-heading text-[17px] font-semibold">ISHITA</span>
-            <span className="text-[11px] tracking-[0.14em] text-white/60 uppercase">ERP console</span>
+            <span className="font-heading text-[17px] font-semibold">ERP console</span>
+            <span className="text-[11px] tracking-[0.14em] text-white/60 uppercase">
+              Orders · plating · dispatch
+            </span>
           </span>
         </div>
 
@@ -103,15 +101,12 @@ const Login = () => {
           </p>
         </div>
 
-        <p className="relative text-[12px] text-white/50">© 2026 ISHITA Industries. All rights reserved.</p>
+        <p className="relative text-[12px] text-white/50">© 2026. All rights reserved.</p>
       </aside>
 
       <main className="flex items-center justify-center bg-paper px-4 py-10 sm:px-8">
         <div className="w-full max-w-[24rem]">
           <div className="mb-8 text-center lg:text-left">
-            <span className="mb-5 inline-grid size-12 place-items-center rounded-xl bg-primary-soft text-primary lg:hidden">
-              <img src={logo} alt="" className="h-7 w-auto object-contain" />
-            </span>
             <h1 className="font-heading text-[24px] font-semibold tracking-[-0.02em] text-ink">Welcome back</h1>
             <p className="mt-1.5 text-[13px] text-ink-3">Sign in to continue to the console.</p>
           </div>

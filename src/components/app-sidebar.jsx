@@ -21,7 +21,6 @@ import {
 } from '@/components/ui/sidebar';
 import { useAuth } from '@/context/AuthContext';
 import { clientPortalAdminApi } from '@/services/apiService';
-import logo from '@/assets/logo.png';
 
 /**
  * The count of client orders sitting in PENDING_APPROVAL, polled for the sidebar badge.
@@ -93,19 +92,22 @@ export function AppSidebar() {
 
   return (
     <Sidebar collapsible="icon">
-      {/* The logo file is the full ISHITA INDUSTRIES lockup — it already carries the name, so the
-          header shows it alone rather than repeating the name as text beside it. The collapse
-          control lives here too, so the rail can always be toggled from the rail itself. */}
+      {/* The header carries a plain text wordmark rather than a logo mark: the console is shown to
+          audiences the brand should not be in front of, and a word is the one thing that stays
+          legible at every rail width. The collapse control lives here too, so the rail can always
+          be toggled from the rail itself. */}
       <SidebarHeader className="p-0">
         <div className="flex h-16 shrink-0 items-center gap-1 border-b border-line px-2.5 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0">
           <Link
             to={home}
             onClick={closeOnMobile}
-            aria-label="ISHITA Industries — go to the dashboard"
+            aria-label="Go to the dashboard"
             title={isClient ? 'Client portal' : 'ERP console'}
             className="flex min-w-0 flex-1 items-center rounded-lg px-1.5 py-1.5 transition-colors hover:bg-surface-2 group-data-[collapsible=icon]:hidden"
           >
-            <img src={logo} alt="ISHITA Industries" className="h-8 w-auto max-w-full object-contain" />
+            <span className="truncate font-heading text-[15px] font-semibold tracking-[-0.01em] text-ink">
+              {isClient ? 'Client portal' : 'ERP console'}
+            </span>
           </Link>
           <SidebarTrigger
             aria-label="Collapse navigation"
